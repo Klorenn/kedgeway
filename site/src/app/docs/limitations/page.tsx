@@ -1,0 +1,40 @@
+import type { Metadata } from "next";
+import PrevNext from "@/components/docs/PrevNext";
+import styles from "../docs.module.css";
+
+export const metadata: Metadata = {
+  title: "Limitations — kedgeway docs",
+  description: "What kedgeway does not do, so you can judge its output.",
+  alternates: { canonical: "/docs/limitations" },
+  openGraph: { title: "Limitations — kedgeway docs", description: "What kedgeway does not do, so you can judge its output.", url: "/docs/limitations" },
+};
+
+export default function Limitations() {
+  return (
+    <>
+      <h1>Limitations</h1>
+      <p className={styles.lede}>kedgeway says what it does not know. These are the gaps to keep in mind.</p>
+      <dl className={styles.defs}>
+        <dt>Manifests, not lockfiles</dt>
+        <dd>kedgeway reads the version you declare, not the one a lockfile resolved. A loose range can resolve to a newer release than the report shows.</dd>
+        <dt>The deprecated list is a sample</dt>
+        <dd>Scout&apos;s deprecated sample is capped at 50. A version missing from it is not proof that it is supported. kedgeway also treats anything more than one major behind as deprecated.</dd>
+        <dt>Current versions come from a docs page</dt>
+        <dd>They are read from the official Software Versions page. If that page changes shape, parsing can fail, and the report says so with DATA_DEGRADED.</dd>
+        <dt>Raven must be reachable</dt>
+        <dd>A live run needs network access and a valid Raven sign-in. Offline, use <code>--fixture</code>. Storing the sign-in as a CI secret is not supported yet.</dd>
+        <dt>No migration</dt>
+        <dd>kedgeway diagnoses; it does not edit your repo. Migration PRs are on the roadmap, not shipped.</dd>
+        <dt>Versions only</dt>
+        <dd>It measures SDK version drift. It does not audit contract logic, security or runtime behavior.</dd>
+        <dt>Scan limits</dt>
+        <dd>Four folders deep, with common build and dependency folders skipped. See What it scans.</dd>
+        <dt>Platforms</dt>
+        <dd>Developed and checked on macOS. The browser-opening code has a Windows branch, but Windows has not been verified.</dd>
+        <dt>Not on npm yet</dt>
+        <dd>Install from source for now.</dd>
+      </dl>
+      <PrevNext href="/docs/limitations" />
+    </>
+  );
+}

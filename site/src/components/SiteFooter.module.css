@@ -1,0 +1,18 @@
+.footer { border-top: 1px solid var(--rule); padding-top: 6rem; padding-bottom: 3rem; }
+.brandRow { display: flex; align-items: flex-end; gap: clamp(0.75rem, 2vw, 1.75rem); margin-bottom: 4.5rem; }
+.brandRow svg { margin-bottom: 0.9em; flex: none; width: clamp(40px, 6vw, 64px); height: auto; }
+.word { font-family: var(--font-sans); font-weight: 400; font-size: clamp(4rem, 15vw, 10rem); line-height: 0.9; letter-spacing: -0.04em; color: var(--ink); margin: 0; }
+.cols { display: grid; gap: 2.25rem 2rem; font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.9; }
+.cols p { margin: 0; }
+.h { color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.6875rem; margin-bottom: 0.5rem !important; }
+.cols a { color: var(--ink-2); text-decoration: none; transition: color 0.15s; }
+.cols a:hover { color: var(--ink); }
+.cols .plain { color: var(--ink-2); }
+.made { color: var(--ink-2); margin-bottom: 0.6rem !important; }
+.icons { display: flex; gap: 1rem; align-items: center; }
+.icons a { display: inline-flex; padding: 0.25rem 0; }
+.icons svg { width: 18px; height: 18px; fill: currentColor; display: block; }
+.legal { margin-top: 4.5rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1rem; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-2); }
+@media (min-width: 40rem) { .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 64rem) { .cols { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) { .cols a { transition: none; } }

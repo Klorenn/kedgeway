@@ -1,0 +1,13 @@
+node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+site/.next
+site/out
+*.tsbuildinfo
+.DS_Store
+.atl/
+.claude/
+site/next-env.d.ts

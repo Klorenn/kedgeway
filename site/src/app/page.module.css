@@ -1,0 +1,51 @@
+/* hero */
+.hero { position: relative; overflow: hidden; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding-block: 6rem 4rem; }
+.heroInner { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.5rem; max-width: 44rem; padding-inline: var(--gutter); }
+.horse { margin: 0 0 0.5rem; display: grid; justify-items: center; gap: 0.5rem; width: 100%; }
+.plate { display: grid; justify-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-2); }
+.plate::before { content: ""; display: block; width: 2.5rem; border-top: 1px solid var(--ink-3); }
+.sub { width: min(48rem, calc(100vw - 32px)); font-size: 1rem; }
+.cta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.75rem 1.25rem; margin-top: 0.5rem; }
+.caption { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
+
+/* sections: hairline above, overline, content */
+.section { position: relative; border-top: 1px solid var(--rule); padding-block: var(--space-section); }
+.pageNo { position: absolute; top: 1rem; right: var(--gutter); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-3); }
+.head { display: grid; gap: 1rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
+.head p:not(.overline), .text p:not(.overline) { max-width: 40rem; }
+.text { display: grid; gap: 1rem; }
+
+/* 01 ecosystem */
+.ecoHead { display: grid; gap: 1.5rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
+.big { font-family: var(--font-mono); font-weight: 400; font-size: clamp(3.5rem, 12vw, 5rem); line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
+@media (min-width: 48rem) { .ecoHead { grid-template-columns: auto minmax(0, 1fr); gap: 4rem; align-items: end; } }
+
+/* 02 steps */
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2rem; }
+.step { border-top: 1px solid var(--rule); padding-top: 1.1rem; min-width: 0; }
+.step h3 { font-family: var(--font-mono); font-weight: 500; font-size: 0.9375rem; margin-bottom: 0.6rem; }
+.step p { font-family: var(--font-mono); font-size: 0.8125rem; overflow-wrap: anywhere; }
+@media (min-width: 48rem) { .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem; } }
+
+/* 03 report: plain mono lines on the page */
+.term { margin: 0; font-size: 0.8rem; line-height: 1.75; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tag { color: var(--ink); font-weight: 600; }
+@media (min-width: 40rem) { .term { font-size: 0.9rem; } }
+
+/* 04 install */
+.install { display: grid; gap: 2.25rem; }
+.install h3 { margin-bottom: 0.75rem; }
+.soon { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 400; color: var(--ink-2); margin-left: 0.5rem; }
+.dim { opacity: 0.6; }
+.note { margin-top: 0.9rem; font-size: 0.95rem; max-width: 40rem; }
+@media (min-width: 48rem) { .install { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.25rem 3rem; } .installWide { grid-column: 1 / -1; } }
+
+/* kedge note */
+.kedge { margin-top: 3rem; max-width: 40rem; }
+
+/* 05 roadmap */
+.road { list-style: none; margin: 0; padding: 0; }
+.road li { display: grid; gap: 0.25rem; padding: 1.1rem 0; border-top: 1px solid var(--rule); }
+.road li:last-child { border-bottom: 1px solid var(--rule); }
+.road .status { font-family: var(--font-mono); font-size: 0.75rem; }
+@media (min-width: 48rem) { .road li { grid-template-columns: 12rem minmax(0, 1fr) auto; gap: 2rem; align-items: baseline; } }

@@ -1,0 +1,6 @@
+.pn { display: grid; gap: 1rem; margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--rule); font-family: var(--font-mono); font-size: 0.8125rem; }
+.pn a { text-decoration: none; display: grid; gap: 0.15rem; color: var(--ink); }
+.pn a:hover .title { text-decoration: underline; text-decoration-color: var(--ink-2); }
+.dir { color: var(--ink-2); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.12em; }
+.next { text-align: left; }
+@media (min-width: 40rem) { .pn { grid-template-columns: 1fr 1fr; } .next { text-align: right; } }
