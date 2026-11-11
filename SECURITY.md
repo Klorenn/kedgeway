@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **security@kedgeway.xyz**, or use GitHub's [private vulnerability reporting](https://github.com/kedgeway/kedgeway/security/advisories/new) as an alternative channel. Please do not open a public issue for security problems. Include what you found, how to reproduce it, and the version or commit affected. We will acknowledge your report and keep you updated while we work on a fix.
+Email **security@kedgeway.xyz**, or use GitHub's [private vulnerability reporting](https://github.com/Klorenn/kedgeway/security/advisories/new) as an alternative channel. Please do not open a public issue for security problems. Include what you found, how to reproduce it, and the version or commit affected. We will acknowledge your report and keep you updated while we work on a fix.
 
 ## Scope
 

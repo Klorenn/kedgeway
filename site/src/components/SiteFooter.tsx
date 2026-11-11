@@ -2,7 +2,7 @@ import Link from "next/link";
 import HorseMark from "./HorseMark";
 import styles from "./SiteFooter.module.css";
 
-const REPO = "https://github.com/kedgeway/kedgeway";
+const REPO = "https://github.com/Klorenn/kedgeway";
 const BLOB = `${REPO}/blob/main`;
 
 // Official simple-icons paths (24x24 viewBox).

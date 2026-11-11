@@ -7,10 +7,10 @@
   "homepage": "https://kedgeway.xyz",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kedgeway/kedgeway.git"
+    "url": "git+https://github.com/Klorenn/kedgeway.git"
   },
   "bugs": {
-    "url": "https://github.com/kedgeway/kedgeway/issues"
+    "url": "https://github.com/Klorenn/kedgeway/issues"
   },
   "keywords": [
     "stellar",

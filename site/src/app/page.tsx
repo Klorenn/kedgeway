@@ -132,7 +132,7 @@ Summary: 2 critical, 0 warning, 0 info`}
             <div>
               <h3>From source</h3>
               <pre className="block">
-                <code>{`git clone https://github.com/kedgeway/kedgeway.git
+                <code>{`git clone https://github.com/Klorenn/kedgeway.git
 cd kedgeway
 npm ci
 npm run build

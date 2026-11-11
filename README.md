@@ -13,7 +13,7 @@ A kedge is a small anchor carried out from a drifting ship and hauled in to pull
 Requires Node >= 22.12. kedgeway is not published to npm yet (publishing is coming), so build it from source:
 
 ```sh
-git clone https://github.com/kedgeway/kedgeway.git
+git clone https://github.com/Klorenn/kedgeway.git
 cd kedgeway
 npm ci
 npm run build   # emits dist/cli.js

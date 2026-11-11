@@ -18,7 +18,7 @@ export default function GettingStarted() {
 
       <h2>Install</h2>
       <p>kedgeway is not published to npm yet. <code>npm install -g kedgeway</code> is coming soon. Until then, build it from source:</p>
-      <pre className="block"><code>{`git clone https://github.com/kedgeway/kedgeway
+      <pre className="block"><code>{`git clone https://github.com/Klorenn/kedgeway
 cd kedgeway
 npm ci
 npm run build
