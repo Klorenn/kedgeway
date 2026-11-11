@@ -26,7 +26,7 @@ export default function SiteHeader() {
         <nav className={styles.nav} aria-label="Primary">
           <Link href="/#install">Install</Link>
           <Link href="/docs">Docs</Link>
-          <a href="https://github.com/kedgeway">GitHub</a>
+          <a href="https://github.com/Klorenn/kedgeway">GitHub</a>
         </nav>
       </div>
     </header>
