@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
-import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open as openFile, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import {
   OAuthClientInformationSchema,
@@ -9,7 +9,7 @@ import {
 import { createServer, type Server } from "node:http";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { UnauthorizedError, type OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformationMixed,
   OAuthClientMetadata,
@@ -53,11 +53,44 @@ function parseStored(raw: unknown): StoredAuth | null {
   return out;
 }
 
+/** What a token write-back is checked against: the session it belongs to must still be the one on disk. */
+export type TokenGuard = (current: StoredAuth) => boolean;
+
 export class AuthStore {
   constructor(
-    private readonly path: string = defaultAuthPath(),
+    readonly path: string = defaultAuthPath(),
     private readonly warn: (message: string) => void = (m) => void process.stderr.write(m),
   ) {}
+
+  /** Identifies the session store for in-process single-flight refreshes. */
+  lockKey(): string {
+    return `file:${this.path}`;
+  }
+
+  /** Runs `fn` holding the cross-process `auth.json.lock`. */
+  withLock<T>(fn: () => Promise<T>): Promise<T> {
+    return withFileLock(this.path, fn);
+  }
+
+  /** What is on disk right now, read without quarantining; undefined when missing or unparseable. */
+  async peek(): Promise<StoredAuth | undefined> {
+    try {
+      return parseStored(JSON.parse(await readFile(this.path, "utf8"))) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Compare-and-swap for tokens (the caller holds the lock): writes `tokens` only if the file exists, parses and
+   * still satisfies `guard`. Never creates, quarantines or clears the file. Returns whether it wrote.
+   */
+  async casTokens(guard: TokenGuard, tokens: OAuthTokens): Promise<boolean> {
+    const current = await this.peek();
+    if (!current || !guard(current)) return false;
+    await this.write({ ...current, tokens });
+    return true;
+  }
 
   async load(): Promise<StoredAuth> {
     let text: string;
@@ -104,7 +137,7 @@ export class AuthStore {
 
   protected async write(data: StoredAuth): Promise<void> {
     await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
-    const tmp = `${this.path}.${process.pid}.tmp`;
+    const tmp = `${this.path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
     await writeFile(tmp, JSON.stringify(data, null, 2), { mode: 0o600 });
     await chmod(tmp, 0o600);
     await rename(tmp, this.path);
@@ -136,19 +169,41 @@ export function decodeAuth(blob: string): StoredAuth {
 }
 
 /**
- * Auth held only in memory: refreshed tokens are never written to disk. `kind` says where it came from:
- * `"env"` is `KEDGEWAY_AUTH` (CI), `"snapshot"` is a read-only copy of `auth.json`.
+ * Auth held in memory. `kind` says where it came from: `"env"` is `KEDGEWAY_AUTH` (CI; nothing is ever written
+ * to disk), `"snapshot"` is a copy of `auth.json` (see {@link readOnlyAuthStore}) whose only disk write is a
+ * refreshed token set, compare-and-swapped into the file it was read from.
  */
 export class MemoryAuthStore extends AuthStore {
   private data: StoredAuth;
+  private readonly id = randomBytes(6).toString("hex");
 
   constructor(
     initial: StoredAuth,
     path?: string,
     readonly kind: "env" | "snapshot" = "env",
+    private readonly backing?: AuthStore,
   ) {
     super(path);
     this.data = { ...initial };
+  }
+
+  override lockKey(): string {
+    return this.backing ? this.backing.lockKey() : `memory:${this.id}`;
+  }
+
+  override withLock<T>(fn: () => Promise<T>): Promise<T> {
+    return this.backing ? this.backing.withLock(fn) : fn();
+  }
+
+  override async peek(): Promise<StoredAuth | undefined> {
+    return (this.backing && (await this.backing.peek())) || { ...this.data };
+  }
+
+  override async casTokens(guard: TokenGuard, tokens: OAuthTokens): Promise<boolean> {
+    if (!guard(this.data)) return false;
+    this.data = { ...this.data, tokens };
+    if (this.backing) await this.backing.casTokens(guard, tokens);
+    return true;
   }
 
   override load(): Promise<StoredAuth> {
@@ -167,19 +222,35 @@ export class MemoryAuthStore extends AuthStore {
   }
 }
 
+/**
+ * One in-memory store per `KEDGEWAY_AUTH` value and process, so a token refreshed (and rotated) by one call is
+ * what the next call in the same process (e.g. the next MCP tool call) uses.
+ */
+const envStores = new Map<string, MemoryAuthStore>();
+function envStore(blob: string): MemoryAuthStore {
+  let store = envStores.get(blob);
+  if (!store) {
+    store = new MemoryAuthStore(decodeAuth(blob));
+    envStores.set(blob, store);
+  }
+  return store;
+}
+
 /** The store live Raven calls use: `KEDGEWAY_AUTH` (in memory) when set, else `auth.json`. */
 export function defaultAuthStore(env: NodeJS.ProcessEnv = process.env): AuthStore {
   const blob = env["KEDGEWAY_AUTH"];
-  return blob !== undefined && blob.trim() !== "" ? new MemoryAuthStore(decodeAuth(blob)) : new AuthStore();
+  return blob !== undefined && blob.trim() !== "" ? envStore(blob) : new AuthStore();
 }
 
 /**
- * An auth store that can never modify anything on disk: `KEDGEWAY_AUTH` when set, else an in-memory copy of
- * `auth.json` (read without quarantining a corrupt file). A silent token refresh therefore stays in memory.
+ * The store `kedgeway doctor` uses: `KEDGEWAY_AUTH` when set, else an in-memory copy of `auth.json` (read without
+ * quarantining a corrupt file). Nothing on disk is created, removed or quarantined. The one write is a refreshed
+ * token set, compare-and-swapped into `auth.json` (only if the file still holds the session that was refreshed):
+ * Raven rotates refresh tokens, so a refresh kept only in memory would leave `auth.json` with a dead refresh token.
  */
 export async function readOnlyAuthStore(env: NodeJS.ProcessEnv = process.env, path: string = defaultAuthPath()): Promise<AuthStore> {
   const blob = env["KEDGEWAY_AUTH"];
-  if (blob !== undefined && blob.trim() !== "") return new MemoryAuthStore(decodeAuth(blob));
+  if (blob !== undefined && blob.trim() !== "") return envStore(blob);
   let stored: StoredAuth = {};
   try {
     stored = parseStored(JSON.parse(await readFile(path, "utf8"))) ?? {};
@@ -188,7 +259,99 @@ export async function readOnlyAuthStore(env: NodeJS.ProcessEnv = process.env, pa
     if (code !== undefined && code !== "ENOENT") throw e;
     stored = {}; // missing or corrupt: nothing to serve
   }
-  return new MemoryAuthStore(stored, undefined, "snapshot");
+  return new MemoryAuthStore(stored, path, "snapshot", new AuthStore(path));
+}
+
+const LOCK_STALE_MS = 30_000;
+const LOCK_WAIT_MS = 10_000;
+const LOCK_POLL_MS = 50;
+
+export interface LockTiming {
+  staleMs: number;
+  waitMs: number;
+  pollMs: number;
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+async function lockAgeMs(lock: string): Promise<number | undefined> {
+  try {
+    const at = (JSON.parse(await readFile(lock, "utf8")) as { at?: unknown }).at;
+    if (typeof at === "number") return Date.now() - at;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+  }
+  try {
+    return Date.now() - (await stat(lock)).mtimeMs; // being written, or unreadable: judge by mtime
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Cross-process lock for read-tokens -> refresh -> save: `<path>.lock` created with O_EXCL, holding the pid and a
+ * timestamp. A lock older than `staleMs` is broken; waits up to `waitMs` polling every `pollMs`; released in
+ * `finally` (only if it is still ours). Without the directory there is nothing to protect, so `fn` runs unlocked.
+ */
+export async function withFileLock<T>(
+  path: string,
+  fn: () => Promise<T>,
+  timing: LockTiming = { staleMs: LOCK_STALE_MS, waitMs: LOCK_WAIT_MS, pollMs: LOCK_POLL_MS },
+): Promise<T> {
+  const lock = `${path}.lock`;
+  const token = randomBytes(8).toString("hex");
+  const deadline = Date.now() + timing.waitMs;
+  for (;;) {
+    try {
+      const fh = await openFile(lock, "wx", 0o600);
+      try {
+        await fh.writeFile(JSON.stringify({ pid: process.pid, at: Date.now(), token }));
+      } finally {
+        await fh.close();
+      }
+      break;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return fn();
+      if (code !== "EEXIST") throw e;
+    }
+    const age = await lockAgeMs(lock);
+    if (age === undefined) continue; // released meanwhile
+    if (age > timing.staleMs) {
+      await rm(lock, { force: true });
+      continue;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for ${lock} (another kedgeway process is refreshing the Raven session). Try again.`);
+    }
+    await sleep(timing.pollMs);
+  }
+  try {
+    return await fn();
+  } finally {
+    try {
+      if ((JSON.parse(await readFile(lock, "utf8")) as { token?: unknown }).token === token) await rm(lock, { force: true });
+    } catch {
+      // already gone or broken by someone else
+    }
+  }
+}
+
+interface SharedResponse {
+  status: number;
+  headers: [string, string][];
+  body: string;
+}
+
+/** In-process single-flight: one refresh per (session store, refresh token) at a time. */
+const inflightRefreshes = new Map<string, Promise<SharedResponse>>();
+
+function refreshTokenOf(init: RequestInit | undefined): string | undefined {
+  if (init?.method?.toUpperCase() !== "POST") return undefined;
+  const body = init.body;
+  const params = body instanceof URLSearchParams ? body : typeof body === "string" ? new URLSearchParams(body) : undefined;
+  if (params?.get("grant_type") !== "refresh_token") return undefined;
+  return params.get("refresh_token") ?? undefined;
 }
 
 /** Base64 blob of the stored auth, or null when nothing usable is stored. */
@@ -286,6 +449,16 @@ export interface ProviderOptions {
 export class FileOAuthProvider implements OAuthClientProvider {
   private currentState: string | undefined;
   private readonly silent: boolean;
+  /** The tokens this provider last handed to the SDK (what a refresh or an `invalidateCredentials` refers to). */
+  private lastTokens: OAuthTokens | undefined;
+  /** Tokens the server rejected during this attempt; hidden from the SDK unless the store holds newer ones. */
+  private rejected: OAuthTokens | undefined;
+  private hideTokens = false;
+  private hideClient = false;
+  /** Tokens this attempt refreshed but could not write back (the session on disk changed): used for this attempt only. */
+  private pinned: OAuthTokens | undefined;
+  /** The client registration this attempt uses. */
+  private clientId: string | undefined;
 
   constructor(
     private readonly store: AuthStore,
@@ -322,25 +495,122 @@ export class FileOAuthProvider implements OAuthClientProvider {
 
   async clientInformation(): Promise<OAuthClientInformationMixed | undefined> {
     const info = (await this.store.load()).clientInformation;
-    if (!info) return undefined;
-    if (this.silent) return info;
-    // A registration is bound to its redirect URI; if the port changed we must re-register.
-    const uris = "redirect_uris" in info ? info.redirect_uris : undefined;
-    if (uris && !uris.map(String).includes(this.redirect)) return undefined;
+    if (!info || this.hideClient) {
+      // Without a registration the SDK would register a new client, which a silent attempt could not even keep.
+      if (this.silent) throw new UnauthorizedError("No stored client registration");
+      return undefined;
+    }
+    if (!this.silent) {
+      // A registration is bound to its redirect URI; if the port changed we must re-register.
+      const uris = "redirect_uris" in info ? info.redirect_uris : undefined;
+      if (uris && !uris.map(String).includes(this.redirect)) return undefined;
+    }
+    this.clientId = info.client_id;
     return info;
   }
 
   async saveClientInformation(info: OAuthClientInformationMixed): Promise<void> {
     if (this.silent) return;
     await this.store.update({ clientInformation: info });
+    this.clientId = info.client_id;
   }
 
   async tokens(): Promise<OAuthTokens | undefined> {
-    return (await this.store.load()).tokens;
+    if (this.pinned) return this.pinned;
+    const stored = (await this.store.load()).tokens;
+    if (this.hideTokens) {
+      // After a rejection, tokens another process rotated in the meantime are used; the rejected ones never again.
+      if (!stored || (this.rejected !== undefined && sameTokens(stored, this.rejected))) return undefined;
+      this.hideTokens = false;
+    }
+    this.lastTokens = stored;
+    return stored;
+  }
+
+  /** The write-back guard: the file must still hold the session this attempt started from, under the same client. */
+  private sameSession(before: OAuthTokens | undefined, after: OAuthTokens): TokenGuard {
+    const clientId = this.clientId;
+    return (current) =>
+      current.clientInformation?.client_id === clientId &&
+      current.tokens !== undefined &&
+      (sameTokens(current.tokens, before) || sameTokens(current.tokens, after));
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    await this.store.update({ tokens });
+    this.hideTokens = false;
+    this.rejected = undefined;
+    if (!this.silent) {
+      // An interactive login owns the store: it writes what the user just authorized.
+      await this.store.update({ tokens });
+      this.pinned = undefined;
+      this.lastTokens = tokens;
+      return;
+    }
+    const guard = this.sameSession(this.lastTokens, tokens);
+    const written = await this.store.withLock(() => this.store.casTokens(guard, tokens));
+    if (written) {
+      this.pinned = undefined;
+      this.lastTokens = tokens;
+    } else {
+      this.pinned = tokens; // logged out or logged in again meanwhile: never clobber that, but finish this attempt
+    }
+  }
+
+  /**
+   * A `fetch` for the transport that serialises refresh-token requests: one per session store and refresh token in
+   * this process (single-flight), and one at a time across processes (`auth.json.lock`). Under the lock it first
+   * re-reads the store: if another process already rotated the session, its tokens are returned instead of
+   * spending the old refresh token; otherwise the refresh is sent and its result written back before the lock is
+   * released.
+   */
+  guardFetch(base: typeof fetch = fetch): typeof fetch {
+    return async (input, init) => {
+      const sent = refreshTokenOf(init);
+      if (sent === undefined) return base(input, init);
+      const key = `${this.store.lockKey()}\n${sent}`;
+      let shared = inflightRefreshes.get(key);
+      if (!shared) {
+        shared = this.store.withLock(() => this.refreshUnderLock(base, input, init, sent)).finally(() => inflightRefreshes.delete(key));
+        inflightRefreshes.set(key, shared);
+      }
+      const r = await shared;
+      return new Response(r.body, { status: r.status, headers: r.headers });
+    };
+  }
+
+  private async refreshUnderLock(
+    base: typeof fetch,
+    input: Parameters<typeof fetch>[0],
+    init: RequestInit | undefined,
+    sent: string,
+  ): Promise<SharedResponse> {
+    const now = await this.store.peek();
+    const onDisk = now?.tokens;
+    if (
+      onDisk?.refresh_token !== undefined &&
+      onDisk.refresh_token !== sent &&
+      now?.clientInformation?.client_id === this.clientId &&
+      !(this.rejected !== undefined && sameTokens(onDisk, this.rejected))
+    ) {
+      const { issuer: _issuer, ...wire } = onDisk;
+      return { status: 200, headers: [["content-type", "application/json"]], body: JSON.stringify(wire) };
+    }
+    const res = await base(input, init);
+    const body = await res.text();
+    if (res.ok) {
+      try {
+        const parsed = OAuthTokensSchema.safeParse(JSON.parse(body));
+        if (parsed.success) {
+          const next: OAuthTokens = { refresh_token: sent, ...parsed.data };
+          if (onDisk?.issuer !== undefined) next.issuer = onDisk.issuer;
+          const clientId = this.clientId;
+          await this.store.casTokens((c) => c.clientInformation?.client_id === clientId && c.tokens?.refresh_token === sent, next);
+        }
+      } catch {
+        // not JSON: the SDK reports it
+      }
+    }
+    return { status: res.status, headers: [...res.headers.entries()], body };
   }
 
   async redirectToAuthorization(url: URL): Promise<void> {
@@ -359,12 +629,32 @@ export class FileOAuthProvider implements OAuthClientProvider {
     return v;
   }
 
+  /**
+   * Called by the SDK when the server rejects stored credentials (e.g. `invalid_grant` on a refresh). The rejected
+   * credentials are hidden from the rest of this attempt (newer tokens in the store are still used). A silent
+   * attempt never deletes anything: it only fails, and the caller decides whether to authorize again. An
+   * interactive attempt deletes the rejected tokens, but only if they are still the ones on disk.
+   */
   async invalidateCredentials(scope: "all" | "client" | "tokens" | "verifier" | "discovery"): Promise<void> {
-    if (scope === "all") await this.store.remove(["clientInformation", "tokens", "codeVerifier"]);
+    if (scope === "all" || scope === "tokens") {
+      this.hideTokens = true;
+      this.rejected = this.pinned ?? this.lastTokens;
+      this.pinned = undefined;
+    }
+    if (scope === "all" || scope === "client") this.hideClient = true;
+    if (this.silent) return;
+    if (scope === "all") await this.store.remove(["clientInformation", "codeVerifier"]);
     else if (scope === "client") await this.store.remove(["clientInformation"]);
-    else if (scope === "tokens") await this.store.remove(["tokens"]);
     else if (scope === "verifier") await this.store.remove(["codeVerifier"]);
+    if (scope === "all" || scope === "tokens") {
+      const current = (await this.store.load()).tokens;
+      if (current && sameTokens(current, this.lastTokens)) await this.store.remove(["tokens"]);
+    }
   }
+}
+
+function sameTokens(a: OAuthTokens, b: OAuthTokens | undefined): boolean {
+  return b !== undefined && a.access_token === b.access_token && a.refresh_token === b.refresh_token;
 }
 
 export interface CallbackServer {

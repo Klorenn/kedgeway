@@ -125,7 +125,7 @@ describe("openRavenSession with KEDGEWAY_AUTH", () => {
 });
 
 describe("readOnlyAuthStore (used by doctor)", () => {
-  it("serves the stored auth but never writes: refreshed tokens stay in memory", async () => {
+  it("serves the stored auth; only refreshed tokens are written back (Raven rotates refresh tokens)", async () => {
     const dir = await mkdtemp(join(tmpdir(), "kw-ro-"));
     try {
       const file = join(dir, "auth.json");
@@ -133,9 +133,15 @@ describe("readOnlyAuthStore (used by doctor)", () => {
       await writeFile(file, original);
       const store = await readOnlyAuthStore({}, file);
       expect((await store.load()).tokens?.access_token).toBe("AT");
-      await store.update({ tokens: { access_token: "REFRESHED", token_type: "Bearer" } });
-      expect((await store.load()).tokens?.access_token).toBe("REFRESHED");
+      await store.remove(["tokens", "clientInformation"]);
+      await store.update({ codeVerifier: "v" });
       expect(await readFile(file, "utf8")).toBe(original);
+      const refreshed = { access_token: "REFRESHED", token_type: "Bearer" };
+      const fresh = await readOnlyAuthStore({}, file);
+      await fresh.casTokens((c) => c.tokens?.refresh_token === "RT" && c.clientInformation?.client_id === "cid", refreshed);
+      expect((await fresh.load()).tokens?.access_token).toBe("REFRESHED");
+      const onDisk = JSON.parse(await readFile(file, "utf8")) as StoredAuth;
+      expect(onDisk).toEqual({ tokens: { access_token: "REFRESHED", token_type: "Bearer" }, clientInformation: auth.clientInformation });
       expect(await readdir(dir)).toEqual(["auth.json"]);
     } finally {
       await rm(dir, { recursive: true, force: true });

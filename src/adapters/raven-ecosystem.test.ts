@@ -164,6 +164,37 @@ describe("openRavenSession", () => {
     await expect(readFile(join(dir, "auth.json"))).rejects.toThrow();
   });
 
+  it("retries silently once when another process rotated the tokens during the silent attempt", async () => {
+    await store.update({ tokens: { access_token: "A1", token_type: "Bearer", refresh_token: "R1" } });
+    const { deps, log } = harness(["unauthorized", "ok"]);
+    const connect = deps.createClient;
+    let first = true;
+    deps.createClient = () => {
+      const c = connect();
+      return {
+        ...c,
+        connect: async (t) => {
+          if (first) {
+            first = false;
+            await new AuthStore(join(dir, "auth.json")).update({ tokens: { access_token: "A2", token_type: "Bearer", refresh_token: "R2" } });
+          }
+          return c.connect(t);
+        },
+      };
+    };
+    const session = await openRavenSession(store, "https://raven.test/mcp", deps, { interactive: false });
+    expect(await session.execute("x")).toBe("hi");
+    expect(log.connects).toBe(2);
+    expect(log.callbackStarts).toBe(0);
+  });
+
+  it("does not retry the silent attempt when the stored tokens did not change", async () => {
+    await store.update({ tokens: { access_token: "A1", token_type: "Bearer", refresh_token: "R1" } });
+    const { deps, log } = harness(["unauthorized", "ok"]);
+    await expect(openRavenSession(store, "https://raven.test/mcp", deps, { interactive: false })).rejects.toThrow(/kedgeway login/);
+    expect(log.connects).toBe(1);
+  });
+
   it("propagates non-auth connection errors", async () => {
     const { deps } = harness([]);
     deps.createClient = () => ({

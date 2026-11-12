@@ -13,3 +13,4 @@ site/out
 site/next-env.d.ts
 .cursor/
 .playwright-mcp/
+site/demo/

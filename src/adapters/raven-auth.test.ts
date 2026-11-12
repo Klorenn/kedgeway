@@ -113,6 +113,8 @@ describe("FileOAuthProvider", () => {
     expect(stored.clientInformation?.client_id).toBe("c");
     expect(stored.codeVerifier).toBeUndefined();
     expect(opened).toBe(0);
+    await store.update({ tokens: { access_token: "old", token_type: "Bearer", refresh_token: "r" } });
+    await p.tokens();
     await p.saveTokens({ access_token: "t", token_type: "Bearer" }); // refreshed tokens must persist
     expect((await store.load()).tokens?.access_token).toBe("t");
   });

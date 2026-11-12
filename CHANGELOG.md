@@ -4,6 +4,11 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Fixed
+
+- fix(auth): stored Raven sessions are reused silently again. Raven rotates the refresh token on every refresh; `kedgeway doctor` refreshed through an in-memory copy and discarded the new refresh token, leaving `auth.json` with one Raven had replaced, and when a later refresh was answered with `invalid_grant` the SDK's `invalidateCredentials("tokens")` made the silent attempt delete the tokens from `auth.json`. Interactive commands then reopened the browser login (with a new client registration), the MCP server failed with `Not logged in to Raven`, and `doctor` reported `auth.json has no tokens`. Now `doctor` writes refreshed tokens back; a silent attempt never deletes stored credentials (it hides them for that attempt only) and never registers a new client; an interactive attempt deletes rejected tokens only if they are still the ones on disk; and when another process rotated the tokens during the silent attempt, kedgeway re-reads `auth.json` (again after about 300 ms) and retries once with them. `KEDGEWAY_AUTH` keeps refreshing in memory, now shared by all calls in one process.
+- fix(auth): refreshes are serialised. In-process single-flight (one refresh request per session and refresh token, e.g. for parallel MCP tool calls) plus a cross-process `auth.json.lock` (O_EXCL, pid and timestamp inside, broken after 30 s, 10 s wait with 50 ms polling, released in `finally`); under the lock kedgeway re-reads `auth.json` and uses tokens another process already rotated. Write-backs are compare-and-swap: only if the file exists, parses, still holds the session that was refreshed and the same `client_id`, so a refresh finishing after `logout` or a new login never recreates or clobbers anything, and `doctor` never creates or quarantines `auth.json`. Temp files are named `auth.json.<pid>.<random>.tmp`.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added

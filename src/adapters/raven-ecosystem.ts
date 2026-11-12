@@ -58,7 +58,7 @@ export interface ConnectDeps {
   openBrowser: BrowserOpener;
 }
 
-export function realConnectDeps(url: string = RAVEN_URL): ConnectDeps {
+export function realConnectDeps(url: string = RAVEN_URL, fetchFn: typeof fetch = fetch): ConnectDeps {
   return {
     createClient: () => {
       const client = new Client({ name: "kedgeway", version: "0.1.0" });
@@ -68,7 +68,12 @@ export function realConnectDeps(url: string = RAVEN_URL): ConnectDeps {
         close: () => client.close(),
       };
     },
-    createTransport: (provider) => new StreamableHTTPClientTransport(new URL(url), { authProvider: provider }),
+    createTransport: (provider) =>
+      new StreamableHTTPClientTransport(new URL(url), {
+        authProvider: provider,
+        // Refreshes go through the provider: single-flight in this process, `auth.json.lock` across processes.
+        fetch: provider instanceof FileOAuthProvider ? provider.guardFetch(fetchFn) : fetchFn,
+      }),
     startCallbackServer,
     openBrowser: openInBrowser,
   };
@@ -86,7 +91,8 @@ function toSession(client: ClientLike): RavenSession {
 
 /**
  * Connects to Raven. Step 1 is a silent attempt with stored credentials (no callback
- * server, no browser, no registration writes). Only on a 401 do we start the local callback
+ * server, no browser, no registration writes); it refreshes an expired access token and persists the rotated
+ * tokens, and it never deletes stored credentials. Only on a 401 do we start the local callback
  * server and run the SDK flow: connect -> UnauthorizedError -> user authorizes ->
  * transport.finishAuth(code) -> reconnect with a fresh client/transport.
  */
@@ -96,6 +102,8 @@ export async function openRavenSession(
   deps: ConnectDeps = realConnectDeps(url),
   options: {
     interactive?: boolean;
+    /** How long to wait before re-reading the store once after a failed silent attempt (default 300 ms). */
+    recheckDelayMs?: number;
     /** Headless login: print the URL (no browser) and also accept the redirect URL or code pasted on stdin. */
     noBrowser?: {
       manualCode: (signal: AbortSignal) => Promise<string>;
@@ -111,24 +119,45 @@ export async function openRavenSession(
   const silentRedirect = saved.callbackPort
     ? `http://127.0.0.1:${saved.callbackPort}/callback`
     : "http://127.0.0.1/callback";
-  const silentProvider = new FileOAuthProvider(store, silentRedirect, noopOpen, { silent: true });
-  const silentClient = deps.createClient();
-  try {
-    await silentClient.connect(deps.createTransport(silentProvider));
-    return toSession(silentClient);
-  } catch (e) {
-    if (!(e instanceof UnauthorizedError)) throw e;
-    await silentClient.close().catch(() => undefined);
-    if (store instanceof MemoryAuthStore) {
-      throw new Error(
-        store.kind === "env"
-          ? "Raven rejected the credentials in KEDGEWAY_AUTH (expired or revoked). Run `kedgeway login --export` again and update the secret."
-          : 'Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.',
-      );
+  const trySilently = async (): Promise<RavenSession | undefined> => {
+    const client = deps.createClient();
+    try {
+      await client.connect(deps.createTransport(new FileOAuthProvider(store, silentRedirect, noopOpen, { silent: true })));
+      return toSession(client);
+    } catch (e) {
+      if (!(e instanceof UnauthorizedError)) throw e;
+      await client.close().catch(() => undefined);
+      return undefined;
     }
-    if (options.interactive === false) {
-      throw new Error('Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.');
-    }
+  };
+  const silent = await trySilently();
+  if (silent) return silent;
+  // Raven rotates refresh tokens: if another kedgeway process refreshed while we tried, its tokens are now the
+  // valid ones, so try once more with them before asking anyone to log in.
+  // A process that won the race may still be writing (it got its new tokens before we got `invalid_grant`), so
+  // give it a moment before concluding the session is gone.
+  const changed = async (): Promise<boolean> => {
+    const latest = (await store.load()).tokens;
+    return latest !== undefined && (latest.access_token !== saved.tokens?.access_token || latest.refresh_token !== saved.tokens?.refresh_token);
+  };
+  let rotated = await changed();
+  if (!rotated && saved.tokens && !(store instanceof MemoryAuthStore && store.kind === "env")) {
+    await new Promise((r) => setTimeout(r, options.recheckDelayMs ?? 300));
+    rotated = await changed();
+  }
+  if (rotated) {
+    const retried = await trySilently();
+    if (retried) return retried;
+  }
+  if (store instanceof MemoryAuthStore) {
+    throw new Error(
+      store.kind === "env"
+        ? "Raven rejected the credentials in KEDGEWAY_AUTH (expired or revoked). Run `kedgeway login --export` again and update the secret."
+        : 'Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.',
+    );
+  }
+  if (options.interactive === false) {
+    throw new Error('Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.');
   }
 
   // 2. interactive authorization

@@ -38,7 +38,7 @@ const code = await runCli(process.argv, {
         cache: new SnapshotCache(),
         now: Date.now,
         exec: (file, args, opts) => run(file, args, { timeout: opts.timeout, killSignal: "SIGKILL", windowsHide: true }), // execFile: never a shell
-        ping: async () => pingRaven(await readOnlyAuthStore()), // read-only: a token refresh must not touch auth.json
+        ping: async () => pingRaven(await readOnlyAuthStore()), // never removes anything; only refreshed (rotated) tokens are written back
       },
       opts,
     ),
