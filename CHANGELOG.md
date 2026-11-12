@@ -6,10 +6,16 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [0.3.1] - 2026-11-12
 
+### Added
+
+- feat(auth): `KEDGEWAY_CONFIG_DIR` (explicit) and `XDG_CONFIG_HOME` (fallback, as `$XDG_CONFIG_HOME/kedgeway`) choose where `auth.json` lives; `login`, `logout`, `login --export`, `doctor`, the MCP server and the SDK default all follow it.
+
 ### Fixed
 
 - fix(auth): stored Raven sessions are reused silently again. Raven rotates the refresh token on every refresh; `kedgeway doctor` refreshed through an in-memory copy and discarded the new refresh token, leaving `auth.json` with one Raven had replaced, and when a later refresh was answered with `invalid_grant` the SDK's `invalidateCredentials("tokens")` made the silent attempt delete the tokens from `auth.json`. Interactive commands then reopened the browser login (with a new client registration), the MCP server failed with `Not logged in to Raven`, and `doctor` reported `auth.json has no tokens`. Now `doctor` writes refreshed tokens back; a silent attempt never deletes stored credentials (it hides them for that attempt only) and never registers a new client; an interactive attempt deletes rejected tokens only if they are still the ones on disk; and when another process rotated the tokens during the silent attempt, kedgeway re-reads `auth.json` (again after about 300 ms) and retries once with them. `KEDGEWAY_AUTH` keeps refreshing in memory, now shared by all calls in one process.
 - fix(auth): refreshes are serialised. In-process single-flight (one refresh request per session and refresh token, e.g. for parallel MCP tool calls) plus a cross-process `auth.json.lock` (O_EXCL, pid and timestamp inside, broken after 30 s, 10 s wait with 50 ms polling, released in `finally`); under the lock kedgeway re-reads `auth.json` and uses tokens another process already rotated. Write-backs are compare-and-swap: only if the file exists, parses, still holds the session that was refreshed and the same `client_id`, so a refresh finishing after `logout` or a new login never recreates or clobbers anything, and `doctor` never creates or quarantines `auth.json`. Temp files are named `auth.json.<pid>.<random>.tmp`.
+- fix(login): `kedgeway login` no longer logs you out before the new login succeeds. The new client registration, PKCE verifier and tokens are staged in memory and replace the stored client and tokens in one write under `auth.json.lock` only once the new tokens exist; a cancelled (Ctrl+C) or failed login leaves the previous session working. `--preserve` (`login --export`) is unchanged.
+- fix(mcp): `kedgeway mcp` exits cleanly (exit 0) when the stdio client goes away: the end of stdin closes the transport, so Node no longer warns about an unsettled top-level await.
 
 ## [0.3.0] - 2026-11-12
 

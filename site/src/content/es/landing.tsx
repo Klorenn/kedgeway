@@ -83,7 +83,7 @@ export default {
     h: "Se instala en un minuto.",
     h2: "Después inicia sesión en Raven.",
     body: "Node 22.12 o posterior. Instala la CLI, inicia sesión en Raven y diagnostica un repo.",
-    note: <>El token se guarda en <code>~/.config/kedgeway/auth.json</code> con modo 0600. <code>--fail-on warning</code> sale con código 2 si algún hallazgo es warning o más grave.</>,
+    note: <>El token se guarda en <code>~/.config/kedgeway/auth.json</code> (o <code>$KEDGEWAY_CONFIG_DIR</code>) con modo 0600. <code>--fail-on warning</code> sale con código 2 si algún hallazgo es warning o más grave.</>,
     fig6: { caption: "instalar, iniciar sesión, diagnosticar", description: "Tres comandos en orden: npm install, login, diagnose." },
     codeLabel: "Terminal",
   },
@@ -94,7 +94,7 @@ export default {
     fig7: { caption: "cúmulo, dither ordenado 4×4", description: "Un estudio de un cúmulo con dither." },
     items: {
       privacy: ["¿Mi código sale de mi máquina?", "No. kedgeway envía un único script fijo a Stellar Raven, sin nada de tu repo. La comparación se ejecuta en tu máquina."],
-      account: ["¿Necesito una cuenta?", "Inicias sesión en Stellar Raven una sola vez con OAuth en tu navegador. El token se guarda localmente en ~/.config/kedgeway/auth.json."],
+      account: ["¿Necesito una cuenta?", "Inicias sesión en Stellar Raven una sola vez con OAuth en tu navegador. El token se guarda localmente en ~/.config/kedgeway/auth.json (se cambia con KEDGEWAY_CONFIG_DIR)."],
       offline: ["¿Funciona sin conexión?", "Sí. --offline reutiliza el snapshot de Raven en caché de tu última ejecución en vivo, y --fixture usa un archivo de snapshot. La primera ejecución en vivo necesita red y una sesión iniciada en Raven."],
       sdks: ["¿Qué SDK detecta?", "soroban-sdk en Cargo.toml, y @stellar/stellar-sdk, @stellar/stellar-base y los paquetes heredados soroban-client y stellar-sdk en package.json."],
       ci: ["¿Puede hacer fallar mi CI?", "Sí. --fail-on sale con código 2 cuando un hallazgo alcanza el umbral. Para datos en vivo en CI, define el secreto KEDGEWAY_AUTH; o usa un fixture."],

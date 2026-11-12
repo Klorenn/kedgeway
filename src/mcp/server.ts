@@ -224,17 +224,33 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
 }
 
 /** Serves MCP until the transport closes (client disconnect or stdin EOF). */
+/**
+ * Serves until the transport closes. With stdio, the client going away only ends stdin (the SDK's stdio
+ * transport does not notice), so `input` ending or closing closes the transport; by default that is
+ * `process.stdin` when the stdio transport is created here.
+ */
 export async function runStdioServer(
   opts: KedgewayServerOptions = {},
-  transport: Transport = new StdioServerTransport(),
+  transport?: Transport,
+  input?: NodeJS.ReadableStream,
 ): Promise<void> {
+  const t = transport ?? new StdioServerTransport();
+  const watched: NodeJS.ReadableStream | undefined = input ?? (transport === undefined ? process.stdin : undefined);
   const closed = new Promise<void>((resolve) => {
-    const prev = transport.onclose;
-    transport.onclose = () => {
+    const prev = t.onclose;
+    t.onclose = () => {
       prev?.();
       resolve();
     };
   });
-  await createKedgewayServer(opts).connect(transport);
-  await closed;
+  const stop = (): void => void t.close().catch(() => undefined);
+  watched?.once("end", stop);
+  watched?.once("close", stop);
+  try {
+    await createKedgewayServer(opts).connect(t);
+    await closed;
+  } finally {
+    watched?.removeListener("end", stop);
+    watched?.removeListener("close", stop);
+  }
 }

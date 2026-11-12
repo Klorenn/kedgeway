@@ -8,7 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { createServer, type Server } from "node:http";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { UnauthorizedError, type OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformationMixed,
@@ -23,8 +23,17 @@ export interface StoredAuth {
   callbackPort?: number;
 }
 
-export function defaultAuthPath(): string {
-  return join(homedir(), ".config", "kedgeway", "auth.json");
+/** kedgeway's config directory: `KEDGEWAY_CONFIG_DIR`, else `$XDG_CONFIG_HOME/kedgeway`, else `~/.config/kedgeway`. */
+export function configDir(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env["KEDGEWAY_CONFIG_DIR"];
+  if (explicit !== undefined && explicit !== "") return resolve(explicit);
+  const xdg = env["XDG_CONFIG_HOME"];
+  // The XDG spec says a relative XDG_CONFIG_HOME must be ignored.
+  return join(xdg !== undefined && xdg !== "" && isAbsolute(xdg) ? xdg : join(homedir(), ".config"), "kedgeway");
+}
+
+export function defaultAuthPath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(configDir(env), "auth.json");
 }
 
 const StoredShapeSchema = z.object({
@@ -116,6 +125,11 @@ export class AuthStore {
   async update(patch: Partial<StoredAuth>): Promise<void> {
     const next = { ...(await this.load()), ...patch };
     await this.write(next);
+  }
+
+  /** Replaces the whole stored auth in one atomic write. */
+  async replace(data: StoredAuth): Promise<void> {
+    await this.write(data);
   }
 
   async remove(keys: (keyof StoredAuth)[]): Promise<void> {

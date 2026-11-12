@@ -5,6 +5,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
+import { PassThrough } from "node:stream";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createKedgewayServer, runStdioServer } from "./server.js";
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
 
@@ -234,6 +236,20 @@ describe("server lifecycle and metadata", () => {
     await c.listTools();
     expect(done).toBe(false);
     await c.close();
+    await running;
+    expect(done).toBe(true);
+  });
+
+  it("runStdioServer resolves when stdin ends (the stdio client went away), so the CLI can exit cleanly", async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    let done = false;
+    const running = runStdioServer({}, new StdioServerTransport(input, output), input).then(() => {
+      done = true;
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(done).toBe(false);
+    input.end();
     await running;
     expect(done).toBe(true);
   });

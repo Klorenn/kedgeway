@@ -8,7 +8,7 @@ Email **security@kedgeway.xyz**, or use GitHub's [private vulnerability reportin
 
 In scope:
 
-- **Auth token storage**: how credentials and client registration are written to `~/.config/kedgeway/auth.json` (permissions, leakage into logs or output), and how `KEDGEWAY_AUTH` / `login --export` handle them.
+- **Auth token storage**: how credentials and client registration are written to `auth.json` in the config directory (`$KEDGEWAY_CONFIG_DIR`, else `$XDG_CONFIG_HOME/kedgeway`, else `~/.config/kedgeway`) (permissions, leakage into logs or output), and how `KEDGEWAY_AUTH` / `login --export` handle them.
 - **OAuth flow**: dynamic client registration, authorization code + PKCE, the local callback server on `127.0.0.1`, state and redirect handling.
 - **Repo scanning**: path traversal, symlink handling, unsafe parsing of `Cargo.toml` / `package.json`, or any way a scanned repository can make kedgeway execute code or read outside the scanned path.
 

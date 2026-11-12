@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, stat, readFile, readdir, writeFile } from "node:fs/
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AuthStore, FileOAuthProvider, startCallbackServer } from "./raven-auth.js";
+import { AuthStore, FileOAuthProvider, defaultAuthPath, startCallbackServer } from "./raven-auth.js";
 
 let dir: string;
 let file: string;
@@ -207,6 +207,25 @@ describe("startCallbackServer", () => {
       await expect(server.code).rejects.toThrow(/timed out/i);
     } finally {
       await server.close();
+    }
+  });
+});
+
+describe("defaultAuthPath", () => {
+  it("prefers KEDGEWAY_CONFIG_DIR, then XDG_CONFIG_HOME/kedgeway, then ~/.config/kedgeway", () => {
+    expect(defaultAuthPath({ KEDGEWAY_CONFIG_DIR: "/cfg/kw", XDG_CONFIG_HOME: "/xdg" })).toBe(join("/cfg/kw", "auth.json"));
+    expect(defaultAuthPath({ XDG_CONFIG_HOME: "/xdg" })).toBe(join("/xdg", "kedgeway", "auth.json"));
+    expect(defaultAuthPath({ KEDGEWAY_CONFIG_DIR: "", XDG_CONFIG_HOME: "" })).toMatch(/[/\\]\.config[/\\]kedgeway[/\\]auth\.json$/);
+  });
+
+  it("the default AuthStore follows the override", () => {
+    const prev = process.env["KEDGEWAY_CONFIG_DIR"];
+    process.env["KEDGEWAY_CONFIG_DIR"] = dir;
+    try {
+      expect(new AuthStore().path).toBe(join(dir, "auth.json"));
+    } finally {
+      if (prev === undefined) delete process.env["KEDGEWAY_CONFIG_DIR"];
+      else process.env["KEDGEWAY_CONFIG_DIR"] = prev;
     }
   });
 });

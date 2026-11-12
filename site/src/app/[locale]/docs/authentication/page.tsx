@@ -34,7 +34,7 @@ export default async function Authentication({ params }: PageProps<"/[locale]/do
       <Callout kind="warning">
         <p>{t.warning}</p>
       </Callout>
-      <CodeBlock code={"~/.config/kedgeway/auth.json"} />
+      <CodeBlock code={"~/.config/kedgeway/auth.json   # or $KEDGEWAY_CONFIG_DIR/auth.json, else $XDG_CONFIG_HOME/kedgeway/auth.json"} />
       <p>{t.whereP}</p>
       <p>{t.deleteP}</p>
       <CodeBlock code={"kedgeway logout"} />

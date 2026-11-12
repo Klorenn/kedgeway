@@ -5,6 +5,7 @@ import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   RavenEcosystem,
+  loginToRaven,
   openRavenSession,
   textFromToolResult,
   type ClientLike,
@@ -12,7 +13,7 @@ import {
   type RavenSession,
   type TransportLike,
 } from "./raven-ecosystem.js";
-import { AuthStore, type CallbackServer } from "./raven-auth.js";
+import { AuthStore, FileOAuthProvider, type CallbackServer, type StoredAuth } from "./raven-auth.js";
 
 const payload = JSON.stringify({
   observedAt: "2026-11-11T00:00:00.000Z",
@@ -203,5 +204,80 @@ describe("openRavenSession", () => {
       close: () => Promise.resolve(),
     });
     await expect(openRavenSession(store, "https://raven.test/mcp", deps)).rejects.toThrow("network down");
+  });
+});
+
+describe("loginToRaven", () => {
+  let dir: string;
+  let file: string;
+  const existing: StoredAuth = {
+    clientInformation: { client_id: "old-client", redirect_uris: ["http://127.0.0.1:4242/callback"] },
+    tokens: { access_token: "OLD-AT", token_type: "Bearer", refresh_token: "OLD-RT" },
+    callbackPort: 4242,
+  };
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "sd-login-"));
+    file = join(dir, "auth.json");
+    await new AuthStore(file).update(existing);
+  });
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  function loginDeps(code: Promise<string>) {
+    const log = { connects: 0 };
+    let provider: FileOAuthProvider | undefined;
+    const deps: ConnectDeps = {
+      createClient: (): ClientLike => ({
+        connect: () => {
+          log.connects += 1;
+          return log.connects === 1 ? Promise.reject(new UnauthorizedError("401")) : Promise.resolve();
+        },
+        callTool: () => Promise.resolve({ content: [{ type: "text", text: "hi" }] }),
+        close: () => Promise.resolve(),
+      }),
+      createTransport: (p): TransportLike => {
+        provider = p as FileOAuthProvider;
+        return {
+          finishAuth: async () => {
+            // what the SDK does on a successful code exchange
+            await provider!.saveClientInformation({ client_id: "new-client", redirect_uris: ["http://127.0.0.1:4242/callback"] });
+            await provider!.saveCodeVerifier("verifier");
+            await provider!.saveTokens({ access_token: "NEW-AT", token_type: "Bearer", refresh_token: "NEW-RT" });
+          },
+        };
+      },
+      startCallbackServer: (): Promise<CallbackServer> =>
+        Promise.resolve({ port: 4242, redirectUrl: "http://127.0.0.1:4242/callback", code, close: () => Promise.resolve() }),
+      openBrowser: () => Promise.resolve(),
+    };
+    return deps;
+  }
+
+  it("a cancelled login leaves the previous session untouched", async () => {
+    const before = await readFile(file, "utf8");
+    const cancelled = Promise.reject(new Error("cancelled"));
+    cancelled.catch(() => undefined);
+    await expect(loginToRaven(new AuthStore(file), {}, "https://raven.test/mcp", loginDeps(cancelled))).rejects.toThrow("cancelled");
+    expect(await readFile(file, "utf8")).toBe(before);
+  });
+
+  it("a successful login replaces client and tokens in one write and keeps no PKCE verifier", async () => {
+    await loginToRaven(new AuthStore(file), {}, "https://raven.test/mcp", loginDeps(Promise.resolve("the-code")));
+    const after = await new AuthStore(file).load();
+    expect(after.clientInformation?.client_id).toBe("new-client");
+    expect(after.tokens?.refresh_token).toBe("NEW-RT");
+    expect(after.callbackPort).toBe(4242);
+    expect(after.codeVerifier).toBeUndefined();
+  });
+
+  it("--preserve reuses a valid stored session without authorizing again", async () => {
+    let callbacks = 0;
+    const deps = loginDeps(Promise.resolve("the-code"));
+    deps.createClient = () => ({ connect: () => Promise.resolve(), callTool: () => Promise.resolve({}), close: () => Promise.resolve() });
+    deps.startCallbackServer = () => ((callbacks += 1), Promise.reject(new Error("must not start")));
+    await loginToRaven(new AuthStore(file), { preserve: true }, "https://raven.test/mcp", deps);
+    expect(callbacks).toBe(0);
+    expect((await new AuthStore(file).load()).tokens?.refresh_token).toBe("OLD-RT");
   });
 });

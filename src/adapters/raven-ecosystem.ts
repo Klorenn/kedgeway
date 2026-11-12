@@ -89,6 +89,21 @@ function toSession(client: ClientLike): RavenSession {
   };
 }
 
+export interface NoBrowserOptions {
+  manualCode: (signal: AbortSignal) => Promise<string>;
+  announce?: (url: string) => void;
+  /** Called with a one-line message when a pasted value is rejected (default: stderr); the prompt then repeats. */
+  onInputError?: (message: string) => void;
+}
+
+export interface SessionOptions {
+  interactive?: boolean;
+  /** How long to wait before re-reading the store once after a failed silent attempt (default 300 ms). */
+  recheckDelayMs?: number;
+  /** Headless login: print the URL (no browser) and also accept the redirect URL or code pasted on stdin. */
+  noBrowser?: NoBrowserOptions;
+}
+
 /**
  * Connects to Raven. Step 1 is a silent attempt with stored credentials (no callback
  * server, no browser, no registration writes); it refreshes an expired access token and persists the rotated
@@ -100,18 +115,7 @@ export async function openRavenSession(
   store: AuthStore = defaultAuthStore(),
   url: string = RAVEN_URL,
   deps: ConnectDeps = realConnectDeps(url),
-  options: {
-    interactive?: boolean;
-    /** How long to wait before re-reading the store once after a failed silent attempt (default 300 ms). */
-    recheckDelayMs?: number;
-    /** Headless login: print the URL (no browser) and also accept the redirect URL or code pasted on stdin. */
-    noBrowser?: {
-      manualCode: (signal: AbortSignal) => Promise<string>;
-      announce?: (url: string) => void;
-      /** Called with a one-line message when a pasted value is rejected (default: stderr); the prompt then repeats. */
-      onInputError?: (message: string) => void;
-    };
-  } = {},
+  options: SessionOptions = {},
 ): Promise<RavenSession> {
   const saved = await store.load();
 
@@ -160,9 +164,16 @@ export async function openRavenSession(
     throw new Error('Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.');
   }
 
-  // 2. interactive authorization
+  return authorizeInteractively(store, deps, options.noBrowser);
+}
+
+/**
+ * Interactive authorization: lazily start the callback server, let the SDK register/redirect, wait for the code
+ * (callback or pasted), finish the exchange and reconnect. Everything it learns is written to `store`.
+ */
+async function authorizeInteractively(store: AuthStore, deps: ConnectDeps, nb: NoBrowserOptions | undefined): Promise<RavenSession> {
+  const saved = await store.load();
   let provider: FileOAuthProvider | undefined;
-  const nb = options.noBrowser;
   let opener: BrowserOpener = nb
     ? (u) => {
         (nb.announce ?? ((x: string) => void process.stderr.write(describeAuthUrl(x))))(u);
@@ -227,13 +238,35 @@ export async function openRavenSession(
   }
 }
 
+/**
+ * `kedgeway login`. Without `preserve` it authorizes a new session, but stages the new client registration, PKCE
+ * verifier and tokens in memory: the stored session is replaced only once the new tokens exist, in one write
+ * under `auth.json.lock`. A cancelled or failed login therefore leaves the previous session working.
+ * With `preserve` (`login --export`) a valid stored session is reused as is.
+ */
 export async function loginToRaven(
   store: AuthStore = new AuthStore(),
-  opts: { preserve?: boolean; noBrowser?: { manualCode: (signal: AbortSignal) => Promise<string> } } = {},
+  opts: { preserve?: boolean; noBrowser?: NoBrowserOptions } = {},
+  url: string = RAVEN_URL,
+  deps: ConnectDeps = realConnectDeps(url),
 ): Promise<void> {
-  if (opts.preserve !== true) await store.remove(["tokens", "clientInformation", "codeVerifier"]);
-  const session = await openRavenSession(store, undefined, undefined, opts.noBrowser ? { noBrowser: opts.noBrowser } : {});
+  if (opts.preserve === true) {
+    const session = await openRavenSession(store, url, deps, opts.noBrowser ? { noBrowser: opts.noBrowser } : {});
+    await session.close();
+    return;
+  }
+  const { callbackPort } = await store.load();
+  const staging = new MemoryAuthStore(callbackPort !== undefined ? { callbackPort } : {});
+  const session = await authorizeInteractively(staging, deps, opts.noBrowser);
   await session.close();
+  const fresh = await staging.load();
+  if (!fresh.tokens || !fresh.clientInformation) throw new Error("Login finished without tokens; nothing was changed. Try `kedgeway login` again.");
+  const { tokens, clientInformation } = fresh;
+  await store.withLock(async () => {
+    const current = await store.load();
+    delete current.codeVerifier;
+    await store.replace({ ...current, clientInformation, tokens, ...(fresh.callbackPort !== undefined ? { callbackPort: fresh.callbackPort } : {}) });
+  });
 }
 
 /** Connects (never interactively) and makes one `search` call; throws if Raven is unreachable or auth fails. */

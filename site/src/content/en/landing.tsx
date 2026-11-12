@@ -83,7 +83,7 @@ export default {
     h: "Install in a minute.",
     h2: "Then sign in to Raven.",
     body: "Node 22.12 or newer. Install the CLI, sign in to Raven, then diagnose a repo.",
-    note: <>The token is stored at <code>~/.config/kedgeway/auth.json</code> with mode 0600. <code>--fail-on warning</code> exits with code 2 if any finding is a warning or worse.</>,
+    note: <>The token is stored at <code>~/.config/kedgeway/auth.json</code> (or <code>$KEDGEWAY_CONFIG_DIR</code>) with mode 0600. <code>--fail-on warning</code> exits with code 2 if any finding is a warning or worse.</>,
     fig6: { caption: "install, sign in, diagnose", description: "Three commands in order: npm install, login, diagnose." },
     codeLabel: "Terminal",
   },
@@ -94,7 +94,7 @@ export default {
     fig7: { caption: "cumulus, 4×4 ordered dither", description: "A study of dithered cumulus cloud." },
     items: {
       privacy: ["Does my code leave my machine?", "No. kedgeway sends one fixed script to Stellar Raven, with nothing from your repo in it. The comparison runs on your machine."],
-      account: ["Do I need an account?", "You sign in to Stellar Raven once with OAuth in your browser. The token is stored locally at ~/.config/kedgeway/auth.json."],
+      account: ["Do I need an account?", "You sign in to Stellar Raven once with OAuth in your browser. The token is stored locally at ~/.config/kedgeway/auth.json (override with KEDGEWAY_CONFIG_DIR)."],
       offline: ["Does it work offline?", "Yes. --offline reuses the cached Raven snapshot from your last live run, and --fixture uses a snapshot file. A first live run needs network access and a Raven sign-in."],
       sdks: ["Which SDKs are detected?", "soroban-sdk in Cargo.toml, and @stellar/stellar-sdk, @stellar/stellar-base and the legacy soroban-client and stellar-sdk in package.json."],
       ci: ["Can it fail my CI?", "Yes. --fail-on exits with code 2 when a finding meets the threshold. For live data in CI set the KEDGEWAY_AUTH secret; or use a fixture."],

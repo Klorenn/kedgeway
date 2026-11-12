@@ -36,7 +36,7 @@ export interface DetailedDiagnosis {
 }
 
 export interface RavenOptions {
-  /** Override the auth file location (default `~/.config/kedgeway/auth.json`). */
+  /** Override the auth file location (default `$KEDGEWAY_CONFIG_DIR/auth.json`, else `$XDG_CONFIG_HOME/kedgeway/auth.json`, else `~/.config/kedgeway/auth.json`). */
   authPath?: string;
   /** When false, never start an OAuth flow: fail fast telling the user to run `kedgeway login`. Default true. */
   interactive?: boolean;
