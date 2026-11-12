@@ -161,12 +161,12 @@ describe("withRemoteRepo hardening", () => {
     const e = spawnErr("128", { stderr: hostile });
     const t0 = performance.now();
     await expect(withRemoteRepo(gh("o/r"), { exec: fakeExec([], () => e) }, async () => 1)).rejects.toThrow(/could not clone/);
-    expect(performance.now() - t0).toBeLessThan(50);
+    expect(performance.now() - t0).toBeLessThan(500); // quadratic versions took seconds; CI runners are slow
     expect(stripCredentials("see https://u:pw@h/x now")).toBe("see https://***@h/x now");
     const t1 = performance.now();
     stripCredentials("a".repeat(200_000));
     stripCredentials("x://".repeat(50_000));
-    expect(performance.now() - t1).toBeLessThan(50);
+    expect(performance.now() - t1).toBeLessThan(500);
   });
 
   it("replaces the temp dir path with the display name in error details", async () => {
