@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
-import { Command, CommanderError } from "commander";
-import { WORKFLOW_PATH, renderWorkflow } from "../core/workflow-template.js";
+import { Command, CommanderError, Option } from "commander";
+import { renderWorkflow, workflowPathFor, type WorkflowMode } from "../core/workflow-template.js";
+import { openPr, PrUsageError, type OpenPrDeps, type PrOutcome } from "../pr-flow.js";
 import type { WorkflowWriteResult } from "../adapters/workflow-writer.js";
 import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import type { RepoFacts } from "../core/repo-facts.js";
@@ -39,6 +40,8 @@ export interface CliIo {
   startMcp: (opts: { allowWrite: boolean }) => Promise<void>;
   /** Overrides for cloning remote sources (git exec, fetch, temp root). Tests inject fakes. */
   remote?: Omit<RemoteRepoOptions, "ref">;
+  /** Overrides for `kedgeway pr` (GitHub fetch, git/refresh exec). Tests inject fakes. */
+  prDeps?: OpenPrDeps;
 }
 
 interface CacheFlags {
@@ -250,6 +253,71 @@ async function runMigrate(path: string, opts: MigrateOptions, io: CliIo): Promis
   }
 }
 
+interface PrOptions extends CacheFlags {
+  fixture?: string;
+  base?: string;
+  branch?: string;
+  repo?: string;
+  token?: string;
+  dryRun?: boolean;
+  refreshLockfiles?: boolean;
+  label?: string;
+  draft?: boolean;
+  allowAnyBranch?: boolean;
+  json?: boolean;
+  apiBase?: string;
+}
+
+export function formatPr(o: PrOutcome): string {
+  if (o.action === "skip") return `kedgeway pr: skipped: ${o.reason ?? "nothing to do"}\n`;
+  if (o.action === "dry-run") {
+    return `kedgeway pr (dry run): nothing was written or sent\nBranch: ${o.branch}\nTitle:  ${o.title}\n\n${o.body ?? ""}`;
+  }
+  const verb = o.action === "create" ? "created" : "updated";
+  return `kedgeway pr: ${verb} pull request #${o.number ?? "?"} on branch ${o.branch}\n${o.url ?? ""}\n`;
+}
+
+async function runPr(path: string, opts: PrOptions, io: CliIo): Promise<number> {
+  if (!checkMaxAge(opts, io)) return 2;
+  const env = io.env ?? process.env;
+  const secret = opts.token ?? env["GITHUB_TOKEN"] ?? "";
+  const scrub = (text: string): string => (secret === "" ? text : text.split(secret).join("***"));
+  try {
+    const target = await resolveTarget(path, undefined, io).catch((e: unknown) => {
+      throw new PrUsageError(e instanceof Error ? e.message : String(e));
+    });
+    if (target.kind === "remote") throw new PrUsageError("pr needs a local checkout: clone the repository and run kedgeway pr inside it");
+    const outcome = await openPr({
+      path,
+      ...ecosystemFor(opts, io),
+      version: io.version,
+      env,
+      dryRun: opts.dryRun === true,
+      ...(opts.base === undefined ? {} : { base: opts.base }),
+      ...(opts.branch === undefined ? {} : { branch: opts.branch }),
+      ...(opts.repo === undefined ? {} : { repo: opts.repo }),
+      ...(opts.token === undefined ? {} : { token: opts.token }),
+      ...(opts.refreshLockfiles === true ? { refreshLockfiles: true } : {}),
+      ...(opts.label === undefined ? {} : { label: opts.label }),
+      ...(opts.draft === true ? { draft: true } : {}),
+      ...(opts.allowAnyBranch === true ? { allowAnyBranch: true } : {}),
+      ...(opts.apiBase === undefined ? {} : { apiBase: opts.apiBase }),
+      ...(io.prDeps === undefined ? {} : { deps: io.prDeps }),
+    });
+    for (const w of outcome.warnings) io.stderr(`kedgeway: warning: ${scrub(w)}\n`);
+    if (opts.json) {
+      const j = outcome.action === "dry-run" ? { action: outcome.action, branch: outcome.branch, title: outcome.title, body: outcome.body } : outcome.action === "skip" ? { action: outcome.action, branch: outcome.branch, title: outcome.title, reason: outcome.reason } : { action: outcome.action, url: outcome.url, branch: outcome.branch, title: outcome.title };
+      io.stdout(`${JSON.stringify(j, null, 2)}\n`);
+    } else {
+      io.stdout(formatPr(outcome));
+    }
+    return 0;
+  } catch (e) {
+    io.stderr(`kedgeway: ${scrub(e instanceof Error ? e.message : String(e))}\n`);
+    return e instanceof PrUsageError ? 2 : 1;
+  }
+}
+
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   let exitCode = 0;
   const program = new Command();
@@ -283,26 +351,51 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       exitCode = await runMigrate(path ?? ".", opts, io);
     });
 
+  withCacheFlags(program.command("pr [path]"))
+    .description("Open (or update) a pull request with the migration edits. Run it inside the repository; it pushes the branch kedgeway/migrate-<major>. Exit 0 ok or skipped, 1 git/API failure, 2 usage.")
+    .option("--base <branch>", "branch the PR targets (default: the repository default branch from the API, else the current branch)")
+    .option("--branch <name>", "head branch to force-push (default kedgeway/migrate-<major>; must start with kedgeway/ unless --allow-any-branch; never the base, default or checked-out branch)")
+    .option("--allow-any-branch", "allow a --branch outside kedgeway/ (it is force-pushed, so it must be a branch only kedgeway writes)")
+    .option("--repo <owner/repo>", "GitHub repository (default GITHUB_REPOSITORY, else the origin remote)")
+    .option("--token <token>", "GitHub token (default GITHUB_TOKEN; prefer the environment variable, argv is visible to other users)")
+    .option("--dry-run", "print the title and body; no git or network writes")
+    .option("--refresh-lockfiles", "refresh the lockfiles the plan touched (cargo/npm/pnpm/yarn, only when installed)")
+    .option("--label <name>", "label to apply to the PR", "kedgeway")
+    .option("--draft", "open the PR as a draft")
+    .option("--json", "print { action, url?, branch, title } as JSON")
+    .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")
+    .addOption(new Option("--api-base <url>", "GitHub API base URL (tests, GitHub Enterprise)").hideHelp())
+    .action(async (path: string | undefined, opts: PrOptions) => {
+      exitCode = await runPr(path ?? ".", opts, io);
+    });
+
   program
     .command("init [path]")
-    .description("Write .github/workflows/kedgeway.yml (the kedgeway GitHub Action) into a repo. Exits 1 if the file exists, unless --force.")
+    .description("Write .github/workflows/kedgeway.yml (the kedgeway GitHub Action) into a repo; --mode pr writes kedgeway-pr.yml (the weekly migration PR bot). Exits 1 if the file exists, unless --force.")
     .option("--force", "overwrite an existing workflow file")
     .option("--print", "print the workflow YAML to stdout instead of writing a file")
-    .action(async (path: string | undefined, opts: { force?: boolean; print?: boolean }) => {
+    .addOption(new Option("--mode <mode>", "which workflow to write: diagnose (default) or pr").choices(["diagnose", "pr"]).default("diagnose"))
+    .action(async (path: string | undefined, opts: { force?: boolean; print?: boolean; mode?: WorkflowMode }) => {
       try {
-        const yaml = renderWorkflow({ version: io.version });
+        const mode: WorkflowMode = opts.mode === "pr" ? "pr" : "diagnose";
+        const yaml = renderWorkflow({ version: io.version, mode });
         if (opts.print) {
           io.stdout(yaml);
           return;
         }
         const root = resolve((io.cwd ?? process.cwd)(), path ?? ".");
-        const r = await io.writeWorkflow(root, WORKFLOW_PATH, yaml, { force: opts.force === true });
+        const r = await io.writeWorkflow(root, workflowPathFor(mode), yaml, { force: opts.force === true });
         if (r.status === "exists") {
           io.stderr(`kedgeway: ${r.path} already exists; use --force to overwrite it.\n`);
           exitCode = 1;
           return;
         }
-        io.stdout(`Wrote ${r.path}\nNext: add your Raven credentials as a repository secret named KEDGEWAY_AUTH (from \`kedgeway login --export\`).\n`);
+        io.stdout(
+          `Wrote ${r.path}\nNext: add your Raven credentials as a repository secret named KEDGEWAY_AUTH (from \`kedgeway login --export\`).\n` +
+            (mode === "pr"
+              ? "Then allow the bot to open pull requests: Settings > Actions > General > Workflow permissions > \"Allow GitHub Actions to create and approve pull requests\" (organizations must allow it first).\n"
+              : ""),
+        );
       } catch (e) {
         io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
         exitCode = 1;

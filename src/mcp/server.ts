@@ -9,6 +9,7 @@ import type { EcosystemPort } from "../ports/ecosystem.js";
 import { formatGuide } from "../core/guide.js";
 import { diagnoseDetailed, diagnoseRemote, migrate, migrateRemote, resolveEcosystem, toSarif } from "../sdk.js";
 import type { RemoteRepoOptions } from "../adapters/remote-repo.js";
+import { openPr, type OpenPrDeps } from "../pr-flow.js";
 
 export interface KedgewayServerOptions {
   /** Ecosystem used when a tool call has no fixture. Defaults to live Raven. */
@@ -17,6 +18,10 @@ export interface KedgewayServerOptions {
   allowWrite?: boolean;
   /** Overrides for cloning remote sources (git exec, fetch, temp root). Tests inject fakes. */
   remote?: Omit<RemoteRepoOptions, "ref">;
+  /** Environment the `pr` tool reads `GITHUB_TOKEN` / `GITHUB_REPOSITORY` from (default `process.env`). */
+  env?: NodeJS.ProcessEnv;
+  /** Overrides for the `pr` tool (GitHub fetch, git/refresh exec). Tests inject fakes. */
+  pr?: OpenPrDeps;
 }
 
 const version = (createRequire(import.meta.url)("../../package.json") as { version: string }).version;
@@ -155,6 +160,62 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
         return text(`${head}${follow}${locks}${guideText ? `\n\n${guideText}` : ""}`, JSON.stringify(plan, null, 2), result.diff);
       } catch (e) {
         return failure(e);
+      }
+    },
+  );
+
+  server.registerTool(
+    "pr",
+    {
+      description:
+        "Open (or update) a pull request with the migration edits for a Stellar/Soroban repo: creates the branch kedgeway/migrate-<major> from the base, applies the manifest edits, commits, force-pushes that branch and creates or updates one PR (never two). Needs a local checkout (path; url is refused), a clean working tree, the server started with --allow-write, and GITHUB_TOKEN in the server's environment (it is never a parameter). dry_run=true only renders the title and body and works without --allow-write.",
+      inputSchema: {
+        path: z.string().optional().describe("Directory of the local git checkout (give this or url; url is refused)"),
+        url: z.string().optional().describe("Not supported: pull requests need a local checkout. Give path"),
+        fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
+        base: z.string().optional().describe("Branch the PR targets (default: the repository default branch)"),
+        branch: z.string().optional().describe("Head branch to push (default kedgeway/migrate-<major>); it is force-pushed"),
+        repo: z.string().optional().describe("owner/repo (default GITHUB_REPOSITORY, else the origin remote)"),
+        dry_run: z.boolean().optional().default(false).describe("Render the title and body only: no git or network writes (works without --allow-write)"),
+        refresh_lockfiles: z.boolean().optional().default(false).describe("Refresh the lockfiles the plan touched (cargo/npm/pnpm/yarn, only when installed)"),
+        label: z.string().optional().describe("Label to apply (default kedgeway)"),
+        draft: z.boolean().optional().default(false).describe("Open the PR as a draft"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    },
+    async ({ path, url, fixture, base, branch, repo, dry_run, refresh_lockfiles, label, draft }) => {
+      const env = opts.env ?? process.env;
+      const token = env["GITHUB_TOKEN"];
+      const scrub = (m: string): string => (token === undefined || token === "" ? m : m.split(token).join("***"));
+      try {
+        checkTarget(path, url);
+        if (url !== undefined) throw new Error("pull requests need a local checkout: clone the repository and give its path (url is not supported)");
+        if (!dry_run && opts.allowWrite !== true) {
+          throw new Error("opening a pull request is disabled. Restart the server with `kedgeway mcp --allow-write` (dry_run still works).");
+        }
+        const o = await openPr({
+          path: path as string,
+          ...ecosystemFor(fixture),
+          version,
+          env,
+          dryRun: dry_run,
+          ...(base === undefined ? {} : { base }),
+          ...(branch === undefined ? {} : { branch }),
+          ...(repo === undefined ? {} : { repo }),
+          ...(refresh_lockfiles ? { refreshLockfiles: true } : {}),
+          ...(label === undefined ? {} : { label }),
+          ...(draft ? { draft: true } : {}),
+          ...(opts.pr === undefined ? {} : { deps: opts.pr }),
+        });
+        const warn = o.warnings.length > 0 ? ` Warnings: ${scrub(o.warnings.join("; "))}.` : "";
+        if (o.action === "skip") return text(`kedgeway pr: skipped: ${o.reason ?? "nothing to do"}.${warn}`);
+        if (o.action === "dry-run") {
+          return text(`Dry run (nothing written or sent): branch ${o.branch}, title "${o.title}". Run without dry_run to open it.${warn}`, o.body ?? "");
+        }
+        const verb = o.action === "create" ? "Created" : "Updated";
+        return text(`${verb} pull request #${o.number ?? "?"} on branch ${o.branch}: ${o.url ?? ""}${warn}`, JSON.stringify({ action: o.action, url: o.url, branch: o.branch, title: o.title }, null, 2));
+      } catch (e) {
+        return { isError: true, ...text(`kedgeway: ${scrub(e instanceof Error ? e.message : String(e))}`) };
       }
     },
   );

@@ -18,6 +18,7 @@ const TOOLS: readonly (readonly [McpTool, string | null])[] = [
   ["findings_reference", null],
   ["migrate", "{ path | url, ref?, fixture?, write? }"],
   ["ecosystem_snapshot", "{ fixture? }"],
+  ["pr", "{ path, fixture?, base?, branch?, repo?, dry_run?, refresh_lockfiles?, label?, draft? }"],
 ];
 
 export default async function Page({ params }: PageProps<"/[locale]/docs/mcp">) {
@@ -42,6 +43,13 @@ export default async function Page({ params }: PageProps<"/[locale]/docs/mcp">) 
       <h2>{t.remoteH}</h2>
       <p>{t.remote}</p>
       <p>{t.remoteDry}</p>
+
+      <h2 id="pr">{t.prH}</h2>
+      <p>{t.pr}</p>
+      <p>{t.prBranch}</p>
+      <Callout kind="warning">
+        <p>{t.prDry}</p>
+      </Callout>
 
       <h2>{t.configH}</h2>
       <p>{t.config}</p>

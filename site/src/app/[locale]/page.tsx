@@ -58,7 +58,7 @@ const FINDINGS: readonly (readonly [LandingFindingCode, string])[] = [
 
 const WORKS_WITH = ["Cargo.toml", "package.json", "GitHub Actions", "Stellar Raven", "Soroban"];
 
-const FAQ_ORDER: readonly LandingFaqId[] = ["privacy", "account", "offline", "sdks", "ci", "install"];
+const FAQ_ORDER: readonly LandingFaqId[] = ["privacy", "account", "offline", "sdks", "ci", "pr", "install"];
 
 const WAYS: readonly (readonly [WayId, string])[] = [
   ["sdk", "/docs/sdk"],

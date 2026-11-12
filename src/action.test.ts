@@ -26,7 +26,7 @@ describe("committed ecosystem fixture", () => {
 describe("action.yml", () => {
   it("declares the documented inputs and outputs and delegates to the run script", async () => {
     const y = await readFile(resolve(root, "action.yml"), "utf8");
-    for (const key of ["path:", "repo:", "KW_REPO:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "version:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
+    for (const key of ["mode:", "pr-base:", "pr-branch:", "pr-draft:", "refresh-lockfiles:", "token:", "pr-url:", "pr-action:", "KW_MODE:", "KW_PR_BASE:", "KW_PR_BRANCH:", "KW_PR_DRAFT:", "KW_REFRESH_LOCKFILES:", "KW_TOKEN:", "github.token", "path:", "repo:", "KW_REPO:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "version:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
       expect(y).toContain(key);
     }
     expect(y).toContain("using: composite");
@@ -214,6 +214,97 @@ process.exit(${code});
     const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: cli });
     expect(r.code).toBe(1);
     expect(r.outputs).toBe("");
+  });
+
+  describe("mode: pr", () => {
+    const prJson = JSON.stringify({ action: "create", url: "https://github.com/o/r/pull/5", branch: "kedgeway/migrate-28", title: "chore(deps): migrate soroban-sdk to 28" });
+    async function prStub(json: string, code: number): Promise<string> {
+      const f = join(tmp, "pr-cli.mjs");
+      await writeFile(
+        f,
+        `import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(join(tmp, "call.json"))}, JSON.stringify({ args: process.argv.slice(2), auth: process.env.KEDGEWAY_AUTH ?? null, token: process.env.GITHUB_TOKEN ?? null, repo: process.env.GITHUB_REPOSITORY ?? null }));
+console.log(${JSON.stringify(json)});
+process.exit(${code});
+`,
+      );
+      return f;
+    }
+    const callPr = async (): Promise<{ args: string[]; auth: string | null; token: string | null; repo: string | null }> =>
+      JSON.parse(await readFile(join(tmp, "call.json"), "utf8")) as { args: string[]; auth: string | null; token: string | null; repo: string | null };
+    const base = { KW_MODE: "pr", KW_PATH: ".", KW_AUTH: "c2VjcmV0", KW_FIXTURE: "", KW_TOKEN: "ghs_tok", KW_FAIL_ON: "warning", KW_JSON: "false", GITHUB_REPOSITORY: "o/r" };
+
+    it("runs `kedgeway pr --json`, hands the token over through the environment and exposes the outputs", async () => {
+      const cli = await prStub(prJson, 0);
+      const r = await run({ ...base, KW_CLI: cli });
+      expect(r.code).toBe(0);
+      const c = await callPr();
+      expect(c.args).toEqual(["pr", ".", "--json"]);
+      expect(c.token).toBe("ghs_tok");
+      expect(c.auth).toBe("c2VjcmV0");
+      expect(c.repo).toBe("o/r");
+      expect(JSON.stringify(c.args)).not.toContain("ghs_tok");
+      expect(r.outputs).toContain("pr-action=create");
+      expect(r.outputs).toContain("pr-url=https://github.com/o/r/pull/5");
+      expect(r.out).toContain("kedgeway pr: create https://github.com/o/r/pull/5");
+      expect(r.out).not.toContain("ghs_tok");
+    });
+
+    it("passes base, branch, draft, refresh-lockfiles and fixture; with a fixture the auth secret is not exported", async () => {
+      const cli = await prStub(prJson, 0);
+      await run({ ...base, KW_FIXTURE: "fx.json", KW_PR_BASE: "main", KW_PR_BRANCH: "bot/x", KW_PR_DRAFT: "true", KW_REFRESH_LOCKFILES: "true", KW_CLI: cli });
+      const c = await callPr();
+      expect(c.args).toEqual(["pr", ".", "--json", "--fixture", "fx.json", "--base", "main", "--branch", "bot/x", "--draft", "--refresh-lockfiles"]);
+      expect(c.auth).toBeNull();
+    });
+
+    it("leaves draft and refresh off unless they are exactly \"true\"", async () => {
+      const cli = await prStub(prJson, 0);
+      await run({ ...base, KW_PR_DRAFT: "false", KW_REFRESH_LOCKFILES: "", KW_CLI: cli });
+      expect((await callPr()).args).toEqual(["pr", ".", "--json"]);
+    });
+
+    it("reports a skip with its reason and still succeeds", async () => {
+      const cli = await prStub(JSON.stringify({ action: "skip", branch: "b", title: "t", reason: "no automatic edits to make" }), 0);
+      const r = await run({ ...base, KW_CLI: cli });
+      expect(r.code).toBe(0);
+      expect(r.outputs).toContain("pr-action=skip");
+      expect(r.out).toMatch(/skip.*no automatic edits/);
+    });
+
+    it("propagates the CLI's exit code and writes no outputs on failure", async () => {
+      const cli = await prStub("", 1);
+      const r = await run({ ...base, KW_CLI: cli });
+      expect(r.code).toBe(1);
+      expect(r.outputs).toBe("");
+    });
+
+    it("still needs fixture or auth, rejects the repo input and unknown modes, and refuses an option-looking path", async () => {
+      const cli = await prStub(prJson, 0);
+      expect((await run({ ...base, KW_AUTH: "", KW_CLI: cli })).code).toBe(1);
+      const repo = await run({ ...base, KW_REPO: "o/other", KW_CLI: cli });
+      expect(repo.code).toBe(1);
+      expect(repo.out).toMatch(/repo/);
+      const bad = await run({ ...base, KW_MODE: "bogus", KW_CLI: cli });
+      expect(bad.code).toBe(1);
+      expect(bad.out).toMatch(/mode/);
+      expect((await run({ ...base, KW_PATH: "--evil", KW_CLI: cli })).code).toBe(1);
+    });
+
+    it("cannot be tricked into workflow commands or output injection by the CLI's JSON", async () => {
+      const evil = JSON.stringify({ action: "create", url: "https://x\n::error::pwn\nfoo=bar", branch: "b", title: "::error::t\r::warning::x", reason: "::error::r" });
+      const cli = await prStub(evil, 0);
+      const r = await run({ ...base, KW_CLI: cli });
+      for (const line of r.out.split(/\r?\n|\r/)) expect(line.startsWith("::")).toBe(false);
+      for (const line of r.outputs.split("\n").filter((l) => l !== "")) expect(line).toMatch(/^(pr-action|pr-url|report-json)=/);
+    });
+
+    it("diagnose stays the default mode", async () => {
+      const cli = await stubCli(report, 0);
+      const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "true", KW_CLI: cli });
+      expect(r.code).toBe(0);
+      expect((await call()).args[0]).toBe("diagnose");
+    });
   });
 });
 

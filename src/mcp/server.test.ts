@@ -44,9 +44,9 @@ function texts(result: unknown): string[] {
 }
 
 describe("kedgeway MCP server", () => {
-  it("lists the four tools", async () => {
+  it("lists the five tools", async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["diagnose", "ecosystem_snapshot", "findings_reference", "migrate"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["diagnose", "ecosystem_snapshot", "findings_reference", "migrate", "pr"]);
   });
 
   it("diagnose returns a text summary and the Diagnosis JSON", async () => {

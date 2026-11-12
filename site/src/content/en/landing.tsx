@@ -98,6 +98,7 @@ export default {
       offline: ["Does it work offline?", "Yes. --offline reuses the cached Raven snapshot from your last live run, and --fixture uses a snapshot file. A first live run needs network access and a Raven sign-in."],
       sdks: ["Which SDKs are detected?", "soroban-sdk in Cargo.toml, and @stellar/stellar-sdk, @stellar/stellar-base and the legacy soroban-client and stellar-sdk in package.json."],
       ci: ["Can it fail my CI?", "Yes. --fail-on exits with code 2 when a finding meets the threshold. For live data in CI set the KEDGEWAY_AUTH secret; or use a fixture."],
+      pr: ["Can it open the PR for me?", "Yes. Run kedgeway init --mode pr. A weekly GitHub Actions job checks your SDK versions against live Stellar data. When you are behind, it pushes one branch, kedgeway/migrate-<major>, and opens a single pull request with the edits, the findings, the manual steps as a checklist and the migration guide. Re-runs update the same PR. It runs in your repo with your own Raven login: no hosted service, and your source code is never rewritten."],
       install: ["How do I install it?", "npm install -g kedgeway. It needs Node 22.12 or newer."],
     },
   },

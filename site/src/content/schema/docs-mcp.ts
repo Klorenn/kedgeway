@@ -1,6 +1,6 @@
 import type { PageMetaDict, Rich } from "./common";
 
-export type McpTool = "diagnose" | "findings_reference" | "migrate" | "ecosystem_snapshot";
+export type McpTool = "diagnose" | "findings_reference" | "migrate" | "ecosystem_snapshot" | "pr";
 
 export interface DocsMcpDict {
   meta: PageMetaDict;
@@ -14,6 +14,10 @@ export interface DocsMcpDict {
   remoteH: string;
   remote: Rich;
   remoteDry: Rich;
+  prH: string;
+  pr: Rich;
+  prBranch: Rich;
+  prDry: Rich;
   configH: string;
   config: Rich;
   loginH: string;

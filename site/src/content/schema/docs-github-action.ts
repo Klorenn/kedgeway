@@ -1,6 +1,6 @@
 import type { PageMetaDict, Rich } from "./common";
 
-export type ActionInput = "path" | "repo" | "fail-on" | "fixture" | "auth" | "json" | "sarif" | "version" | "annotations";
+export type ActionInput = "mode" | "path" | "repo" | "fail-on" | "fixture" | "auth" | "json" | "sarif" | "version" | "annotations" | "pr-base" | "pr-branch" | "pr-draft" | "refresh-lockfiles" | "token";
 
 export interface DocsGithubActionDict {
   meta: PageMetaDict;
@@ -23,8 +23,15 @@ export interface DocsGithubActionDict {
   annotations: Rich;
   annotationItems: { caps: Rich; noFile: Rich; line: Rich; sanitised: Rich };
   annotationsOutside: Rich;
+  prH: string;
+  pr: Rich;
+  prRequirementsP: Rich;
+  prRequirements: Record<"permissions" | "checkout" | "credentials" | "concurrency" | "host" | "lockfiles" | "setting", Rich>;
+  prExample: Rich;
+  prOutputs: Rich;
   sarifH: string;
   sarif: Rich;
   exitH: string;
   exit: Rich;
+  exitPr: Rich;
 }

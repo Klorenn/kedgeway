@@ -52,6 +52,7 @@ npm link        # optional: exposes `kedgeway`
 ```sh
 kedgeway --version                            # print the version (-V)
 kedgeway init [path]                          # write .github/workflows/kedgeway.yml (--force, --print)
+kedgeway init --mode pr                       # write .github/workflows/kedgeway-pr.yml (the weekly migration PR bot)
 kedgeway login                                # force the OAuth flow
 kedgeway login --export                       # print credentials as a base64 secret for CI
 kedgeway login --no-browser                   # headless login: print the URL, paste the redirect back
@@ -70,6 +71,8 @@ kedgeway diagnose o/r --ref v1.2.0            # GitHub shorthand, a branch or ta
 kedgeway migrate [path]                       # guide plus a dry-run plan
 kedgeway migrate [path] --write               # apply them (local paths only)
 kedgeway migrate https://github.com/o/r       # dry-run plan for a remote repo
+kedgeway pr --dry-run                         # render the migration PR title and body, send nothing
+kedgeway pr                                   # open or update the migration PR (needs GITHUB_TOKEN)
 kedgeway mcp                                  # MCP server over stdio
 ```
 
@@ -190,6 +193,8 @@ Invalid input gets a one-line error and the prompt repeats. A pasted URL is chec
 
 `kedgeway init [path]` writes `.github/workflows/kedgeway.yml` (default: the current directory) with the [GitHub Action](#github-action) pinned to this kedgeway version, `fail-on: warning` and `auth: ${{ secrets.KEDGEWAY_AUTH }}`. It refuses to overwrite an existing file (exit `1`) unless you pass `--force`; `--print` writes the YAML to stdout and touches no file. It prints the path it wrote and a reminder to create the `KEDGEWAY_AUTH` secret (see [CI authentication](#ci-authentication)). The pinned tag only exists once that version is released.
 
+`kedgeway init --mode pr` writes `.github/workflows/kedgeway-pr.yml` instead: the [bot workflow](#automatic-prs-the-kedgeway-bot) (weekly cron plus `workflow_dispatch`, `contents: write` and `pull-requests: write`, a `concurrency` group so two runs never overlap, checkout with `fetch-depth: 0` and `persist-credentials: false`, `mode: pr`). The default output of `kedgeway init` is unchanged. Both modes use the same `--force` and `--print` flags.
+
 ## `kedgeway doctor`
 
 `kedgeway doctor` is a self-check that changes nothing: Node version (>= 22.12), auth state (`KEDGEWAY_AUTH` valid in the environment, `auth.json` with tokens, or none), the snapshot cache (path and age), and the Stellar CLI (`stellar --version`, run without a shell with a 5 s timeout, killed with SIGKILL and also bounded by doctor's own timer: not installed is a `warn` since it is optional; with a cached snapshot, the current major or newer is `ok`, one major behind `warn`, two or more `fail`; with `--offline` or no snapshot it is `ok` and only reports the installed version), and Raven reachability (one cheap non-interactive `search` call with a 10 s timeout, skipped with `--offline`; it uses a read-only copy of the credentials, so a token refresh cannot modify `auth.json`). It prints one line per check (`ok`, `warn`, `fail` or `skip`) and exits `1` if any check failed, `0` otherwise (warnings do not fail it).
@@ -229,6 +234,88 @@ The edits stay narrow:
 
 Always review the diff and run your tests: a major bump can contain breaking API changes that kedgeway does not rewrite.
 
+## Automatic PRs (the kedgeway bot)
+
+`kedgeway pr` turns the `migrate` plan into a pull request. It runs inside your repository, with your `KEDGEWAY_AUTH` and your `GITHUB_TOKEN`; there is no hosted service. The easiest way to run it is the scheduled workflow:
+
+```sh
+kedgeway init --mode pr      # writes .github/workflows/kedgeway-pr.yml
+```
+
+```yaml
+name: kedgeway-pr
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: kedgeway-pr
+  cancel-in-progress: false
+
+jobs:
+  kedgeway-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: Klorenn/kedgeway@v0.3.0
+        with:
+          mode: pr
+          auth: ${{ secrets.KEDGEWAY_AUTH }}
+```
+
+Setup, once:
+
+1. Store your Raven login as the `KEDGEWAY_AUTH` secret ([CI authentication](#ci-authentication)).
+2. Give the workflow `permissions: contents: write` and `pull-requests: write` (the generated file does).
+3. Allow the workflow token to open pull requests: Settings, Actions, General, Workflow permissions, "Allow GitHub Actions to create and approve pull requests". An organization must allow it first at the organization level. Without it GitHub answers `403` (`GitHub Actions is not permitted to create or approve pull requests`); kedgeway prints that message with a hint pointing at this setting and exits `1`.
+
+What a run does:
+
+1. Plans the migration on a clean working tree (a dirty tree exits `2`, unless `--dry-run`). No automatic edit means it prints the reason and exits `0` without touching git or the network.
+2. Fetches the base, then creates (or resets) the branch `kedgeway/migrate-<target major>` (`kedgeway/migrate-toolchain` when there is no concrete target) from `origin/<base>` (never from local HEAD, so unpushed local commits cannot leak into the PR; if the tree differs from what was planned it is planned again), applies the same edits as `migrate --write`, optionally refreshes lockfiles, and commits exactly the files it changed (the edited manifests and the lockfiles it refreshed, never `git add -A`) as `kedgeway[bot] <kedgeway@users.noreply.github.com>` (set `KEDGEWAY_GIT_AUTHOR_NAME` / `KEDGEWAY_GIT_AUTHOR_EMAIL` to change it; hooks and signing are off for that commit).
+3. Force-pushes that branch with `--force-with-lease` pinned to the commit `git ls-remote` reported (empty when the branch does not exist), so a branch that moved in the meantime is never overwritten blindly, and creates the pull request, or updates the one that is already open. Then it applies the label `kedgeway` (created if missing; a label failure is a warning, not an error). It prints the PR URL.
+
+**Branch safety.** The branch is force-pushed, so kedgeway refuses to use anything that is not its own: the branch must start with `kedgeway/`, and it may never equal the base branch, the repository default branch or the checked-out branch (`--branch main --base main` exits `2` before anything is pushed). The CLI flag `--allow-any-branch` lifts only the prefix rule, for another name that only kedgeway writes; it is not available in the MCP `pr` tool or in the action's `pr-branch` input.
+
+The lease only guards the push race (the branch moving between kedgeway's `ls-remote` and its push). It does not protect human work: commits someone adds to a `kedgeway/*` branch are overwritten the next time the bot runs, so do your own work on a different branch.
+
+**Dedupe.** The branch name is derived from the plan, so the same migration always lands on the same branch. Before pushing, kedgeway asks the API for an OPEN pull request whose head is that branch and whose base is the same base: if one exists it updates its title and body (and the force-push refreshes the commits), otherwise it creates one. There are never two open PRs for one branch; a closed or merged one does not block a new run. When the plan moves to a new target major the branch name changes, so a new PR is opened and the old one stays for you to close.
+
+**What the PR contains.** The title (`chore(deps): migrate soroban-sdk to 28`, at most 72 characters, or `chore(toolchain): kedgeway migration`), then a body with: a summary line of what moves from and to, a findings table (code, severity, `file:line`), the edits, the manual steps as a checklist, the migration guide, a "Lockfiles" note when a lockfile pins a changed dependency and still needs refreshing, notes about anything that could not be applied or refreshed, the provenance (snapshot source and `observedAt`) and the footer `Opened by kedgeway <version>`. Everything that comes from your repo or from Raven (file names, messages, evidence, snapshot text) is placed inside code spans or fences with the backticks escaped, so it cannot start a heading, list item, table row, quote or `::` workflow command.
+
+`kedgeway pr [path]` options:
+
+| Option | Meaning |
+| ------ | ------- |
+| `--dry-run` | print the title and body; no git writes and no network at all (works on a dirty tree, needs no token) |
+| `--base <branch>` | target branch (default: the repository default branch from the API, falling back, with a warning, to the current branch) |
+| `--branch <name>` | head branch (default `kedgeway/migrate-<major>`); must start with `kedgeway/` and may not be the base, default or checked-out branch |
+| `--allow-any-branch` | allow a `--branch` outside `kedgeway/` (CLI only) |
+| `--repo <owner/repo>` | default `GITHUB_REPOSITORY`, else parsed from `git remote get-url origin` |
+| `--token <token>` | default `GITHUB_TOKEN`. Prefer the environment variable: argv is visible to other users |
+| `--refresh-lockfiles` | refresh only the lockfiles the plan touched, and only if the tool is installed: `cargo update -p soroban-sdk`, `npm install --package-lock-only`, `pnpm install --lockfile-only`, `yarn install --mode update-lockfile` (npm and pnpm also get `--ignore-scripts`; Yarn 1 is skipped). Off by default; a failure becomes a note in the PR body, not a crash |
+| `--label <name>` | label to apply (default `kedgeway`) |
+| `--draft` | open the PR as a draft |
+| `--json` | print `{ action, url?, branch, title }` (`action` is `create`, `update`, `skip` or `dry-run`; skip adds `reason`, dry-run adds `body`) |
+| `--fixture`, `--offline`, `--no-cache`, `--max-age` | as for `diagnose` and `migrate` |
+
+Exit codes: `0` created, updated or skipped; `1` git or API failure; `2` usage (a dirty tree, a missing token or repository, a bad `--branch`/`--repo`, a remote URL source, contradictory cache flags).
+
+Credentials. The token is sent only in the `Authorization` header of API calls and, for `git fetch`/`ls-remote`/`push`, as a URL-scoped `http.<scheme>://<host>/.extraheader` handed to git through `GIT_CONFIG_*` environment variables (never argv, never a URL, never logged); error text from git and the API has the token and its base64 form removed. The key is URL-scoped because git uses the most specific `extraheader`, and `actions/checkout` persists one for `github.com` (an empty entry first clears it, so exactly one `Authorization` header is sent; a test with a loopback server verifies this). Before anything is pushed, `git remote get-url --push origin` must be an https URL on the GitHub host (`github.com`, or the host of `GITHUB_API_URL` / `--api-base` on Enterprise), otherwise the run exits `2` and the token is never sent; ssh and local remotes use git's own credentials. The generated workflow uses `persist-credentials: false` so the checkout leaves no token in `.git/config`. API redirects are refused and only GET requests are retried. Package managers started by `--refresh-lockfiles` get an allowlisted environment (`PATH`, `HOME`, `TMPDIR`, `LANG`/`LC_*`, proxy variables, `CARGO_HOME`, `RUSTUP_HOME`, `npm_config_cache`, `CI`): no `GITHUB_TOKEN`, `KEDGEWAY_AUTH`, `KW_*` or `ACTIONS_*`. Yarn 2+ runs with `YARN_ENABLE_SCRIPTS=0`; Yarn 1 (classic) is skipped with a note in the PR body, because it ignores `--mode` and runs install scripts. All API calls have a 60 s timeout and a 5xx is retried once. `GITHUB_API_URL` (set on GitHub Enterprise Server runners) is honored.
+
+Limits: there is no hosted service yet; the bot runs in your repo with your Raven login. Only manifest version strings change (plus the lockfiles you opt into); source code is never rewritten, so CI on the PR is your safety net. One migration branch at a time per target major. Local paths only: a `url` source is refused (CLI exit `2`, MCP error).
+
+The same flow is available as the `pr` MCP tool (see [MCP server](#mcp-server)) and as `planPr` / `openPr` in the [library](#library-typescript-sdk).
+
 ## Library (TypeScript SDK)
 
 ```ts
@@ -239,6 +326,8 @@ const diagnosis = await diagnose({ path: ".", ecosystem: createRavenEcosystem() 
 ```
 
 Remote repositories: `await diagnoseRemote({ source: "https://github.com/o/r", ref: "main", fixture: "snapshot.json" })` (same options as `diagnose`, plus `ref`) clones, scans and cleans up; `parseRepoSource(input)` is the pure parser, `resolveRepoSource(input)` also checks the disk, and `migrateRemote` returns a dry-run plan.
+
+Pull requests: `planPr({ path, fixture })` returns the branch, title and Markdown body without touching git or the network; `openPr({ path, repo, token, dryRun, base, branch, refreshLockfiles, label, draft })` runs the whole flow of `kedgeway pr` and resolves to `{ action, url?, branch, title, body?, warnings }` (it throws `PrUsageError` for precondition failures). The pure pieces are `renderPrBody`, `decidePr`, `branchNameFor` and `prTitleFor`.
 
 Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, `planMigration`, `applyMigration`, `migrate`, `buildGuide`, `formatGuide`, `migrationDocs`, `findImportHits`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`, `MigrationPlan`, `MigrationStep`, `MigrationGuide`, `SourceHit`.
 
@@ -254,6 +343,7 @@ ESM only (Node >= 22.12). The package `exports` map has no `default` or `require
 | `findings_reference` | none | the 18 finding codes with severity, meaning and what `migrate` does for them |
 | `migrate` | `{ path \| url, ref?, fixture?, write? }` | summary including the guide, plan JSON and unified diff; dry run unless `write: true` |
 | `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
+| `pr` | `{ path, fixture?, base?, branch?, repo?, dry_run?, refresh_lockfiles?, label?, draft? }` | opens or updates the migration pull request (see [Automatic PRs](#automatic-prs-the-kedgeway-bot)); `dry_run: true` returns the title and body |
 
 Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
 
@@ -266,6 +356,8 @@ Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
 ```
 
 The MCP server never starts an OAuth flow: without stored Raven credentials, live calls fail immediately with `Run "kedgeway login" first`. Run `kedgeway login` once in a terminal (or pass `fixture`). `diagnose`, `migrate` and `ecosystem_snapshot` read the `path` / `fixture` you give them from the local disk; `migrate` with `write: true` edits files there, but only if you started the server with `kedgeway mcp --allow-write`; without it `write: true` returns an error and dry runs still work. The `migrate` tool is annotated as destructive and non-read-only.
+
+The `pr` tool needs a local checkout: a `url` source is an error. Opening a PR (anything but `dry_run: true`) requires `kedgeway mcp --allow-write` and a `GITHUB_TOKEN` in the environment of the server process; the token is deliberately not a tool parameter. `dry_run: true` works without `--allow-write` and without a token, and touches neither git nor the network.
 
 `diagnose` and `migrate` take either `path` or `url` (exactly one; a URL or `owner/repo` is shallow-cloned to a temp dir and deleted afterwards, see [Remote repositories](#remote-repositories)). `migrate` with `url` is always a dry run: `write: true` is an error even with `--allow-write`.
 
@@ -291,10 +383,16 @@ The MCP server never starts an OAuth flow: without stored Raven credentials, liv
 | `sarif` | `false` | also write SARIF 2.1.0 to `$RUNNER_TEMP/kedgeway.sarif` |
 | `version` | action tag | kedgeway version to run: empty uses the tag you pinned, a semver (`1.2.3`) overrides it, `source` builds the checked-out action |
 | `annotations` | on in Actions | emit GitHub annotations (file and line) for each finding; `"false"` disables |
+| `mode` | `diagnose` | `diagnose` reports findings; `pr` opens or updates the migration pull request ([the bot](#automatic-prs-the-kedgeway-bot)) |
+| `pr-base` | repo default branch | `mode: pr`: branch the PR targets |
+| `pr-branch` | `kedgeway/migrate-<major>` | `mode: pr`: head branch to push; force-pushed with a lease, so it must start with `kedgeway/` (and may not be the base or default branch) |
+| `pr-draft` | `false` | `mode: pr`: open the PR as a draft |
+| `refresh-lockfiles` | `false` | `mode: pr`: also refresh the lockfiles the plan touched, when the tool is installed |
+| `token` | `${{ github.token }}` | `mode: pr`: token for the push and the API (reaches the CLI through the environment, never argv) |
 
 Pin a release tag as above: `@v1.2.3` installs exactly kedgeway 1.2.3 from npm (no build) and fails with a clear error if that version is not published. Any other ref (`@main`, a SHA, a branch, or the local `./` in this repo's own CI) builds the checked-out source (`npm ci && npm run build`), which is slower; `@main` is unpinned and can change under you. The `version` input overrides the detected version (strict semver such as `1.2.3`, or `source` to force the source build). A pinned tag therefore runs what the npm registry holds for that version (installed with `--ignore-scripts`), not the code at the git tag; `version: source` keeps the git tag as the trust anchor.
 
-Outputs: `summary` (`critical=0 warning=1 info=2`), `report-json` (path to the JSON report under `RUNNER_TEMP`) and `sarif` (path to the SARIF file, only when `sarif: true`).
+Outputs: `summary` (`critical=0 warning=1 info=2`), `report-json` (path to the JSON report under `RUNNER_TEMP`) and `sarif` (path to the SARIF file, only when `sarif: true`). With `mode: pr`: `pr-url` (empty when skipped), `pr-action` (`create`, `update` or `skip`) and `report-json`; `fail-on`, `annotations`, `sarif` and `repo` do not apply (`repo` is refused). `mode: pr` needs `permissions: contents: write` and `pull-requests: write`, `actions/checkout` with `fetch-depth: 0` and `persist-credentials: false`, and "Allow GitHub Actions to create and approve pull requests" enabled in Settings, Actions, General (organizations must allow it first), otherwise the API returns `403`.
 
 The action needs a data source and fails fast, naming both inputs, if you set neither:
 
@@ -371,6 +469,7 @@ For live data in CI set the `KEDGEWAY_AUTH` secret (see [CI authentication](#ci-
 - The snapshot cache is a single global file; `--max-age` applies to its `observedAt`.
 - `KEDGEWAY_AUTH` refreshes tokens in memory only. If Raven rotates refresh tokens, the stored secret can go stale and must be re-exported.
 - Scanning stops at depth 4 and skips `node_modules`, `target`, `dist`, `.git`, `.next`, `vendor`, `build`, `coverage`.
+- `kedgeway pr` rewrites manifests only and relies on your CI to catch API breaks; it is not a hosted service (it runs in your repo with your Raven login and token), works on local checkouts only, and when a plan moves to a new target major it opens a new branch and PR rather than retargeting the old one. The "Allow GitHub Actions to create and approve pull requests" setting is not something kedgeway can check; a `403` is the symptom.
 - Migration prints a guide and bumps version strings. It does not rewrite source, and it does not invent a changelog when Raven's doc search returns none.
 - The live OAuth flow is not covered by automated tests.
 

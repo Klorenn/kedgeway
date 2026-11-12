@@ -2,7 +2,7 @@ import type { Rich } from "./common";
 
 export type EcoStatus = "deprecated" | "current" | "supported" | "unknown";
 export type LandingFindingCode = "SDK_DEPRECATED" | "JS_LEGACY_PACKAGE" | "SDK_BEHIND" | "MANIFEST_UNPARSEABLE" | "DATA_DEGRADED" | "NO_SDK_FOUND";
-export type LandingFaqId = "privacy" | "account" | "offline" | "sdks" | "ci" | "install";
+export type LandingFaqId = "privacy" | "account" | "offline" | "sdks" | "ci" | "pr" | "install";
 export type WayId = "sdk" | "mcp" | "action" | "migrate";
 export interface Figure { caption: string; description: string }
 

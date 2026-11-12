@@ -12,7 +12,7 @@ const DICT = { en, es };
 
 export const generateMetadata = ({ params }: PageProps<"/[locale]/docs/github-action">) => metaFor(params, "/docs/github-action", DICT);
 
-const INPUTS: readonly ActionInput[] = ["path", "repo", "fail-on", "fixture", "auth", "json", "sarif", "version", "annotations"];
+const INPUTS: readonly ActionInput[] = ["mode", "path", "repo", "fail-on", "fixture", "auth", "json", "sarif", "version", "annotations", "pr-base", "pr-branch", "pr-draft", "refresh-lockfiles", "token"];
 
 const USE = `- uses: actions/checkout@v4
 - uses: Klorenn/kedgeway@v0.1.0
@@ -20,6 +20,34 @@ const USE = `- uses: actions/checkout@v4
     path: .
     fail-on: warning
     auth: \${{ secrets.KEDGEWAY_AUTH }}   # live Raven data; or use fixture: for offline`;
+
+const PR = `name: kedgeway-pr
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: kedgeway-pr
+  cancel-in-progress: false
+
+jobs:
+  kedgeway-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: Klorenn/kedgeway@v0.3.0
+        with:
+          mode: pr
+          auth: \${{ secrets.KEDGEWAY_AUTH }}`;
 
 const SARIF = `permissions:
   contents: read
@@ -85,12 +113,30 @@ export default async function Page({ params }: PageProps<"/[locale]/docs/github-
       </ul>
       <p>{t.annotationsOutside}</p>
 
+      <h2 id="open-a-migration-pr">{t.prH}</h2>
+      <p>{t.pr}</p>
+      <CodeBlock code={"kedgeway init --mode pr"} />
+      <CodeBlock code={PR} />
+      <p>{t.prExample}</p>
+      <p>{t.prRequirementsP}</p>
+      <ul>
+        <li>{t.prRequirements.permissions}</li>
+        <li>{t.prRequirements.checkout}</li>
+        <li>{t.prRequirements.credentials}</li>
+        <li>{t.prRequirements.concurrency}</li>
+        <li>{t.prRequirements.host}</li>
+        <li>{t.prRequirements.lockfiles}</li>
+        <li>{t.prRequirements.setting}</li>
+      </ul>
+      <p>{t.prOutputs}</p>
+
       <h2 id="sarif-and-code-scanning">{t.sarifH}</h2>
       <CodeBlock code={SARIF} />
       <p>{t.sarif}</p>
 
       <h2 id="exit-codes-and-speed">{t.exitH}</h2>
       <p>{t.exit}</p>
+      <p>{t.exitPr}</p>
       <PrevNext href="/docs/github-action" />
     </>
   );

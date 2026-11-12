@@ -1,11 +1,15 @@
 name: kedgeway
-description: Diagnose how outdated a Stellar/Soroban repo's SDK versions are.
+description: Diagnose how outdated a Stellar/Soroban repo's SDK versions are, or open a pull request that migrates them.
 author: Klorenn
 branding:
   icon: anchor
   color: blue
 
 inputs:
+  mode:
+    description: '"diagnose" (default) reports findings. "pr" opens or updates a pull request with the migration edits (the kedgeway bot); the workflow needs `permissions: contents: write` and `pull-requests: write`, and the repository or organization must allow "Allow GitHub Actions to create and approve pull requests" (Settings, Actions, General).'
+    required: false
+    default: diagnose
   path:
     description: Directory to scan.
     required: false
@@ -35,6 +39,27 @@ inputs:
     required: false
     default: "false"
 
+  pr-base:
+    description: 'mode pr: branch the pull request targets. Empty uses the repository default branch.'
+    required: false
+    default: ""
+  pr-branch:
+    description: 'mode pr: head branch to push. Empty uses kedgeway/migrate-<target major>. The branch is force-pushed, so use one kedgeway owns.'
+    required: false
+    default: ""
+  pr-draft:
+    description: 'mode pr: open the pull request as a draft ("true" or "false").'
+    required: false
+    default: "false"
+  refresh-lockfiles:
+    description: 'mode pr: also refresh the lockfiles the plan touched (cargo update -p soroban-sdk, npm/pnpm/yarn lockfile-only) when the tool is installed ("true" or "false").'
+    required: false
+    default: "false"
+  token:
+    description: 'mode pr: GitHub token used to push and to call the API. Defaults to the workflow token.'
+    required: false
+    default: ${{ github.token }}
+
   version:
     description: kedgeway version to run. Empty uses the version of the action tag you pinned (`@v1.2.3` installs kedgeway 1.2.3 from npm). Any other ref (`@main`, a SHA, a branch, the local `./`) builds the checked-out source. Set a semver such as `1.2.3` to override, or `source` to force the source build.
     required: false
@@ -55,6 +80,12 @@ outputs:
   sarif:
     description: Path to the SARIF report (only when the `sarif` input is "true").
     value: ${{ steps.run.outputs.sarif }}
+  pr-url:
+    description: 'mode pr: URL of the pull request that was created or updated (empty when skipped).'
+    value: ${{ steps.run.outputs.pr-url }}
+  pr-action:
+    description: 'mode pr: "create", "update" or "skip".'
+    value: ${{ steps.run.outputs.pr-action }}
 
 runs:
   using: composite
@@ -102,10 +133,16 @@ runs:
         test -f "$cli" || { echo "::error title=kedgeway::Resolved kedgeway entry point not found: $cli"; exit 1; }
         echo "cli=$cli" >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
-    - name: Run kedgeway diagnose
+    - name: Run kedgeway
       id: run
       shell: bash
       env:
+        KW_MODE: ${{ inputs.mode }}
+        KW_PR_BASE: ${{ inputs.pr-base }}
+        KW_PR_BRANCH: ${{ inputs.pr-branch }}
+        KW_PR_DRAFT: ${{ inputs.pr-draft }}
+        KW_REFRESH_LOCKFILES: ${{ inputs.refresh-lockfiles }}
+        KW_TOKEN: ${{ inputs.token }}
         KW_PATH: ${{ inputs.path }}
         KW_REPO: ${{ inputs.repo }}
         KW_FAIL_ON: ${{ inputs.fail-on }}
