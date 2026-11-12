@@ -691,6 +691,22 @@ function listen(server: Server, port: number): Promise<void> {
   });
 }
 
+const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] as string);
+
+/** The page the browser lands on after the OAuth redirect. Static text only: messages are escaped, no scripts. */
+function callbackPage(message: string, ok: boolean): string {
+  const body = ok ? "You can close this tab and go back to the terminal." : "See the terminal for details.";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>kedgeway</title><style>
+html,body{margin:0;height:100%;background:#0b0b0c;color:#f2efe9;font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+main{min-height:100%;display:grid;place-items:center;padding:24px}
+.card{max-width:28rem;text-align:center}
+.mark{font:500 14px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:#9a978f;margin-bottom:24px}
+h1{font-size:28px;line-height:1.15;margin:0 0 12px;font-weight:500}
+p{margin:0;color:#9a978f}
+.ok{display:inline-block;width:10px;height:10px;border-radius:50%;background:${ok ? "#7bc47f" : "#c8322b"};margin-right:10px;vertical-align:middle}
+</style></head><body><main><div class="card"><div class="mark">kedgeway</div><h1><span class="ok"></span>${escapeHtml(message)}</h1><p>${body}</p></div></main></body></html>`;
+}
+
 export async function startCallbackServer(
   preferredPort: number | undefined,
   expectedState: () => string | undefined,
@@ -704,11 +720,17 @@ export async function startCallbackServer(
   });
   code.catch(() => undefined);
 
-  const HEADERS = { "content-type": "text/plain; charset=utf-8", "x-content-type-options": "nosniff" };
+  const HEADERS = {
+    "content-type": "text/html; charset=utf-8",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'",
+    "referrer-policy": "no-referrer",
+    "cache-control": "no-store",
+  };
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     const reply = (status: number, msg: string): void => {
-      res.writeHead(status, HEADERS).end(`kedgeway: ${msg}`);
+      res.writeHead(status, HEADERS).end(callbackPage(status === 200 ? "Logged in to Stellar Raven." : msg, status === 200));
     };
     if (url.pathname !== "/callback") {
       reply(404, "not found");
@@ -730,7 +752,7 @@ export async function startCallbackServer(
       reply(400, "missing authorization code");
       return;
     }
-    reply(200, "authorization complete. You can close this tab.");
+    reply(200, "Logged in to Stellar Raven.");
     resolveCode(c);
   });
 

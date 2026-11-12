@@ -151,6 +151,22 @@ describe("startCallbackServer", () => {
     }
   });
 
+  it("serves a small HTML page on success, with a strict CSP and no inline script", async () => {
+    const server = await startCallbackServer(undefined, () => "st");
+    try {
+      const res = await fetch(`${server.redirectUrl}?code=abc&state=st`);
+      expect(res.headers.get("content-type")).toMatch(/^text\/html/);
+      expect(res.headers.get("content-security-policy")).toContain("default-src 'none'");
+      const body = await res.text();
+      expect(body).toContain("<title>kedgeway</title>");
+      expect(body).toContain("Logged in to Stellar Raven");
+      expect(body).toContain("You can close this tab");
+      expect(body).not.toContain("<script");
+    } finally {
+      await server.close();
+    }
+  });
+
   it("answers 400 on state mismatch but keeps waiting for the real callback", async () => {
     const server = await startCallbackServer(undefined, () => "st");
     try {
