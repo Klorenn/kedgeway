@@ -23,6 +23,8 @@ export interface HatchOptions {
   weight?: number;
   /** Trailing streaks to the left of each row. */
   trails?: boolean;
+  /** Draw these rows instead of one of the gallop frames (for example the standing horse). */
+  rows?: HatchRun[][];
 }
 
 function rng(seed: number): () => number {
@@ -38,8 +40,8 @@ function rng(seed: number): () => number {
 const n2 = (n: number): string => n.toFixed(2);
 
 /** One frame as horizontal dry-brush strokes. Deterministic: same frame, same strokes. */
-export function hatchGeometry(frame: number, { weight = 1, trails = true }: HatchOptions = {}): HatchGeometry {
-  const rows: HatchRun[][] = HORSE_HATCH.frames[frame] ?? [];
+export function hatchGeometry(frame: number, { weight = 1, trails = true, rows: rowsOverride }: HatchOptions = {}): HatchGeometry {
+  const rows: HatchRun[][] = rowsOverride ?? HORSE_HATCH.frames[frame] ?? [];
   const filled = rows.map((r, i) => (r.length > 0 ? i : -1)).filter((i) => i >= 0);
   const first = filled[0] ?? 0;
   const last = filled[filled.length - 1] ?? 0;

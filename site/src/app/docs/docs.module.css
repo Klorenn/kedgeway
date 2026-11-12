@@ -25,3 +25,6 @@
 @media (min-width: 64rem) {
   .docs { grid-template-columns: 13rem minmax(0, 1fr); gap: 4rem; padding-top: 7rem; }
 }
+@media (min-width: 80rem) {
+  .docs { grid-template-columns: 13rem minmax(0, 44rem) 12rem; justify-content: center; }
+}

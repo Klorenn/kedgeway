@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Architecture — kedgeway docs",
   description: "How kedgeway is organized: pure core, ports, adapters and the CLI.",
   alternates: { canonical: "/docs/architecture" },
-  openGraph: { title: "Architecture — kedgeway docs", description: "How kedgeway is organized: pure core, ports, adapters and the CLI.", url: "/docs/architecture" },
+  openGraph: { title: "Architecture — kedgeway docs", description: "How kedgeway is organized: pure core, ports, adapters and the CLI.", url: "/docs/architecture", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Architecture() {

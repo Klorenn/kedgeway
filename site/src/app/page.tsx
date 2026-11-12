@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CodeBlock from "@/components/CodeBlock";
+import FlowDiagram from "@/components/FlowDiagram";
+import Typewriter from "@/components/Typewriter";
 import EcosystemGrid from "@/components/EcosystemGrid";
 import EngravingStrip from "@/components/EngravingStrip";
 import HeroHorse from "@/components/HeroHorse";
+import MeasureBackdrop from "@/components/MeasureBackdrop";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -12,12 +16,6 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: { title: "kedgeway: Stellar toolchain diagnosis", description: "kedgeway is a CLI that diagnoses how outdated a Stellar or Soroban repo's toolchain is, using live data from Stellar Raven.", url: "/" },
 };
-
-const STEPS = [
-  { name: "scan", lines: ["Cargo.toml", "package.json"] },
-  { name: "ask raven", lines: ["Software Versions docs", "Scout toolchain index"] },
-  { name: "diagnose", lines: ["findings by severity", "each with source + time"] },
-] as const;
 
 const ROADMAP = [
   ["MCP server", "Lets coding agents call diagnose directly."],
@@ -30,23 +28,33 @@ export default function Home() {
   return (
     <>
       <section className={styles.hero}>
+        <MeasureBackdrop anchor="[data-hero-horse]" />
         <EngravingStrip variant="left" seed={3} />
         <EngravingStrip variant="right" seed={11} />
-        <EngravingStrip variant="top" seed={7} />
-        <div className={styles.heroInner}>
-          <figure className={styles.horse}>
-            <HeroHorse />
-            <figcaption className={styles.plate}>Muybridge, pl. 626 — 1878</figcaption>
-          </figure>
-          <h1>Your Soroban SDK <em>is drifting.</em></h1>
+        <div className={styles.textBlock}>
+          <h1 className={styles.title}>Your Soroban SDK is drifting.</h1>
           <p className={styles.sub}>kedgeway asks the live Stellar ecosystem what is current and tells you how far behind you are.</p>
           <div className={styles.cta}>
-            <a className="btnPrimary" href="#install">kedgeway diagnose</a>
+            <Link className="btnPrimary" href="#install">kedgeway diagnose</Link>
             <Link className="btnLink" href="/docs">Read the docs →</Link>
           </div>
           <p className={styles.caption}>open source · MIT · built on Stellar Raven</p>
         </div>
+        <figure className={styles.horseBlock}>
+          <figcaption className={styles.plate}>Muybridge, pl. 626 — 1878</figcaption>
+          <HeroHorse />
+        </figure>
       </section>
+
+      <div className={styles.ticker} role="note" aria-label="Key figures">
+        <span>5,863 repos scanned</span>
+        <span aria-hidden="true">·</span>
+        <span>1,285 deprecated (22%)</span>
+        <span aria-hidden="true">·</span>
+        <span>current soroban-sdk 28</span>
+        <span aria-hidden="true">·</span>
+        <span>observed 2026-11-11</span>
+      </div>
 
       <section className={styles.section} aria-labelledby="eco-h">
         <span className={styles.pageNo} aria-hidden="true">01/05</span>
@@ -75,16 +83,7 @@ export default function Home() {
               kedgeway scans <code>Cargo.toml</code> for <code>soroban-sdk</code>, including workspace dependencies and <code>package =</code> renames, and <code>package.json</code> for <code>@stellar/stellar-sdk</code>, <code>@stellar/stellar-base</code>, and the legacy <code>soroban-client</code> and <code>stellar-sdk</code>. Then it asks Stellar Raven. If a source fails, the report says <code>DATA_DEGRADED</code> instead of guessing.
             </p>
           </div>
-          <ol className={styles.steps}>
-            {STEPS.map((s) => (
-              <li key={s.name} className={styles.step}>
-                <h3>{s.name}</h3>
-                {s.lines.map((l) => (
-                  <p key={l}>{l}</p>
-                ))}
-              </li>
-            ))}
-          </ol>
+          <FlowDiagram />
         </div>
       </section>
 
@@ -98,6 +97,7 @@ export default function Home() {
               Findings are sorted by severity, point at the file, and say what to do. Every finding cites its source and observation time. Use <code>--json</code> for machines and <code>--fail-on</code> for CI.
             </p>
           </div>
+          <Typewriter>
           <pre className={styles.term} aria-label="Example kedgeway report">
             <code>
               <span className={styles.tag}>$ kedgeway diagnose ./my-contract</span>
@@ -117,47 +117,42 @@ Ecosystem: soroban-sdk current major 28, observed 2026-11-11T22:00:57Z
 Summary: 2 critical, 0 warning, 0 info`}
             </code>
           </pre>
+          </Typewriter>
         </div>
       </section>
 
       <section className={styles.section} id="install" aria-labelledby="install-h">
         <span className={styles.pageNo} aria-hidden="true">04/05</span>
-        <div className="colWide">
+        <div className="col">
           <div className={styles.head}>
             <p className="overline">04 — install</p>
             <h2 id="install-h">Install</h2>
-            <p>kedgeway is not published to npm yet. Build it from source today.</p>
+            <p>Build kedgeway from source, sign in to Raven, then diagnose a repo.</p>
           </div>
-          <div className={styles.install}>
-            <div>
-              <h3>From source</h3>
-              <pre className="block">
-                <code>{`git clone https://github.com/Klorenn/kedgeway.git
+          <ol className={styles.steps4}>
+            <li>
+              <p className="overline">01 — Build from source</p>
+              <CodeBlock code={`git clone https://github.com/Klorenn/kedgeway
 cd kedgeway
 npm ci
 npm run build
-npm link`}</code>
-              </pre>
-            </div>
-            <div>
-              <h3>
-                From npm <span className={styles.soon}>coming soon</span>
-              </h3>
-              <pre className={`block ${styles.dim}`}>
-                <code>npm install -g kedgeway</code>
-              </pre>
-            </div>
-            <div className={styles.installWide}>
-              <h3>Then</h3>
-              <pre className="block">
-                <code>{`kedgeway login
-kedgeway diagnose ./my-contract`}</code>
-              </pre>
-              <p className={styles.note}>
+npm link`} />
+            </li>
+            <li>
+              <p className="overline">02 — Sign in to Raven</p>
+              <CodeBlock code="kedgeway login" />
+              <p className={styles.stepNote}>
                 <code>login</code> opens your browser for OAuth with Raven. The token is stored at <code>~/.config/kedgeway/auth.json</code> with mode 0600.
               </p>
-            </div>
-          </div>
+            </li>
+            <li>
+              <p className="overline">03 — Diagnose</p>
+              <CodeBlock code="kedgeway diagnose ./my-contract --fail-on warning" />
+              <p className={styles.stepNote}>Exits with code 2 if any finding is a warning or worse.</p>
+            </li>
+          </ol>
+          <p className={styles.npmSoon}>From npm — coming soon</p>
+          <p className={styles.npmLine} aria-label="Not available yet">npm install -g kedgeway</p>
           <p className={styles.kedge}>
             A kedge is a small anchor carried out from a drifting ship and hauled in to pull it back on course. kedgeway pulls a repo&apos;s SDK versions back on course.
           </p>

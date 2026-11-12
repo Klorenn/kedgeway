@@ -1,13 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
-import Particles from "@/components/Particles";
+import { Geist, Geist_Mono } from "next/font/google";
+import FrameCounter from "@/components/FrameCounter";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
-const serif = Instrument_Serif({ subsets: ["latin"], variable: "--font-serif-face", display: "swap", weight: "400", style: "italic" });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://kedgeway.xyz"),
@@ -33,11 +32,11 @@ export const viewport: Viewport = { themeColor: "#0b0b0c" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${geistMono.variable} ${serif.variable}`}>
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body>
-        <Particles />
         <a className="skip" href="#main">Skip to content</a>
         <SiteHeader />
+        <FrameCounter />
         <main id="main">{children}</main>
         <SiteFooter />
       </body>

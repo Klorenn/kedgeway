@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Roadmap — kedgeway docs",
   description: "Planned kedgeway work. None of it has shipped.",
   alternates: { canonical: "/docs/roadmap" },
-  openGraph: { title: "Roadmap — kedgeway docs", description: "Planned kedgeway work. None of it has shipped.", url: "/docs/roadmap" },
+  openGraph: { title: "Roadmap — kedgeway docs", description: "Planned kedgeway work. None of it has shipped.", url: "/docs/roadmap", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Roadmap() {

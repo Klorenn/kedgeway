@@ -100,7 +100,7 @@ export default function HeroHorse() {
 
   const { rect, spiral } = construction;
   return (
-    <div ref={rootRef} className={styles.root} data-state="idle">
+    <div ref={rootRef} className={styles.root} data-state="idle" data-hero-horse="">
       <svg
         ref={svgRef}
         className={styles.svg}

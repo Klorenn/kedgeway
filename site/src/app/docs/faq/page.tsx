@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "FAQ — kedgeway docs",
   description: "Short answers to common questions about kedgeway.",
   alternates: { canonical: "/docs/faq" },
-  openGraph: { title: "FAQ — kedgeway docs", description: "Short answers to common questions about kedgeway.", url: "/docs/faq" },
+  openGraph: { title: "FAQ — kedgeway docs", description: "Short answers to common questions about kedgeway.", url: "/docs/faq", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 const QA: [string, string][] = [

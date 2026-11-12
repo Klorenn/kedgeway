@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { BAYER4, fbm2, smoothstep } from "@/lib/noise";
 import styles from "./EngravingStrip.module.css";
 
-type Variant = "left" | "right" | "top";
+type Variant = "left" | "right";
 
 interface EngravingStripProps {
   variant: Variant;
@@ -39,11 +39,11 @@ export default function EngravingStrip({ variant, seed = 3 }: EngravingStripProp
           const n = fbm2(u * 3.2 * (cols / rows < 1 ? 1 : 0.35) + 0.3, v * 5.5, seed);
           let d = smoothstep(0.38, 0.82, n);
           // Dithered falloff: the field itself fades, so the edge breaks into dots instead of a gradient.
-          const inner = variant === "left" ? 1 - smoothstep(0.35, 1, u) : variant === "right" ? 1 - smoothstep(0.35, 1, 1 - u) : 1;
-          const bottom = 1 - smoothstep(variant === "top" ? 0.3 : 0.5, 1, v);
+          const inner = variant === "left" ? 1 - smoothstep(0.35, 1, u) : 1 - smoothstep(0.35, 1, 1 - u);
+          const bottom = 1 - smoothstep(0.5, 1, v);
           // Keep the area under the fixed navbar clear so nav links stay legible.
-          const top = variant === "top" ? 1 : smoothstep(0.1, 0.24, v);
-          d *= inner * bottom * top * (variant === "top" ? 0.65 : 1);
+          const top = smoothstep(0.1, 0.24, v);
+          d *= inner * bottom * top;
           const on = d > (BAYER4[y % 4]?.[x % 4] ?? 0.5);
           const i = (y * cols + x) * 4;
           img.data[i] = INK[0];

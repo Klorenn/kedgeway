@@ -8,7 +8,6 @@
   --construct: #c8322b;
   --font-sans: var(--font-geist), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  --font-serif: var(--font-serif-face), "Times New Roman", serif;
   --gutter: 16px;
   --space-section: clamp(5rem, 11vw, 9rem);
   color-scheme: dark;
@@ -35,11 +34,12 @@ a { color: inherit; text-decoration: underline; text-decoration-color: var(--ink
 a:hover { text-decoration-color: var(--ink); }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
 
-h1, h2, h3 { font-family: var(--font-sans); font-weight: 400; color: var(--ink); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h1, h2, h3 { font-family: var(--font-sans); font-weight: 500; color: var(--ink); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
 h1 { font-size: clamp(2rem, 8vw, 3rem); line-height: 1.05; }
 h2 { font-size: 1.75rem; line-height: 1.15; }
 h3 { font-size: 1.0625rem; line-height: 1.3; letter-spacing: -0.01em; font-weight: 500; }
-h1 em, h2 em { font-family: var(--font-serif); font-style: italic; font-weight: 400; letter-spacing: -0.01em; font-size: 1.08em; }
+/* Headings are single-tone: any <em> inside renders like the rest of the heading. */
+h1 em, h2 em { font-style: normal; font-weight: inherit; color: inherit; }
 p { margin: 0; }
 strong { color: var(--ink); font-weight: 600; }
 
@@ -86,5 +86,16 @@ pre.block code { font-size: inherit; color: inherit; }
   html { scroll-behavior: auto; }
 }
 
-/* page layers: particles sit behind everything */
+/* page layers */
 main, footer { position: relative; z-index: 1; }
+
+/* Print: docs on white paper, no chrome, URLs after links. */
+@media print {
+  :root { --bg: #fff; --ink: #000; --ink-2: #222; --ink-3: #666; --rule: #ccc; }
+  html, body { background: #fff !important; color: #000; }
+  body::after, canvas, header, footer, nav, aside, .skip { display: none !important; }
+  main { z-index: auto; }
+  article a[href]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #444; word-break: break-all; }
+  article a[href^="#"]::after { content: ""; }
+  pre, code { color: #000 !important; }
+}

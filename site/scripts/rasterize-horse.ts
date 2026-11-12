@@ -250,6 +250,14 @@ function hatchRows(data: Buffer, w: number, h: number): Run[][] {
   return rows;
 }
 
+async function standingHatch(sheet: string): Promise<Run[][]> {
+  // Frame 12 of the sheet (row 3, column 4): a standing horse. Same crop, same cleanup, same rider mask.
+  const box: Box = { left: (BOX_X[3] as number) + CROP.dx, top: (BOX_Y[2] as number) + CROP.dy, width: CROP.w, height: CROP.h };
+  const { data, w, h } = await silhouette(sheet, box);
+  const { masked } = maskRider(data, w, h, 11);
+  return hatchRows(masked, w, h);
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
   const showCompact = process.argv.includes("--compact");
@@ -300,6 +308,7 @@ async function main(): Promise<void> {
       .png()
       .toFile(resolve(contact.replace(/\.png$/, "-rider.png")));
   }
+  const standing = await standingHatch(sheet);
   const hatchBody = hatch
     .map((f, i) => `  [ // frame ${i + 1}\n${f.map((r) => `    ${JSON.stringify(r)},`).join("\n")}\n  ],`)
     .join("\n");
@@ -322,6 +331,11 @@ ${hatchBody}
 
 /** Index of the fully extended flight frame. */
 export const HATCH_STATIC = ${STATIC_INDEX};
+
+/** Frame 12 of the sheet: the standing horse (used on the 404 page). */
+export const HORSE_STANDING: HatchRun[][] = [
+${standing.map((r) => `  ${JSON.stringify(r)},`).join("\n")}
+];
 `,
   );
   if (showCompact) console.log(compact.join("\n"));

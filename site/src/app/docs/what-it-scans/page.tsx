@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
@@ -6,7 +7,7 @@ export const metadata: Metadata = {
   title: "What it scans — kedgeway docs",
   description: "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges.",
   alternates: { canonical: "/docs/what-it-scans" },
-  openGraph: { title: "What it scans — kedgeway docs", description: "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges.", url: "/docs/what-it-scans" },
+  openGraph: { title: "What it scans — kedgeway docs", description: "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges.", url: "/docs/what-it-scans", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function WhatItScans() {
@@ -17,7 +18,7 @@ export default function WhatItScans() {
 
       <h2>Cargo.toml</h2>
       <p>It looks for the <code>soroban-sdk</code> crate in these forms:</p>
-      <pre className="block"><code>{`# string
+      <CodeBlock label="toml" code={`# string
 soroban-sdk = "21.0.0"
 
 # table
@@ -31,7 +32,7 @@ sdk = { package = "soroban-sdk", version = "21.0.0" }
 soroban-sdk = "21.0.0"
 
 [dependencies]
-soroban-sdk = { workspace = true }`}</code></pre>
+soroban-sdk = { workspace = true }`} />
       <ul>
         <li><strong>Tables read:</strong> <code>[dependencies]</code>, <code>[dev-dependencies]</code>, <code>[build-dependencies]</code>, and the same three under <code>[target.&lt;cfg&gt;]</code>.</li>
         <li><strong>Renames:</strong> a <code>package = &quot;soroban-sdk&quot;</code> key is followed to the real crate name.</li>

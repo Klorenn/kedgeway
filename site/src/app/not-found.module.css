@@ -1,0 +1,4 @@
+.wrap { min-height: 100svh; display: grid; place-items: center; padding: 7rem var(--gutter) 5rem; }
+.col { display: grid; justify-items: center; text-align: center; gap: 1.5rem; max-width: 36rem; }
+.mono { font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink-2); }
+.back { font-family: var(--font-mono); font-size: 0.9rem; color: var(--ink); }

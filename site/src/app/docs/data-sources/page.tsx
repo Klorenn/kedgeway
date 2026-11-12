@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Data sources — kedgeway docs",
   description: "Where kedgeway gets ground truth, how conflicts are settled, and what DATA_DEGRADED means.",
   alternates: { canonical: "/docs/data-sources" },
-  openGraph: { title: "Data sources — kedgeway docs", description: "Where kedgeway gets ground truth, how conflicts are settled, and what DATA_DEGRADED means.", url: "/docs/data-sources" },
+  openGraph: { title: "Data sources — kedgeway docs", description: "Where kedgeway gets ground truth, how conflicts are settled, and what DATA_DEGRADED means.", url: "/docs/data-sources", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function DataSources() {

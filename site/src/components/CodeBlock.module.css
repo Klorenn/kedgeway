@@ -1,0 +1,8 @@
+/* The one allowed surface: code only (see BRAND.md). */
+.block { background: #101113; border: 1px solid var(--rule); border-radius: 2px; margin: 0 0 1.25rem; min-width: 0; }
+.bar { display: flex; align-items: center; justify-content: space-between; padding: 0.4rem 1.25rem; border-bottom: 1px solid var(--rule); font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
+.pre { margin: 0; padding: 1.25rem; overflow-x: auto; font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.pre code { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+.copy { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); background: none; border: 0; padding: 0.25rem 0; cursor: pointer; }
+.copy:hover { color: var(--ink); }
+@media print { .block { background: #fff; border-color: #ccc; } .bar { display: none; } .pre { color: #000; } }

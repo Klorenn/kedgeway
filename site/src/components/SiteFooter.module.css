@@ -4,7 +4,7 @@
 .word { font-family: var(--font-sans); font-weight: 400; font-size: clamp(4rem, 15vw, 10rem); line-height: 0.9; letter-spacing: -0.04em; color: var(--ink); margin: 0; }
 .cols { display: grid; gap: 2.25rem 2rem; font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.9; }
 .cols p { margin: 0; }
-.h { color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.6875rem; margin-bottom: 0.5rem !important; }
+.h { display: flex; align-items: center; gap: 0.5rem; color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.6875rem; margin-bottom: 0.5rem !important; }
 .cols a { color: var(--ink-2); text-decoration: none; transition: color 0.15s; }
 .cols a:hover { color: var(--ink); }
 .cols .plain { color: var(--ink-2); }

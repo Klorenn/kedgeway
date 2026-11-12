@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import PixelIcon, { type PixelIconName } from "@/components/icons/pixel";
 import { DOCS_GROUPS } from "@/data/docs-nav";
+
+const GROUP_ICON: Record<string, PixelIconName> = { Start: "anchor", Use: "terminal", Reference: "file", More: "clock" };
 import styles from "./DocsNav.module.css";
 
 /** Left navigation: sticky on desktop, collapsible on mobile. */
@@ -24,7 +27,10 @@ export default function DocsNav() {
       <div id="docs-panel" className={styles.panel} data-open={open}>
         {DOCS_GROUPS.map((g) => (
           <div key={g.label} className={styles.group}>
-            <p className={styles.label}>{g.label}</p>
+            <p className={styles.label}>
+              <PixelIcon name={GROUP_ICON[g.label] ?? "file"} size={16} />
+              <span>{g.label}</span>
+            </p>
             <ul className={styles.list}>
               {g.pages.map((p) => (
                 <li key={p.href}>

@@ -1,4 +1,4 @@
-.root { width: min(100%, 560px); aspect-ratio: 180 / 101; --sw: 0.35; color: var(--ink); }
+.root { width: min(100%, 440px); aspect-ratio: 180 / 101; --sw: 0.35; color: var(--ink); }
 .svg { width: 100%; height: 100%; overflow: visible; }
 .line { fill: none; stroke: var(--construct); stroke-width: var(--sw); }
 .rect { stroke-opacity: 0.35; }

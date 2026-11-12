@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: "Overview — kedgeway docs",
   description: "What kedgeway is and is not, how it thinks, and where to read next.",
   alternates: { canonical: "/docs" },
-  openGraph: { title: "Overview — kedgeway docs", description: "What kedgeway is and is not, how it thinks, and where to read next.", url: "/docs" },
+  openGraph: { title: "Overview — kedgeway docs", description: "What kedgeway is and is not, how it thinks, and where to read next.", url: "/docs", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Overview() {

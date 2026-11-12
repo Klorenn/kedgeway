@@ -1,0 +1,4 @@
+.counter { position: fixed; left: 1rem; bottom: 4.5rem; z-index: 15; font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-2); pointer-events: none; display: none; font-variant-numeric: tabular-nums; }
+@media (min-width: 48rem) { .counter { display: block; } }
+@media (prefers-reduced-motion: reduce) { .counter { display: none; } }
+@media print { .counter { display: none; } }

@@ -28,7 +28,7 @@ function horseDataUri(): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-export async function renderOg(): Promise<ImageResponse> {
+export async function renderOg(label?: string): Promise<ImageResponse> {
   const [sans, mono] = await fontsPromise;
   const fonts: { name: string; data: ArrayBuffer; weight: 400 | 500; style: "normal" }[] = [];
   if (sans) fonts.push({ name: "Geist", data: sans, weight: 400, style: "normal" });
@@ -49,11 +49,15 @@ export async function renderOg(): Promise<ImageResponse> {
           fontFamily: sans ? "Geist" : "sans-serif",
         }}
       >
-        <div style={{ display: "flex", fontFamily: mono ? "Geist Mono" : "monospace", fontSize: 34, fontWeight: 500, letterSpacing: -0.4 }}>
-          kedgeway
+        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: mono ? "Geist Mono" : "monospace", fontSize: 34, fontWeight: 500, letterSpacing: -0.4 }}>
+          <div style={{ display: "flex" }}>kedgeway</div>
+          {label ? <div style={{ display: "flex", color: "#9A978F" }}>{label}</div> : null}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", fontSize: 76, lineHeight: 1.05, letterSpacing: -2, maxWidth: 460 }}>Diagnose Stellar SDK drift.</div>
+          <div style={{ display: "flex", flexWrap: "wrap", fontSize: 76, lineHeight: 1.05, letterSpacing: -2, maxWidth: 460 }}>
+            <div style={{ display: "flex", marginRight: 18 }}>Diagnose Stellar SDK</div>
+            <div style={{ display: "flex" }}>drift.</div>
+          </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={horseDataUri()} width={600} height={285} alt="" />
         </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
@@ -7,7 +8,7 @@ export const metadata: Metadata = {
   title: "Commands — kedgeway docs",
   description: "Every kedgeway command, flag and exit code.",
   alternates: { canonical: "/docs/commands" },
-  openGraph: { title: "Commands — kedgeway docs", description: "Every kedgeway command, flag and exit code.", url: "/docs/commands" },
+  openGraph: { title: "Commands — kedgeway docs", description: "Every kedgeway command, flag and exit code.", url: "/docs/commands", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Commands() {
@@ -17,7 +18,7 @@ export default function Commands() {
       <p className={styles.lede}>Three commands: <code>diagnose</code>, <code>login</code> and <code>logout</code>.</p>
 
       <h2 id="diagnose">diagnose</h2>
-      <pre className="block"><code>{"kedgeway diagnose [path] [--json] [--fixture <file>] [--fail-on <severity>]"}</code></pre>
+      <CodeBlock label="bash" code={"kedgeway diagnose [path] [--json] [--fixture <file>] [--fail-on <severity>]"} />
       <p>Scans the repo at <code>path</code> (default: the current directory), fetches ecosystem data, and prints a report. Raven is used unless you pass <code>--fixture</code>.</p>
       <dl className={styles.defs}>
         <dt><code>--json</code></dt>
@@ -27,15 +28,15 @@ export default function Commands() {
         <dt><code>{"--fail-on <severity>"}</code></dt>
         <dd>Exit with code 2 if any finding is at or above <code>critical</code>, <code>warning</code> or <code>info</code>. Any other value is an error and exits with 1.</dd>
       </dl>
-      <pre className="block"><code>{`kedgeway diagnose ./my-contract --fail-on critical
-kedgeway diagnose . --json > report.json`}</code></pre>
+      <CodeBlock label="bash" code={`kedgeway diagnose ./my-contract --fail-on critical
+kedgeway diagnose . --json > report.json`} />
 
       <h2 id="login">login</h2>
-      <pre className="block"><code>kedgeway login</code></pre>
+      <CodeBlock label="bash" code={"kedgeway login"} />
       <p>Starts a fresh OAuth authorization with Stellar Raven and stores the token. Prints <code>Logged in to Stellar Raven.</code> on success. See <Link href="/docs/authentication">Authentication</Link>.</p>
 
       <h2 id="logout">logout</h2>
-      <pre className="block"><code>kedgeway logout</code></pre>
+      <CodeBlock label="bash" code={"kedgeway logout"} />
       <p>Deletes the stored credentials. It prints whether anything was removed and exits with 0 either way.</p>
 
       <h2 id="exit-codes">Exit codes</h2>

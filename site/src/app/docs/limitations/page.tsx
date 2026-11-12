@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
@@ -6,7 +7,7 @@ export const metadata: Metadata = {
   title: "Limitations — kedgeway docs",
   description: "What kedgeway does not do, so you can judge its output.",
   alternates: { canonical: "/docs/limitations" },
-  openGraph: { title: "Limitations — kedgeway docs", description: "What kedgeway does not do, so you can judge its output.", url: "/docs/limitations" },
+  openGraph: { title: "Limitations — kedgeway docs", description: "What kedgeway does not do, so you can judge its output.", url: "/docs/limitations", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Limitations() {
@@ -14,6 +15,9 @@ export default function Limitations() {
     <>
       <h1>Limitations</h1>
       <p className={styles.lede}>kedgeway says what it does not know. These are the gaps to keep in mind.</p>
+      <Callout kind="note">
+        <p>A clean report is evidence about declared versions only. It is not a security review of your contracts.</p>
+      </Callout>
       <dl className={styles.defs}>
         <dt>Manifests, not lockfiles</dt>
         <dd>kedgeway reads the version you declare, not the one a lockfile resolved. A loose range can resolve to a newer release than the report shows.</dd>

@@ -43,32 +43,32 @@ chroma is the construction red, used exclusively for construction lines (golden 
 
 Data states (grid only): deprecated = `--ink`; current = `--ink-2`; supported = `--rule`; unknown = `--ink-3`.
 The report's `$` line and `[CRITICAL]` tags are `--ink` at 600 weight, not colored. No glow, no shadows.
-Background particles: a sparse field of ink dust (1px, ≤ 400 particles) drifting slowly upward across the whole page, 20% opacity, pausing under reduced motion.
+Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical hairlines and a baseline under the hooves, scrolling left at ~36px/s with a fainter half-speed layer behind; faded under the text, static under reduced motion. No other page region moves.
 
 ## Typography
 
-- **Geist Sans** (headings, body) via `next/font/google`.
-- **Instrument Serif, italic** (one emphasized phrase inside each heading, never a whole heading).
-- **Geist Mono** (wordmark, overlines, commands, the report).
-- Scale: hero 3rem/1.05 (serif italic phrase at 1.08×), section heading 1.75rem/1.15, body 1.0625rem/1.6, overline 0.75rem mono uppercase tracking 0.12em.
-- Headings are sentence case, weight 400 for sans with the italic serif carrying the emphasis. No bold heavier than 500.
-- Example hero: `Your Soroban SDK <em>is drifting.</em>` — sans + serif italic.
+- **Geist Sans**: headings 500, body 400, via `next/font/google`.
+- **Geist Mono**: wordmark, overlines, commands, the report, labels.
+- Two typefaces only. No italics anywhere.
+- Scale: hero 3rem/1.05, section heading 1.75rem/1.15, body 1.0625rem/1.6, overline 0.75rem mono uppercase tracking 0.12em.
+- Headings are sentence case, single-tone: Geist 500 in `--ink`. No gray phrase, no italics, no second typeface. No bold heavier than 500.
+- Example hero: `Your Soroban SDK is drifting.` on one line at desktop widths.
 
 ## Layout rules
 
-- **No boxes.** No cards, no bordered panels, no filled surfaces behind text. Structure comes from
+- **No boxes.** No cards, no bordered panels, no filled surfaces behind text. **One exception: code blocks** (surface `#101113`, 1px `--rule` border, 2px radius, label bar with a copy button). Structure comes from
   hairlines (`--rule`, 1px) and whitespace.
 - Content column 40rem for text, 64rem for data. Centered.
 - Vertical rhythm: sections separated by 9rem desktop / 5rem mobile, each opened by a hairline and an overline (`01 — the ecosystem`).
-- Code and commands: mono text with a 2px `--ink` left rule, no background, no border.
+- Code and commands: the `CodeBlock` (mono, label bar, Copy button, no `$` prompts in copyable text). The report in section 03 is output, so it stays plain mono lines.
 - The report: plain mono lines on the page, prompt line and severity tag in `--ink` at weight 600, no color, no panel.
 - Buttons: one filled `--ink` with `--bg` text (mono), one text link with `→`. Radius 2px. Nothing else is a button.
 - Links in body: underline 1px `--ink-2`, no color change.
 
 ## Motion
 
-- Hero gallop at 10fps, pauses off-screen, static under reduced motion.
-- Grid: deprecated dots light in a left-to-right wave once (1.2s). Nothing else animates. No scroll reveals.
+- Hero gallop at 10fps and the measuring wall behind it; both pause off-screen and are static under reduced motion.
+- Outside the hero, motion happens once and stops: the grid wave (1.2s), the diagram packet, the report typewriter. No scroll reveals.
 
 ## Image direction
 

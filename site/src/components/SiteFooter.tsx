@@ -1,5 +1,6 @@
 import Link from "next/link";
 import HorseMark from "./HorseMark";
+import PixelIcon from "./icons/pixel";
 import styles from "./SiteFooter.module.css";
 
 const REPO = "https://github.com/Klorenn/kedgeway";
@@ -20,26 +21,38 @@ export default function SiteFooter() {
         </div>
         <div className={styles.cols}>
           <div>
-            <p className={styles.h}>Product</p>
+            <p className={styles.h}>
+              <PixelIcon name="terminal" size={16} />
+              <span>Product</span>
+            </p>
             <p><Link href="/#install">Install</Link></p>
             <p><Link href="/docs">Docs</Link></p>
             <p><Link href="/docs/roadmap">Roadmap</Link></p>
             <p><a href={`${BLOB}/CHANGELOG.md`}>Changelog</a></p>
           </div>
           <div>
-            <p className={styles.h}>Project</p>
+            <p className={styles.h}>
+              <PixelIcon name="file" size={16} />
+              <span>Project</span>
+            </p>
             <p><a href={REPO}>GitHub</a></p>
             <p><a href={`${BLOB}/LICENSE`}>License MIT</a></p>
             <p><a href={`${BLOB}/SECURITY.md`}>Security</a></p>
             <p><a href={`${BLOB}/CONTRIBUTING.md`}>Contributing</a></p>
           </div>
           <div>
-            <p className={styles.h}>Source</p>
+            <p className={styles.h}>
+              <PixelIcon name="raven" size={16} />
+              <span>Source</span>
+            </p>
             <p className={styles.plain}>Built on Stellar Raven</p>
             <p className={styles.plain}>Muybridge pl. 626 — 1878</p>
           </div>
           <div>
-            <p className={styles.h}>Author</p>
+            <p className={styles.h}>
+              <PixelIcon name="anchor" size={16} />
+              <span>Author</span>
+            </p>
             <p className={styles.made}>Made by Kl0ren</p>
             <div className={styles.icons}>
               <a href="https://x.com/kl0ren" aria-label="Kl0ren on X">

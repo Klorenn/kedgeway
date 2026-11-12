@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import CodeBlock from "@/components/CodeBlock";
+import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
@@ -6,7 +8,7 @@ export const metadata: Metadata = {
   title: "Authentication — kedgeway docs",
   description: "How kedgeway signs in to Stellar Raven, what it stores, and what it sends.",
   alternates: { canonical: "/docs/authentication" },
-  openGraph: { title: "Authentication — kedgeway docs", description: "How kedgeway signs in to Stellar Raven, what it stores, and what it sends.", url: "/docs/authentication" },
+  openGraph: { title: "Authentication — kedgeway docs", description: "How kedgeway signs in to Stellar Raven, what it stores, and what it sends.", url: "/docs/authentication", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Authentication() {
@@ -33,10 +35,13 @@ export default function Authentication() {
       </p>
 
       <h2>Where the token lives</h2>
-      <pre className="block"><code>~/.config/kedgeway/auth.json</code></pre>
+      <Callout kind="warning">
+        <p>Anyone who can read <code>~/.config/kedgeway/auth.json</code> can use your Raven session. kedgeway writes it with mode 0600; keep it out of backups and repos, and run <code>kedgeway logout</code> on shared machines.</p>
+      </Callout>
+      <CodeBlock label="bash" code={"~/.config/kedgeway/auth.json"} />
       <p>The folder is created with mode 0700 and the file is written with mode 0600, through a temporary file and a rename. It holds the OAuth tokens, the client registration, and the last callback port.</p>
       <p>To delete it:</p>
-      <pre className="block"><code>kedgeway logout</code></pre>
+      <CodeBlock label="bash" code={"kedgeway logout"} />
 
       <h2>What is sent to Raven</h2>
       <p>

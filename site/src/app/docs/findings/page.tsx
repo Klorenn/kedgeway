@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: "Findings — kedgeway docs",
   description: "Every kedgeway finding code: severity, meaning, evidence and what to do.",
   alternates: { canonical: "/docs/findings" },
-  openGraph: { title: "Findings — kedgeway docs", description: "Every kedgeway finding code: severity, meaning, evidence and what to do.", url: "/docs/findings" },
+  openGraph: { title: "Findings — kedgeway docs", description: "Every kedgeway finding code: severity, meaning, evidence and what to do.", url: "/docs/findings", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
 };
 
 export default function Findings() {
