@@ -27,6 +27,15 @@ export const DOCS_GROUPS: DocsGroup[] = [
     ],
   },
   {
+    label: "Integrations",
+    pages: [
+      { href: "/docs/sdk", title: "TypeScript SDK", summary: "Call diagnose and migrate from your own code." },
+      { href: "/docs/mcp", title: "MCP server", summary: "Let AI assistants diagnose a repo." },
+      { href: "/docs/github-action", title: "GitHub Action", summary: "Gate pull requests on drift." },
+      { href: "/docs/migrate", title: "Migration mode", summary: "Plan and apply SDK version bumps." },
+    ],
+  },
+  {
     label: "Reference",
     pages: [
       { href: "/docs/what-it-scans", title: "What it scans", summary: "Manifest forms, skipped folders, version ranges." },
@@ -38,7 +47,6 @@ export const DOCS_GROUPS: DocsGroup[] = [
   {
     label: "More",
     pages: [
-      { href: "/docs/roadmap", title: "Roadmap", summary: "Planned work. None of it has shipped." },
       { href: "/docs/faq", title: "FAQ", summary: "Short answers." },
     ],
   },

@@ -45,11 +45,11 @@ const FAQ: [string, string][] = [
   ["When will it be on npm?", "Not yet. npm install -g kedgeway is coming soon; build from source today."],
 ];
 
-const ROADMAP = [
-  ["MCP server", "Lets coding agents call diagnose directly."],
-  ["TypeScript SDK", "Run diagnoses from your own tooling."],
-  ["Migration mode", "Opens a PR with the upgrade already applied."],
-  ["GitHub Action", "Checks every pull request for drift."],
+const SHIPPED = [
+  ["TypeScript SDK", "Call diagnose and migrate from your own code.", "/docs/sdk"],
+  ["MCP server", "kedgeway mcp lets AI assistants diagnose a repo.", "/docs/mcp"],
+  ["GitHub Action", "Fail a pull request on drift, with a fixture.", "/docs/github-action"],
+  ["Migration mode", "Plan and apply SDK bumps; dry run by default.", "/docs/migrate"],
 ] as const;
 
 export default function Home() {
@@ -215,12 +215,12 @@ kedgeway diagnose ./my-contract --fail-on warning`}
       <section className={`${styles.section} ${styles.light}`} aria-labelledby="road-h">
         <div className={`col ${styles.centered}`}>
           <div className={styles.head}>
-            <h2 id="road-h">What comes next. <span className="line2">None of it has shipped.</span></h2>
+            <h2 id="road-h">Not a roadmap anymore. <span className="line2">Four ways to run it.</span></h2>
           </div>
           <ul className={styles.road}>
-            {ROADMAP.map(([name, what]) => (
+            {SHIPPED.map(([name, what, href]) => (
               <li key={name}>
-                <h3>{name}</h3>
+                <h3><Link href={href}>{name}</Link></h3>
                 <p>{what}</p>
               </li>
             ))}
@@ -233,7 +233,7 @@ kedgeway diagnose ./my-contract --fail-on warning`}
           <svg width="160" height="76" viewBox="-6 15 160 76" role="img" aria-label="A horse at full gallop" className={styles.ctaHorse}>
             <HatchGroup frame={STATIC_FRAME} color="var(--ink)" trails={false} weight={1.6} />
           </svg>
-          <h2 id="cta-h" className={styles.ctaTitle}>Stop drifting. <span className="line2">Diagnose your repo now.</span></h2>
+          <h2 id="cta-h" className={styles.ctaTitle}>Stop drifting. <span className="line2">Diagnose, then migrate.</span></h2>
           <div className={styles.cta}>
             <Link className="btnPrimary" href="#install">Get started</Link>
             <Link className="btnLink" href="/docs">Read the docs →</Link>

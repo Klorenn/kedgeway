@@ -15,7 +15,7 @@ export default function GettingStarted() {
   return (
     <>
       <h1>Getting started</h1>
-      <p className={styles.lede}>Five minutes from clone to your first report. You need Node.js 20 or newer.</p>
+      <p className={styles.lede}>Five minutes from clone to your first report. You need Node.js 22.12 or newer.</p>
 
       <h2>Install</h2>
       <p>kedgeway is not published to npm yet. <code>npm install -g kedgeway</code> is coming soon. Until then, build it from source:</p>

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const QA: [string, string][] = [
   ["Does kedgeway send my code anywhere?", "No. It sends one fixed script to Stellar Raven, with nothing from your repo in it. The comparison happens on your machine."],
   ["Why do I have to log in?", "Live ecosystem data comes from the Stellar Raven MCP server, which requires OAuth. You log in once; the token is stored at ~/.config/kedgeway/auth.json."],
-  ["Does it change my repo?", "No. It only reads manifests. Migration is on the roadmap, not shipped."],
+  ["Does it change my repo?", "diagnose never does. kedgeway migrate is a dry run unless you pass --write, and it refuses to write over uncommitted git changes."],
   ["Can I run it offline?", "Yes, with --fixture and a saved snapshot. See Fixtures."],
   ["Why do I get SDK_UNKNOWN?", "Either the version in your manifest cannot be read as a single major (for example an upper bound or a compound range), or the current major was unavailable. See What it scans and DATA_DEGRADED."],
   ["Does it read my lockfile?", "No. It reads the versions declared in Cargo.toml and package.json."],

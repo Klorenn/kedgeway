@@ -27,8 +27,8 @@ export default function Limitations() {
         <dd>They are read from the official Software Versions page. If that page changes shape, parsing can fail, and the report says so with DATA_DEGRADED.</dd>
         <dt>Raven must be reachable</dt>
         <dd>A live run needs network access and a valid Raven sign-in. Offline, use <code>--fixture</code>. Storing the sign-in as a CI secret is not supported yet.</dd>
-        <dt>No migration</dt>
-        <dd>kedgeway diagnoses; it does not edit your repo. Migration PRs are on the roadmap, not shipped.</dd>
+        <dt>Migration is narrow</dt>
+        <dd><code>kedgeway migrate</code> is experimental. It bumps versions in manifests and lists manual steps; it does not rewrite source code and never runs cargo or npm.</dd>
         <dt>Versions only</dt>
         <dd>It measures SDK version drift. It does not audit contract logic, security or runtime behavior.</dd>
         <dt>Scan limits</dt>

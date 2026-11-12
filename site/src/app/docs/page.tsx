@@ -29,7 +29,7 @@ export default function Overview() {
 
       <h2>What it is not</h2>
       <ul>
-        <li>Not a migration tool. It does not change your repo. A migration mode is on the <Link href="/docs/roadmap">roadmap</Link>, not shipped.</li>
+        <li>Not a rewriter. <code>diagnose</code> never changes your repo. <Link href="/docs/migrate">Migration mode</Link> is experimental, bumps versions only, and never runs <code>cargo</code> or <code>npm</code>.</li>
         <li>Not a lockfile auditor. It reads the versions you declare in manifests, not what a lockfile resolved.</li>
         <li>Not a security or contract audit. It only measures SDK version drift.</li>
         <li>Not a service. Your repo contents never leave your machine. See <Link href="/docs/authentication">Authentication</Link>.</li>

@@ -27,7 +27,7 @@ export default function Ci() {
 
       <h2>Live data is not supported in CI yet</h2>
       <p className={styles.note}>
-        Raven sign-in needs a browser. Storing <code>~/.config/kedgeway/auth.json</code> as a CI secret is <strong>not supported</strong> yet. A GitHub Action is on the <Link href="/docs/roadmap">roadmap</Link>, not shipped.
+        Raven sign-in needs a browser. Storing <code>~/.config/kedgeway/auth.json</code> as a CI secret is <strong>not supported</strong> yet. There is now a <Link href="/docs/github-action">GitHub Action</Link> that wraps this; it also needs a fixture.
       </p>
       <p>Until then, run offline in CI against a saved snapshot with <code>--fixture</code>. Refresh the snapshot by hand when the ecosystem moves. See <Link href="/docs/fixtures">Fixtures</Link>.</p>
 

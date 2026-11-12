@@ -4,7 +4,7 @@ import HorseMark from "./HorseMark";
 import PixelIcon from "./icons/pixel";
 import styles from "./SiteFooter.module.css";
 
-const REPO = "https://github.com/kedgeway/kedgeway";
+const REPO = "https://github.com/Klorenn/kedgeway";
 const BLOB = `${REPO}/blob/main`;
 
 // Official simple-icons paths (24x24 viewBox).
@@ -42,8 +42,11 @@ export default function SiteFooter() {
                 <li><Link href="/#install">Install</Link></li>
                 <li><Link href="/docs">Docs</Link></li>
                 <li><Link href="/docs/findings">Findings</Link></li>
+                <li><Link href="/docs/sdk">SDK</Link></li>
+                <li><Link href="/docs/mcp">MCP</Link></li>
+                <li><Link href="/docs/github-action">Action</Link></li>
+                <li><Link href="/docs/migrate">Migrate</Link></li>
                 <li><a href={`${BLOB}/CHANGELOG.md`}>Changelog</a></li>
-                <li><Link href="/docs/roadmap">Roadmap</Link></li>
               </ul>
             </nav>
             <nav className={styles.col} aria-label="Project">

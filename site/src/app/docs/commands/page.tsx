@@ -15,7 +15,7 @@ export default function Commands() {
   return (
     <>
       <h1>Commands</h1>
-      <p className={styles.lede}>Three commands: <code>diagnose</code>, <code>login</code> and <code>logout</code>.</p>
+      <p className={styles.lede}>Five commands: <code>diagnose</code>, <code>login</code>, <code>logout</code>, <code>migrate</code> and <code>mcp</code>.</p>
 
       <h2 id="diagnose">diagnose</h2>
       <CodeBlock label="bash" code={"kedgeway diagnose [path] [--json] [--fixture <file>] [--fail-on <severity>]"} />
@@ -38,6 +38,14 @@ kedgeway diagnose . --json > report.json`} />
       <h2 id="logout">logout</h2>
       <CodeBlock label="bash" code={"kedgeway logout"} />
       <p>Deletes the stored credentials. It prints whether anything was removed and exits with 0 either way.</p>
+
+      <h2 id="migrate">migrate</h2>
+      <CodeBlock code={"kedgeway migrate [path] [--write] [--fixture <file>]"} />
+      <p>Experimental. Plans SDK version bumps and prints a unified diff; it edits files only with <code>--write</code>. Exit 0 when there is nothing to do or the edits were applied, 2 on a dry run with a plan, 1 on error. See <Link href="/docs/migrate">Migration mode</Link>.</p>
+
+      <h2 id="mcp">mcp</h2>
+      <CodeBlock code={"kedgeway mcp"} />
+      <p>Runs an MCP server over stdio. It never starts OAuth: log in first. See <Link href="/docs/mcp">MCP server</Link>.</p>
 
       <h2 id="exit-codes">Exit codes</h2>
       <div className={styles.tableWrap}>
