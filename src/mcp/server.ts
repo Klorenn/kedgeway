@@ -1,15 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { createRequire } from "node:module";
 import { z } from "zod";
-import { SEVERITY_RANK, type Diagnosis, type Severity } from "../core/diagnose.js";
+import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import { FINDINGS_REFERENCE } from "../core/findings-reference.js";
 import type { EcosystemPort } from "../ports/ecosystem.js";
-import { diagnoseDetailed, resolveEcosystem } from "../sdk.js";
+import { diagnoseDetailed, migrate, resolveEcosystem } from "../sdk.js";
 
 export interface KedgewayServerOptions {
   /** Ecosystem used when a tool call has no fixture. Defaults to live Raven. */
   ecosystem?: EcosystemPort;
 }
+
+const version = (createRequire(import.meta.url)("../../package.json") as { version: string }).version;
 
 const SeveritySchema = z.enum(["critical", "warning", "info"]);
 
@@ -24,12 +28,12 @@ function failure(e: unknown): { isError: true; content: { type: "text"; text: st
 function summarize(d: Diagnosis, failOn: Severity | undefined): string {
   const base = `${d.summary.critical} critical, ${d.summary.warning} warning, ${d.summary.info} info`;
   if (!failOn) return base;
-  const met = d.findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[failOn]);
+  const met = meetsThreshold(d, failOn);
   return `${base}. fail-on ${failOn}: ${met ? "met (a finding is at or above the threshold)" : "not met"}`;
 }
 
 export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServer {
-  const server = new McpServer({ name: "kedgeway", version: "0.1.0" });
+  const server = new McpServer({ name: "kedgeway", version });
   const ecosystemFor = (fixture: string | undefined) =>
     fixture ? { fixture } : opts.ecosystem ? { ecosystem: opts.ecosystem } : {};
 
@@ -76,9 +80,47 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
     },
   );
 
+  server.registerTool(
+    "migrate",
+    {
+      description:
+        "Plan SDK version bumps for a Stellar/Soroban repo (experimental). Dry run by default: returns a summary, the plan JSON and a unified diff. With write=true it edits the manifests (refused if they have uncommitted git changes). Never runs cargo or npm.",
+      inputSchema: {
+        path: z.string().describe("Directory of the repository"),
+        fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
+        write: z.boolean().optional().default(false).describe("Apply the edits (default false: dry run)"),
+      },
+    },
+    async ({ path, fixture, write }) => {
+      try {
+        const { plan, result } = await migrate({ path, write, ...ecosystemFor(fixture) });
+        const edits = plan.steps.filter((s) => s.kind !== "manual").length;
+        const head = result.written
+          ? `Updated ${result.changes.length} file(s): ${result.changes.map((c) => c.file).join(", ")}.`
+          : `Dry run: ${edits} edit(s), ${result.manual.length} manual step(s).`;
+        const follow = result.followUp.length > 0 ? ` Next run: ${result.followUp.join("; ")}.` : "";
+        return text(`${head}${follow}`, JSON.stringify(plan, null, 2), result.diff);
+      } catch (e) {
+        return failure(e);
+      }
+    },
+  );
+
   return server;
 }
 
-export async function runStdioServer(opts: KedgewayServerOptions = {}): Promise<void> {
-  await createKedgewayServer(opts).connect(new StdioServerTransport());
+/** Serves MCP until the transport closes (client disconnect or stdin EOF). */
+export async function runStdioServer(
+  opts: KedgewayServerOptions = {},
+  transport: Transport = new StdioServerTransport(),
+): Promise<void> {
+  const closed = new Promise<void>((resolve) => {
+    const prev = transport.onclose;
+    transport.onclose = () => {
+      prev?.();
+      resolve();
+    };
+  });
+  await createKedgewayServer(opts).connect(transport);
+  await closed;
 }

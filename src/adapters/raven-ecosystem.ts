@@ -87,6 +87,7 @@ export async function openRavenSession(
   store: AuthStore = new AuthStore(),
   url: string = RAVEN_URL,
   deps: ConnectDeps = realConnectDeps(url),
+  options: { interactive?: boolean } = {},
 ): Promise<RavenSession> {
   const saved = await store.load();
 
@@ -102,6 +103,9 @@ export async function openRavenSession(
   } catch (e) {
     if (!(e instanceof UnauthorizedError)) throw e;
     await silentClient.close().catch(() => undefined);
+    if (options.interactive === false) {
+      throw new Error('Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.');
+    }
   }
 
   // 2. interactive authorization

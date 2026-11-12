@@ -52,18 +52,4 @@ runs:
         KW_FIXTURE: ${{ inputs.fixture }}
         KW_JSON: ${{ inputs.json }}
         KW_CLI: ${{ github.action_path }}/dist/cli.js
-      run: |
-        set -euo pipefail
-        if [ -z "$KW_FIXTURE" ]; then
-          echo "::error title=kedgeway::OAuth in CI isn't supported yet. Set the 'fixture' input to a committed ecosystem snapshot JSON (see the README, GitHub Action section)."
-          exit 1
-        fi
-        report="$RUNNER_TEMP/kedgeway-report.json"
-        node "$KW_CLI" diagnose "$KW_PATH" --json --fixture "$KW_FIXTURE" > "$report"
-        summary=$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const s=d.summary;console.log("critical="+s.critical+" warning="+s.warning+" info="+s.info)' "$report")
-        echo "summary=$summary" >> "$GITHUB_OUTPUT"
-        echo "report-json=$report" >> "$GITHUB_OUTPUT"
-        args=(diagnose "$KW_PATH" --fixture "$KW_FIXTURE")
-        if [ "$KW_JSON" = "true" ]; then args+=(--json); fi
-        if [ -n "$KW_FAIL_ON" ]; then args+=(--fail-on "$KW_FAIL_ON"); fi
-        node "$KW_CLI" "${args[@]}"
+      run: bash "$GITHUB_ACTION_PATH/scripts/action-run.sh"

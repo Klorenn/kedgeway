@@ -4,9 +4,22 @@ export interface FindingReference {
   code: string;
   severity: Severity;
   meaning: string;
+  /** What `kedgeway migrate` does for this code, when it acts on it. */
+  migration?: string;
 }
 
-export const FINDINGS_REFERENCE: readonly FindingReference[] = [
+const MIGRATION: Record<string, string> = {
+  SDK_DEPRECATED: "Bumps soroban-sdk to the exact current version (workspace root for inherited deps); operator ranges become a manual step.",
+  SDK_BEHIND: "Bumps soroban-sdk to the exact current version, preserving =, ~ or ^ prefixes.",
+  SDK_UNKNOWN: "Manual step explaining why no edit was made.",
+  JS_SDK_DEPRECATED: "Bumps @stellar/stellar-sdk to the current version, keeping ^ or ~; @stellar/stellar-base becomes a manual step.",
+  JS_SDK_BEHIND: "Bumps @stellar/stellar-sdk to the current version, keeping ^ or ~; @stellar/stellar-base becomes a manual step.",
+  JS_SDK_UNKNOWN: "Manual step explaining why no edit was made.",
+  JS_LEGACY_PACKAGE: "Replaces the legacy package with @stellar/stellar-sdk at ^current and adds a manual step with rg patterns to update imports.",
+  MANIFEST_UNPARSEABLE: "Manual step: fix the manifest, then re-run.",
+};
+
+const BASE: readonly FindingReference[] = [
   { code: "SDK_DEPRECATED", severity: "critical", meaning: "soroban-sdk is on a deprecated major: two or more majors behind the official current major, or a major listed as deprecated by Scout that is below current." },
   { code: "SDK_BEHIND", severity: "warning", meaning: "soroban-sdk is exactly one major behind the official current major." },
   { code: "SDK_CURRENT", severity: "info", meaning: "soroban-sdk is on the official current major (or newer)." },
@@ -20,3 +33,8 @@ export const FINDINGS_REFERENCE: readonly FindingReference[] = [
   { code: "MANIFEST_UNPARSEABLE", severity: "warning", meaning: "A Cargo.toml, package.json or directory could not be read or parsed, so it was not checked." },
   { code: "DATA_DEGRADED", severity: "warning", meaning: "Part of the ecosystem data could not be fetched or parsed; related verdicts may be unknown or incomplete." },
 ];
+
+export const FINDINGS_REFERENCE: readonly FindingReference[] = BASE.map((f) => {
+  const migration = MIGRATION[f.code];
+  return migration ? { ...f, migration } : f;
+});

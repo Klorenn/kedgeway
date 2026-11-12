@@ -28,6 +28,7 @@ describe("FakeEcosystem", () => {
       const out = await (await loadFixture(f)).fetchSnapshot();
       expect(out.protocolCurrent).toBeNull();
       expect(out.degraded).toEqual([]);
+      expect(out.sorobanSdk.currentVersion).toBeNull();
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -1,7 +1,7 @@
 import { Command, CommanderError } from "commander";
-import { SEVERITY_RANK, type Diagnosis, type Severity } from "../core/diagnose.js";
+import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import type { RepoFacts } from "../core/repo-facts.js";
-import { diagnoseDetailed } from "../sdk.js";
+import { diagnoseDetailed, migrate, type MigrateOutcome } from "../sdk.js";
 import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 
 export interface CliIo {
@@ -54,10 +54,68 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
       ...(opts.fixture ? { fixture: opts.fixture } : { ecosystem: io.createRavenPort() }),
     });
     io.stdout(opts.json ? `${JSON.stringify(diagnosis, null, 2)}\n` : formatReport(facts, snapshot, diagnosis));
-    if (threshold && diagnosis.findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[threshold])) {
+    if (threshold && meetsThreshold(diagnosis, threshold)) {
       return 2;
     }
     return 0;
+  } catch (e) {
+    io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
+    return 1;
+  }
+}
+
+interface MigrateOptions {
+  dryRun?: boolean;
+  write?: boolean;
+  fixture?: string;
+}
+
+export function formatMigration(o: MigrateOutcome, write: boolean): string {
+  const { plan, result } = o;
+  const lines: string[] = [];
+  lines.push(`kedgeway migrate (${write ? "write" : "dry run"}): ${plan.root}`);
+  if (plan.steps.length === 0) {
+    lines.push("", "Nothing to migrate.");
+    return `${lines.join("\n")}\n`;
+  }
+  if (result.diff) lines.push("", result.diff.trimEnd());
+  if (result.written) {
+    lines.push("", `Updated ${result.changes.length} file(s): ${result.changes.map((c) => c.file).join(", ")}`);
+  }
+  if (result.skipped.length > 0) {
+    lines.push("", "Could not apply (do these by hand):");
+    for (const s of result.skipped) lines.push(`  - ${s.step.file}: ${s.reason}`);
+  }
+  if (result.manual.length > 0) {
+    lines.push("", "Manual steps:");
+    for (const m of result.manual) lines.push(`  - ${m.file}${m.dependency ? ` (${m.dependency})` : ""}: ${m.reason}`);
+  }
+  if (result.followUp.length > 0 && (result.changes.length > 0 || result.written)) {
+    lines.push("", "Next, run:");
+    for (const c of result.followUp) lines.push(`  ${c}`);
+  }
+  const edits = plan.steps.filter((s) => s.kind !== "manual").length;
+  lines.push(
+    "",
+    `Plan: ${edits} edit(s), ${result.manual.length} manual step(s).${write ? "" : " Re-run with --write to apply."}`,
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+async function runMigrate(path: string, opts: MigrateOptions, io: CliIo): Promise<number> {
+  if (opts.dryRun && opts.write) {
+    io.stderr("kedgeway: --dry-run and --write are mutually exclusive\n");
+    return 1;
+  }
+  const write = opts.write === true;
+  try {
+    const outcome = await migrate({
+      path,
+      write,
+      ...(opts.fixture ? { fixture: opts.fixture } : { ecosystem: io.createRavenPort() }),
+    });
+    io.stdout(formatMigration(outcome, write));
+    return !write && outcome.plan.steps.length > 0 ? 2 : 0;
   } catch (e) {
     io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
     return 1;
@@ -81,6 +139,16 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     .option("--fail-on <severity>", "exit 2 if any finding is at or above: critical | warning | info")
     .action(async (path: string | undefined, opts: DiagnoseOptions) => {
       exitCode = await runDiagnose(path ?? ".", opts, io);
+    });
+
+  program
+    .command("migrate [path]")
+    .description("Plan (default, dry run) or apply (--write) SDK version bumps. Experimental.")
+    .option("--dry-run", "print the planned edits as a diff without writing (default)")
+    .option("--write", "apply the edits to the manifests")
+    .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")
+    .action(async (path: string | undefined, opts: MigrateOptions) => {
+      exitCode = await runMigrate(path ?? ".", opts, io);
     });
 
   program

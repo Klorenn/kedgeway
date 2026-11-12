@@ -9,6 +9,8 @@ export interface Finding {
   message: string;
   file: string;
   evidence: string;
+  /** The dependency a finding is about; `file` is where its version is declared. */
+  dependency?: { name: string; raw: string; file: string };
 }
 
 export interface Diagnosis {
@@ -24,6 +26,10 @@ function provenance(s: EcosystemSnapshot): string {
 
 function jsProvenance(s: EcosystemSnapshot): string {
   return `source: ${s.jsSdk.source}, observed ${s.observedAt}`;
+}
+
+function depRef(dep: DetectedDep): NonNullable<Finding["dependency"]> {
+  return { name: dep.name, raw: dep.raw, file: dep.declaredIn ?? dep.file };
 }
 
 function majorOf(version: string): number | null {
@@ -137,6 +143,10 @@ function diagnoseJsDep(dep: DetectedDep, s: EcosystemSnapshot): Finding {
   };
 }
 
+export function meetsThreshold(d: Diagnosis, severity: Severity): boolean {
+  return d.findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[severity]);
+}
+
 export function diagnose(facts: RepoFacts, snapshot: EcosystemSnapshot): Diagnosis {
   const findings: Finding[] = [];
 
@@ -159,7 +169,7 @@ export function diagnose(facts: RepoFacts, snapshot: EcosystemSnapshot): Diagnos
     });
   }
   for (const dep of facts.rustDeps) {
-    if (dep.name === "soroban-sdk") findings.push(diagnoseRustDep(dep, snapshot));
+    if (dep.name === "soroban-sdk") findings.push({ ...diagnoseRustDep(dep, snapshot), dependency: depRef(dep) });
   }
   for (const dep of facts.jsDeps) {
     if (dep.name === "soroban-client" || dep.name === "stellar-sdk") {
@@ -169,9 +179,10 @@ export function diagnose(facts: RepoFacts, snapshot: EcosystemSnapshot): Diagnos
         message: `${dep.name} ${dep.raw} is a legacy package; replace it with @stellar/stellar-sdk.`,
         file: dep.file,
         evidence: `Legacy package name detected in manifest; reference: ${snapshot.jsSdk.source}, observed ${snapshot.observedAt}.`,
+        dependency: depRef(dep),
       });
     } else {
-      findings.push(diagnoseJsDep(dep, snapshot));
+      findings.push({ ...diagnoseJsDep(dep, snapshot), dependency: depRef(dep) });
     }
   }
   if (facts.rustDeps.length === 0 && facts.jsDeps.length === 0 && facts.manifestErrors.length === 0) {

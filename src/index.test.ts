@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -7,7 +7,7 @@ import type { Diagnosis, EcosystemSnapshot, Finding, RepoFacts, Severity } from 
 
 const snapshot: EcosystemSnapshot = {
   observedAt: "2026-11-11T00:00:00.000Z",
-  sorobanSdk: { currentMajor: 28, deprecatedVersions: [], source: "fake" },
+  sorobanSdk: { currentMajor: 28, currentVersion: "28.0.0", deprecatedVersions: [], source: "fake" },
   jsSdk: { currentVersion: "17.2.1", source: "fake" },
   protocolCurrent: 29,
   degraded: [],
@@ -34,6 +34,9 @@ describe("public API", () => {
       "createRavenEcosystem",
       "FakeEcosystem",
       "loadFixture",
+      "planMigration",
+      "applyMigration",
+      "migrate",
     ]) {
       expect(sdk).toHaveProperty(name);
       expect((sdk as Record<string, unknown>)[name]).toBeTypeOf("function");
@@ -72,5 +75,16 @@ describe("public API", () => {
 
   it("createRavenEcosystem returns an EcosystemPort without connecting", () => {
     expect(sdk.createRavenEcosystem().fetchSnapshot).toBeTypeOf("function");
+  });
+
+  it("migrate plans and (dry-run) applies without writing; write mode edits the file", async () => {
+    const eco = new sdk.FakeEcosystem(snapshot);
+    const dry = await sdk.migrate({ path: dir, ecosystem: eco });
+    expect(dry.plan.steps[0]).toMatchObject({ kind: "bump-rust-dep", to: "28.0.0" });
+    expect(dry.result.written).toBe(false);
+    expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toContain('"21.0.0"');
+    const wet = await sdk.migrate({ path: dir, ecosystem: eco, write: true });
+    expect(wet.result.written).toBe(true);
+    expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toContain('"28.0.0"');
   });
 });

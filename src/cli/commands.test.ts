@@ -1,4 +1,6 @@
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -8,7 +10,7 @@ import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 
 const snapshot: EcosystemSnapshot = {
   observedAt: "2026-01-01T00:00:00.000Z",
-  sorobanSdk: { currentMajor: 23, deprecatedVersions: [], source: "fake" },
+  sorobanSdk: { currentMajor: 23, currentVersion: "23.0.0", deprecatedVersions: [], source: "fake" },
   jsSdk: { currentVersion: null, source: "fake" },
   protocolCurrent: null,
   degraded: [],
@@ -154,4 +156,69 @@ describe("mcp", () => {
     expect(await runCli(argv("mcp"), io)).toBe(1);
     expect(err.join("")).toContain("nope");
   });
+});
+
+describe("migrate", () => {
+  const cargo = `[dependencies]\nsoroban-sdk = "21.0.0" # pinned\n`;
+
+  it("dry-run (default) prints a diff, changes nothing and exits 2 when there are steps", async () => {
+    await repoWith("21.0.0");
+    const { io, out } = makeIo();
+    const code = await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io);
+    const text = out.join("");
+    expect(code).toBe(2);
+    expect(text).toContain("--- a/c/Cargo.toml");
+    expect(text).toContain('+soroban-sdk = "23.0.0"');
+    expect(text).toContain("cargo update -p soroban-sdk");
+    expect(text).toMatch(/dry run/i);
+    expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toContain('"21.0.0"');
+  });
+
+  it("--write applies the edits, prints a summary and follow-up commands, exits 0", async () => {
+    await mkdir(join(dir, "c"), { recursive: true });
+    await writeFile(join(dir, "c/Cargo.toml"), cargo);
+    const { io, out } = makeIo();
+    const code = await runCli(argv("migrate", dir, "--write", "--fixture", await fixtureFile()), io);
+    expect(code).toBe(0);
+    expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toBe(`[dependencies]\nsoroban-sdk = "23.0.0" # pinned\n`);
+    expect(out.join("")).toMatch(/updated.*c\/Cargo\.toml/is);
+    expect(out.join("")).toContain("cargo update -p soroban-sdk");
+  });
+
+  it("exits 0 when there is nothing to do", async () => {
+    await repoWith("23.0.0");
+    const { io, out } = makeIo();
+    expect(await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io)).toBe(0);
+    expect(out.join("")).toMatch(/nothing to migrate/i);
+  });
+
+  it("exits 2 in dry-run when only manual steps exist", async () => {
+    await mkdir(join(dir, "c"), { recursive: true });
+    await writeFile(join(dir, "c/Cargo.toml"), `[dependencies]\nsoroban-sdk = ">=21.0.0"\n`);
+    const { io, out } = makeIo();
+    expect(await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io)).toBe(2);
+    expect(out.join("")).toMatch(/manual/i);
+  });
+
+  it("rejects --dry-run together with --write", async () => {
+    const { io, err } = makeIo();
+    expect(await runCli(argv("migrate", dir, "--dry-run", "--write", "--fixture", await fixtureFile()), io)).toBe(1);
+    expect(err.join("")).toMatch(/dry-run.*write/i);
+  });
+
+  it("refuses --write on uncommitted changes with exit 1", async () => {
+    await repoWith("21.0.0");
+    const git = promisify(execFile);
+    await git("git", ["init", "-q"], { cwd: dir });
+    const { io, err } = makeIo();
+    expect(await runCli(argv("migrate", dir, "--write", "--fixture", await fixtureFile()), io)).toBe(1);
+    expect(err.join("")).toMatch(/uncommitted/i);
+    expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toContain('"21.0.0"');
+  });
+
+  async function fixtureFile(): Promise<string> {
+    const f = join(dir, "snapshot-migrate.json");
+    await writeFile(f, JSON.stringify(snapshot));
+    return f;
+  }
 });

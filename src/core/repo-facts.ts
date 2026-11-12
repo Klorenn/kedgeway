@@ -7,6 +7,8 @@ export interface DetectedDep {
   version: string | null;
   major: number | null;
   file: string;
+  /** For workspace-inherited deps: the manifest that actually declares the version. */
+  declaredIn?: string;
 }
 
 export interface ManifestError {
@@ -152,7 +154,8 @@ export function resolveRustDeps(
         .sort((a, b) => posix.dirname(b.file).length - posix.dirname(a.file).length)[0];
       if (owner) {
         referenced.add(`${owner.file}::${dep.key}`);
-        out.push(toDep("soroban-sdk", owner.manifest.workspaceDeps[dep.key] ?? "", file));
+        const resolved = toDep("soroban-sdk", owner.manifest.workspaceDeps[dep.key] ?? "", file);
+        out.push(owner.file === file ? resolved : { ...resolved, declaredIn: owner.file });
       } else if (isRustPackage(dep.name)) {
         out.push(toDep(dep.name, "", file));
       }

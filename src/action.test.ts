@@ -1,6 +1,8 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { diagnose, loadFixture } from "./index.js";
 
 const root = resolve(import.meta.dirname, "..");
@@ -22,14 +24,94 @@ describe("committed ecosystem fixture", () => {
 });
 
 describe("action.yml", () => {
-  it("declares the documented inputs, outputs and fail-fast message", async () => {
+  it("declares the documented inputs and outputs and delegates to the run script", async () => {
     const y = await readFile(resolve(root, "action.yml"), "utf8");
     for (const key of ["path:", "fail-on:", "fixture:", "json:", "summary:", "report-json:"]) {
       expect(y).toContain(key);
     }
     expect(y).toContain("using: composite");
-    expect(y).toMatch(/OAuth in CI isn't supported yet/);
     expect(y).toContain("github.action_path");
-    expect(y).toContain("RUNNER_TEMP");
+    expect(y).toContain("scripts/action-run.sh");
+  });
+});
+
+describe("scripts/action-run.sh", () => {
+  const script = resolve(root, "scripts/action-run.sh");
+  let tmp: string;
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "kw-action-"));
+  });
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  async function stubCli(json: string, code: number): Promise<string> {
+    const f = join(tmp, "cli.mjs");
+    await writeFile(f, `console.log(${JSON.stringify(json)}); process.exit(${code});\n`);
+    return f;
+  }
+
+  function run(env: Record<string, string>): Promise<{ code: number; out: string; outputs: string; calls: string }> {
+    const outputsFile = join(tmp, "gh_output");
+    return new Promise((res) => {
+      execFile(
+        "bash",
+        [script],
+        { env: { PATH: process.env["PATH"] ?? "", RUNNER_TEMP: tmp, GITHUB_OUTPUT: outputsFile, ...env } },
+        async (err, stdout, stderr) => {
+          const outputs = await readFile(outputsFile, "utf8").catch(() => "");
+          const code = err && typeof err.code === "number" ? err.code : 0;
+          res({ code, out: stdout + stderr, outputs, calls: "" });
+        },
+      );
+    });
+  }
+
+  const report = JSON.stringify({
+    findings: [{ severity: "warning", code: "SDK_BEHIND", file: "Cargo.toml", message: "behind", evidence: "e" }],
+    summary: { critical: 0, warning: 1, info: 0 },
+  });
+
+  it("fails fast with a clear message when no fixture is given", async () => {
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: "x" });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/OAuth in CI isn't supported yet/);
+  });
+
+  it("writes outputs even when fail-on trips, then exits with the CLI's code", async () => {
+    const cli = await stubCli(report, 2);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: cli });
+    expect(r.code).toBe(2);
+    expect(r.outputs).toContain("summary=critical=0 warning=1 info=0");
+    expect(r.outputs).toMatch(/report-json=.*kedgeway-report\.json/);
+    expect(r.out).toContain("SDK_BEHIND");
+    expect((await readFile(join(tmp, "kedgeway-report.json"), "utf8")).includes("SDK_BEHIND")).toBe(true);
+  });
+
+  it("exits 0 and writes outputs on success", async () => {
+    const cli = await stubCli(report, 0);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "true", KW_CLI: cli });
+    expect(r.code).toBe(0);
+    expect(r.outputs).toContain("summary=");
+  });
+
+  it("propagates tool errors (exit 1) without writing outputs", async () => {
+    const cli = await stubCli("", 1);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: cli });
+    expect(r.code).toBe(1);
+    expect(r.outputs).toBe("");
+  });
+});
+
+describe("packaging", () => {
+  it("emits declarations in the build config and checks dist before publishing", async () => {
+    const build = JSON.parse(await readFile(resolve(root, "tsconfig.build.json"), "utf8")) as {
+      compilerOptions?: { declaration?: boolean; declarationMap?: boolean };
+    };
+    expect(build.compilerOptions?.declaration).toBe(true);
+    expect(build.compilerOptions?.declarationMap).toBe(true);
+    const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")) as { scripts: Record<string, string> };
+    expect(pkg.scripts["prepublishOnly"]).toContain("scripts/check-dist.mjs");
+    await expect(readFile(resolve(root, "scripts/check-dist.mjs"), "utf8")).resolves.toContain("dist/index.d.ts");
   });
 });

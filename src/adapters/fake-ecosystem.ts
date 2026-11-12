@@ -6,6 +6,7 @@ export const SnapshotSchema = z.object({
   observedAt: z.string(),
   sorobanSdk: z.object({
     currentMajor: z.number().int().nullable(),
+    currentVersion: z.string().nullable().default(null),
     deprecatedVersions: z.array(z.string()),
     source: z.string(),
   }),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diagnose } from "./diagnose.js";
+import { diagnose, meetsThreshold } from "./diagnose.js";
 import type { DetectedDep, RepoFacts } from "./repo-facts.js";
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
 
@@ -114,6 +114,17 @@ describe("diagnose: JS", () => {
   });
 });
 
+describe("diagnose: dependency reference", () => {
+  it("attaches the declaring dependency to dep findings (workspace root when resolved)", () => {
+    const ws: DetectedDep = { ...rust("21.0.0", "contracts/a/Cargo.toml"), declaredIn: "Cargo.toml" };
+    const d = diagnose(facts([ws, rust("21.0.0", "b/Cargo.toml")], [js("@stellar/stellar-sdk", "12.0.0"), js("soroban-client")]), snap());
+    expect(d.findings[0]?.dependency).toEqual({ name: "soroban-sdk", raw: "21.0.0", file: "Cargo.toml" });
+    expect(d.findings[1]?.dependency).toEqual({ name: "soroban-sdk", raw: "21.0.0", file: "b/Cargo.toml" });
+    expect(d.findings[2]?.dependency).toEqual({ name: "@stellar/stellar-sdk", raw: "1.0.0".replace("1.0.0", "12.0.0"), file: "package.json" });
+    expect(d.findings[3]?.dependency).toEqual({ name: "soroban-client", raw: "1.0.0", file: "package.json" });
+  });
+});
+
 describe("diagnose: meta findings", () => {
   it("NO_SDK_FOUND when nothing detected", () => {
     const d = diagnose(facts([]), snap());
@@ -139,5 +150,14 @@ describe("diagnose: meta findings", () => {
   it("summarises counts by severity", () => {
     const d = diagnose(facts([rust("21.0.0"), rust("22.0.0"), rust("23.0.0")], [js("soroban-client")]), snap());
     expect(d.summary).toEqual({ critical: 2, warning: 1, info: 1 });
+  });
+});
+
+describe("meetsThreshold", () => {
+  it("is true when any finding is at or above the severity", () => {
+    const d = diagnose(facts([rust("22.0.1")]), snap()); // one warning
+    expect(meetsThreshold(d, "info")).toBe(true);
+    expect(meetsThreshold(d, "warning")).toBe(true);
+    expect(meetsThreshold(d, "critical")).toBe(false);
   });
 });

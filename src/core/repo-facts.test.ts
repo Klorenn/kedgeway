@@ -88,7 +88,9 @@ describe("resolveRustDeps", () => {
         { file: "Cargo.toml", manifest: root },
         { file: "a/Cargo.toml", manifest: member },
       ]),
-    ).toEqual([{ name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, file: "a/Cargo.toml" }]);
+    ).toEqual([
+      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, file: "a/Cargo.toml", declaredIn: "Cargo.toml" },
+    ]);
   });
 
   it("resolves workspace refs against the nearest ancestor workspace", () => {
@@ -101,7 +103,7 @@ describe("resolveRustDeps", () => {
       { file: "contracts/a/Cargo.toml", manifest: member },
     ]);
     expect(deps).toEqual([
-      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, file: "contracts/a/Cargo.toml" },
+      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, file: "contracts/a/Cargo.toml", declaredIn: "Cargo.toml" },
     ]);
   });
 

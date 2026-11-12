@@ -24,4 +24,20 @@ describe("FINDINGS_REFERENCE", () => {
       expect(f.meaning.length).toBeGreaterThan(10);
     }
   });
+
+  it("describes what `kedgeway migrate` does for each actionable code", () => {
+    const withMigration = FINDINGS_REFERENCE.filter((f) => f.migration).map((f) => f.code).sort();
+    expect(withMigration).toEqual(
+      [
+        "JS_LEGACY_PACKAGE",
+        "JS_SDK_BEHIND",
+        "JS_SDK_DEPRECATED",
+        "JS_SDK_UNKNOWN",
+        "MANIFEST_UNPARSEABLE",
+        "SDK_BEHIND",
+        "SDK_DEPRECATED",
+        "SDK_UNKNOWN",
+      ].sort(),
+    );
+  });
 });

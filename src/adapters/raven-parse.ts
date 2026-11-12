@@ -97,6 +97,7 @@ export function snapshotFromPayload(p: RavenPayload): EcosystemSnapshot {
     observedAt: p.observedAt,
     sorobanSdk: {
       currentMajor: majorOf(p.rustSdkCurrent),
+      currentVersion: p.rustSdkCurrent,
       deprecatedVersions: p.deprecatedVersions,
       source: `raven: stellarDocs.get_doc_page /docs/networks/software-versions (current); scout.analyzeEcosystem toolchain deprecated-repo sample${
         p.scoutGeneratedAt ? ` generated ${p.scoutGeneratedAt}` : ""

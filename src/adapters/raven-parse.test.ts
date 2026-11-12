@@ -46,6 +46,7 @@ describe("parseRavenResult", () => {
     const snap = parseRavenResult(JSON.stringify(payload) + footer);
     expect(snap.observedAt).toBe(payload.observedAt);
     expect(snap.sorobanSdk.currentMajor).toBe(28);
+    expect(snap.sorobanSdk.currentVersion).toBe("28.0.0");
     expect(snap.sorobanSdk.deprecatedVersions).toEqual(["29.0.0", "27.0.2", "26.0.1"]);
     expect(snap.sorobanSdk.source).toContain("raven");
     expect(snap.jsSdk.currentVersion).toBe("17.2.1");

@@ -50,6 +50,8 @@ kedgeway diagnose [path]                      # human-readable report
 kedgeway diagnose . --json                    # Diagnosis as JSON
 kedgeway diagnose . --fail-on warning         # exit 2 on any finding >= warning
 kedgeway diagnose . --fixture snapshot.json   # offline, no Raven
+kedgeway migrate [path]                       # experimental: plan SDK bumps (dry run)
+kedgeway migrate [path] --write               # apply them
 kedgeway mcp                                  # MCP server over stdio
 ```
 
@@ -92,16 +94,37 @@ kedgeway detects `soroban-sdk` in every `Cargo.toml` (string and table forms, re
 
 Version ranges that do not pin a major (`<21`, `a || b`) are reported as `*_UNKNOWN`.
 
+## Migration mode (experimental)
+
+```sh
+kedgeway migrate [path]            # dry run (default): prints a unified diff, edits nothing
+kedgeway migrate [path] --write    # applies the edits
+kedgeway migrate . --fixture snapshot.json
+```
+
+Deliberately narrow and safe:
+
+- **Rust**: a deprecated or behind `soroban-sdk` is bumped to the exact current version (for example `28.0.0`). Only the quoted version string on that one line changes, so comments, `features` and formatting are untouched. `workspace = true` members are left alone and the workspace root is bumped instead. `=`, `~` and `^` prefixes are kept; other ranges (`>=`, `<`) become manual steps.
+- **JS**: `@stellar/stellar-sdk` is bumped to the current version, keeping `^` or `~` (exact pins stay exact). `@stellar/stellar-base` is a manual step because the snapshot has no current base version. `soroban-client` and unscoped `stellar-sdk` are replaced by `@stellar/stellar-sdk` at `^current`, plus a manual step listing `rg` patterns to update imports. `package.json` keeps key order and indentation.
+- **Manual steps** are listed with their reason; kedgeway never guesses.
+- It never runs `cargo` or `npm`. It prints the follow-up commands (`cargo update -p soroban-sdk`, `npm install`).
+- `--write` is refused if a file it would touch has uncommitted changes in git (skipped if git is not installed or the path is not in a repo).
+- Exit codes: `0` nothing to do or applied, `2` the plan has steps and this is a dry run (so CI can gate), `1` error.
+
+Always review the diff and run your tests: a major bump can contain breaking API changes that kedgeway does not rewrite.
+
 ## Library (TypeScript SDK)
 
 ```ts
-import { diagnose, FakeEcosystem, createRavenEcosystem } from "kedgeway";
+import { diagnose, createRavenEcosystem } from "kedgeway";
 
 const diagnosis = await diagnose({ path: ".", ecosystem: createRavenEcosystem() });
 // or offline: await diagnose({ path: ".", fixture: "snapshot.json" });
 ```
 
-Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`.
+Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, `planMigration`, `applyMigration`, `migrate`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`, `MigrationPlan`, `MigrationStep`.
+
+ESM only (Node >= 22.12). The package `exports` map has no `default` or `require` condition, so `require("kedgeway")` is not supported. Type declarations (`dist/index.d.ts`) are emitted by the build and checked before publishing.
 
 ## MCP server
 
@@ -110,7 +133,8 @@ Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diag
 | Tool | Input | Returns |
 | ---- | ----- | ------- |
 | `diagnose` | `{ path, fixture?, failOn? }` | a text summary and the Diagnosis JSON |
-| `findings_reference` | none | the 12 finding codes with severity and meaning |
+| `findings_reference` | none | the 12 finding codes with severity, meaning and what `migrate` does for them |
+| `migrate` | `{ path, fixture?, write? }` | summary, plan JSON and unified diff; dry run unless `write: true` |
 | `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
 
 Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
@@ -123,13 +147,13 @@ Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
 }
 ```
 
-On first live use Raven's authorization URL is printed to stderr (stdout is reserved for the protocol); run `kedgeway login` once beforehand to avoid that.
+The MCP server never starts an OAuth flow: without stored Raven credentials, live calls fail immediately with `Run "kedgeway login" first`. Run `kedgeway login` once in a terminal (or pass `fixture`). `diagnose`, `migrate` and `ecosystem_snapshot` read the `path` / `fixture` you give them from the local disk; `migrate` with `write: true` edits files there.
 
 ## GitHub Action
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: Klorenn/kedgeway@main
+- uses: Klorenn/kedgeway@v0.1.0
   with:
     path: .
     fail-on: warning
@@ -142,6 +166,8 @@ On first live use Raven's authorization URL is printed to stderr (stdout is rese
 | `fail-on` | `warning` | fail on any finding at or above this severity; empty disables |
 | `fixture` | none | ecosystem snapshot JSON (required for now) |
 | `json` | `false` | print JSON instead of text |
+
+Pin a release tag as above; `@main` is unpinned and can change under you. The action builds kedgeway from source on every run (`npm ci && npm run build`), which is slow, until built `dist/` is committed on release tags.
 
 Outputs: `summary` (`critical=0 warning=1 info=2`) and `report-json` (path to the JSON report under `RUNNER_TEMP`).
 
@@ -180,7 +206,7 @@ OAuth in CI is not supported yet, so `--fixture` is the offline path: commit an 
 - Scout's deprecated set is a capped sample and can disagree with the docs; matching is by major.
 - `@stellar/stellar-base` is compared against the `@stellar/stellar-sdk` major.
 - Scanning stops at depth 4 and skips `node_modules`, `target`, `dist`, `.git`, `.next`, `vendor`, `build`, `coverage`.
-- Diagnosis only: no migration.
+- Migration is experimental and limited to the version bumps described above; it does not rewrite source code.
 - The live OAuth flow is not covered by automated tests.
 
 ## Roadmap

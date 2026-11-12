@@ -154,6 +154,15 @@ describe("openRavenSession", () => {
     expect(log.callbackClosed).toBe(1);
   });
 
+  it("non-interactive mode fails fast with a login hint and never starts the callback server", async () => {
+    const { deps, log } = harness(["unauthorized"]);
+    await expect(
+      openRavenSession(store, "https://raven.test/mcp", deps, { interactive: false }),
+    ).rejects.toThrow(/kedgeway login/);
+    expect(log.callbackStarts).toBe(0);
+    await expect(readFile(join(dir, "auth.json"))).rejects.toThrow();
+  });
+
   it("propagates non-auth connection errors", async () => {
     const { deps } = harness([]);
     deps.createClient = () => ({
