@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
@@ -47,6 +48,9 @@ export default function Authentication() {
       <p>
         Only one fixed script, run through Raven&apos;s <code>execute</code> tool. It asks for the Software Versions page, the Scout toolchain index and a documentation search. It does not include anything from your repo. File names, manifests and versions stay on your machine; the comparison happens locally.
       </p>
+
+      <h2>In CI</h2>
+      <p>Run <code>kedgeway login --export</code> to print your stored credentials as a base64 secret, and put it in a <code>KEDGEWAY_AUTH</code> secret. At runtime the variable replaces <code>auth.json</code>: it is never written to disk and refreshes in memory only, so a rotated refresh token can make it go stale. See <Link href="/docs/ci">CI</Link>.</p>
 
       <h2>Troubleshooting</h2>
       <dl className={styles.defs}>

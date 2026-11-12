@@ -48,6 +48,26 @@ export default function DataSources() {
         <li><code>stellarDocs.search_docs: &lt;error&gt;</code></li>
       </ul>
       <p>When the current soroban-sdk major is missing, repo findings fall back to SDK_UNKNOWN and no deprecation claim is made.</p>
+      <h2>Snapshot cache</h2>
+      <p>After every successful Raven fetch, kedgeway writes the ecosystem snapshot to <code>$XDG_CACHE_HOME/kedgeway/snapshot.json</code> (by default <code>~/.cache/kedgeway/</code>, file mode 0600, folder 0700). Later runs reuse it.</p>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead><tr><th scope="col">Situation</th><th scope="col">What happens</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Fresh cache</th><td>Younger than <code>--max-age</code> (default <code>24h</code>) and not dated in the future: used without calling Raven.</td></tr>
+            <tr><th scope="row">Stale cache</th><td>Refetched. If Raven then fails, the stale cache is used and a <code>DATA_DEGRADED</code> finding says <code>using cached snapshot from &lt;observedAt&gt;</code>.</td></tr>
+            <tr><th scope="row"><code>--offline</code></th><td>Never calls Raven. Exits 1 if there is no cache. A stale cache is used with a <code>DATA_DEGRADED</code> finding such as <code>snapshot is N hours old</code>.</td></tr>
+            <tr><th scope="row"><code>--no-cache</code></th><td>Skips reading the cache and the failure fallback, but still writes the fresh snapshot.</td></tr>
+            <tr><th scope="row"><code>--max-age &lt;duration&gt;</code></th><td>How old a cached snapshot may be: <code>30s</code>, <code>15m</code>, <code>24h</code> or <code>2d</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li>A snapshot that carries <code>DATA_DEGRADED</code> notes is never written to the cache, and a cached one that carries notes counts as stale.</li>
+        <li><code>--offline</code> with <code>--no-cache</code> is rejected (exit 1). <code>--offline</code> is ignored, with a warning, when <code>--fixture</code> is set. <code>--fixture</code> bypasses the cache entirely.</li>
+        <li>The cache is a single global file. <code>--max-age</code> applies to its <code>observedAt</code>.</li>
+      </ul>
+
       <PrevNext href="/docs/data-sources" />
     </>
   );

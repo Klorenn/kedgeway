@@ -29,8 +29,8 @@ export default function Overview() {
 
       <h2>What it is not</h2>
       <ul>
-        <li>Not a rewriter. <code>diagnose</code> never changes your repo. <Link href="/docs/migrate">Migration mode</Link> is experimental, bumps versions only, and never runs <code>cargo</code> or <code>npm</code>.</li>
-        <li>Not a lockfile auditor. It reads the versions you declare in manifests, not what a lockfile resolved.</li>
+        <li>Not a rewriter. <code>diagnose</code> never changes your repo. <Link href="/docs/migrate">Migration</Link> prints a guide and bumps version strings. It never runs <code>cargo</code> or <code>npm</code>.</li>
+        <li>Not a full lockfile auditor. It uses the resolved version of the direct dependency when a supported lockfile has one verdict, and falls back to the manifest otherwise.</li>
         <li>Not a security or contract audit. It only measures SDK version drift.</li>
         <li>Not a service. Your repo contents never leave your machine. See <Link href="/docs/authentication">Authentication</Link>.</li>
       </ul>

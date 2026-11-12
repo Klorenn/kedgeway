@@ -23,9 +23,9 @@ export default function Page() {
         <table className={styles.table}>
           <thead><tr><th scope="col">Tool</th><th scope="col">Input</th><th scope="col">Returns</th></tr></thead>
           <tbody>
-            <tr><th scope="row"><code>diagnose</code></th><td><code>{"{ path, fixture?, failOn? }"}</code></td><td>A text summary and the Diagnosis JSON.</td></tr>
+            <tr><th scope="row"><code>diagnose</code></th><td><code>{"{ path, fixture?, failOn?, format? }"}</code></td><td>A text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with <code>format: &quot;sarif&quot;</code>.</td></tr>
             <tr><th scope="row"><code>findings_reference</code></th><td>none</td><td>The 12 finding codes with severity, meaning, and what <code>migrate</code> does for them.</td></tr>
-            <tr><th scope="row"><code>migrate</code></th><td><code>{"{ path, fixture?, write? }"}</code></td><td>Summary, plan JSON and a unified diff. A dry run unless <code>write: true</code>.</td></tr>
+            <tr><th scope="row"><code>migrate</code></th><td><code>{"{ path, fixture?, write? }"}</code></td><td>Summary, including the guide, plus the plan JSON and a unified diff. A dry run unless <code>write: true</code>.</td></tr>
             <tr><th scope="row"><code>ecosystem_snapshot</code></th><td><code>{"{ fixture? }"}</code></td><td>The ecosystem snapshot: live via Raven unless a fixture is given.</td></tr>
           </tbody>
         </table>
@@ -43,7 +43,7 @@ export default function Page() {
       <Callout kind="warning">
         <p>The MCP server never starts an OAuth flow. Without stored Raven credentials, live calls fail immediately with <code>Run &quot;kedgeway login&quot; first</code>. Run <code>kedgeway login</code> once in a terminal, or pass <code>fixture</code>.</p>
       </Callout>
-      <p><code>diagnose</code>, <code>migrate</code> and <code>ecosystem_snapshot</code> read the <code>path</code> or <code>fixture</code> you give them from the local disk. <code>migrate</code> with <code>write: true</code> edits files there, so review what your assistant is allowed to call.</p>
+      <p><code>diagnose</code>, <code>migrate</code> and <code>ecosystem_snapshot</code> read the <code>path</code> or <code>fixture</code> you give them from the local disk. <code>migrate</code> with <code>write: true</code> edits files there, but only if you started the server with <code>kedgeway mcp --allow-write</code>. Without that flag <code>write: true</code> returns an error and dry runs still work. The tool is annotated as destructive and non-read-only.</p>
       <PrevNext href="/docs/mcp" />
     </>
   );

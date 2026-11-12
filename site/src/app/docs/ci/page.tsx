@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
+import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
@@ -25,11 +26,14 @@ export default function Ci() {
       </ul>
       <p>Pick the threshold by how strict you want to be: <code>--fail-on critical</code> fails on deprecated SDKs and legacy packages; <code>--fail-on warning</code> also fails on one-major-behind and on unknowns.</p>
 
-      <h2>Live data is not supported in CI yet</h2>
-      <p className={styles.note}>
-        Raven sign-in needs a browser. Storing <code>~/.config/kedgeway/auth.json</code> as a CI secret is <strong>not supported</strong> yet. There is now a <Link href="/docs/github-action">GitHub Action</Link> that wraps this; it also needs a fixture.
-      </p>
-      <p>Until then, run offline in CI against a saved snapshot with <code>--fixture</code>. Refresh the snapshot by hand when the ecosystem moves. See <Link href="/docs/fixtures">Fixtures</Link>.</p>
+      <h2>Live data in CI</h2>
+      <p>Export your stored Raven login once, on a machine where you are signed in, and store it as a repository secret:</p>
+      <CodeBlock code={`kedgeway login --export | pbcopy   # macOS; use xclip or wl-copy elsewhere`} />
+      <p>Create a secret named <code>KEDGEWAY_AUTH</code> with that value (Settings, Secrets and variables, Actions). In the <Link href="/docs/github-action">GitHub Action</Link> pass it as <code>auth: ${"{{ secrets.KEDGEWAY_AUTH }}"}</code>. Outside the action, set the <code>KEDGEWAY_AUTH</code> environment variable yourself.</p>
+      <Callout kind="warning">
+        <p>The secret holds OAuth tokens: treat it like a password. kedgeway refreshes the token in memory only and never writes it to disk. If Raven rotates refresh tokens, the stored secret can go stale. Re-export it when runs start failing.</p>
+      </Callout>
+      <p>Prefer no secret at all? Run offline against a saved snapshot with <code>--fixture</code> and refresh it by hand. See <Link href="/docs/fixtures">Fixtures</Link>. The action needs one of the two: <code>auth</code> or <code>fixture</code>.</p>
 
       <h2>GitHub Actions example</h2>
       <p>This is an untested sketch. It builds kedgeway from source (it is not on npm yet), then checks the repo against a committed fixture. Adjust the checkout of kedgeway to wherever you host it.</p>

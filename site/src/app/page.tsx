@@ -39,9 +39,9 @@ const WORKS_WITH: { label: string; icon: PixelIconName }[] = [
 const FAQ: [string, string][] = [
   ["Does my code leave my machine?", "No. kedgeway sends one fixed script to Stellar Raven, with nothing from your repo in it. The comparison runs on your machine."],
   ["Do I need an account?", "You sign in to Stellar Raven once with OAuth in your browser. The token is stored locally at ~/.config/kedgeway/auth.json."],
-  ["Does it work offline?", "Yes, with --fixture and a saved snapshot. A live run needs network access and a Raven sign-in."],
+  ["Does it work offline?", "Yes. --offline reuses the cached Raven snapshot from your last live run, and --fixture uses a snapshot file. A first live run needs network access and a Raven sign-in."],
   ["Which SDKs are detected?", "soroban-sdk in Cargo.toml, and @stellar/stellar-sdk, @stellar/stellar-base and the legacy soroban-client and stellar-sdk in package.json."],
-  ["Can it fail my CI?", "Yes. --fail-on exits with code 2 when a finding meets the threshold. Live data in CI is not supported yet, so use a fixture."],
+  ["Can it fail my CI?", "Yes. --fail-on exits with code 2 when a finding meets the threshold. For live data in CI set the KEDGEWAY_AUTH secret; or use a fixture."],
   ["When will it be on npm?", "Not yet. npm install -g kedgeway is coming soon; build from source today."],
 ];
 
@@ -49,7 +49,8 @@ const SHIPPED = [
   ["TypeScript SDK", "Call diagnose and migrate from your own code.", "/docs/sdk"],
   ["MCP server", "kedgeway mcp lets AI assistants diagnose a repo.", "/docs/mcp"],
   ["GitHub Action", "Fail a pull request on drift, with a fixture.", "/docs/github-action"],
-  ["Migration mode", "Plan and apply SDK bumps; dry run by default.", "/docs/migrate"],
+  ["Migration guide", "Published version, protocol, and the lines to edit. Dry run by default.", "/docs/migrate"],
+  ["Lockfiles, cache & SARIF", "Resolved versions, an offline snapshot cache, code-scanning output.", "/docs/commands"],
 ] as const;
 
 export default function Home() {
@@ -215,7 +216,7 @@ kedgeway diagnose ./my-contract --fail-on warning`}
       <section className={`${styles.section} ${styles.light}`} aria-labelledby="road-h">
         <div className={`col ${styles.centered}`}>
           <div className={styles.head}>
-            <h2 id="road-h">Not a roadmap anymore. <span className="line2">Four ways to run it.</span></h2>
+            <h2 id="road-h">Not a roadmap anymore. <span className="line2">Everything below has shipped.</span></h2>
           </div>
           <ul className={styles.road}>
             {SHIPPED.map(([name, what, href]) => (

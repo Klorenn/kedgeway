@@ -19,16 +19,16 @@ export default function Limitations() {
         <p>A clean report is evidence about declared versions only. It is not a security review of your contracts.</p>
       </Callout>
       <dl className={styles.defs}>
-        <dt>Manifests, not lockfiles</dt>
-        <dd>kedgeway reads the version you declare, not the one a lockfile resolved. A loose range can resolve to a newer release than the report shows.</dd>
+        <dt>Lockfile parsing is limited</dt>
+        <dd>Cargo.lock, package-lock.json, pnpm-lock.yaml and yarn.lock are read; pnpm and yarn with a minimal parser, so unusual layouts fall back to the manifest version. Nothing above the scan root is read.</dd>
         <dt>The deprecated list is a sample</dt>
         <dd>Scout&apos;s deprecated sample is capped at 50. A version missing from it is not proof that it is supported. kedgeway also treats anything more than one major behind as deprecated.</dd>
         <dt>Current versions come from a docs page</dt>
         <dd>They are read from the official Software Versions page. If that page changes shape, parsing can fail, and the report says so with DATA_DEGRADED.</dd>
         <dt>Raven must be reachable</dt>
-        <dd>A live run needs network access and a valid Raven sign-in. Offline, use <code>--fixture</code>. Storing the sign-in as a CI secret is not supported yet.</dd>
+        <dd>A live run needs network access and a valid Raven sign-in. Offline, use <code>--offline</code> (the cached snapshot) or <code>--fixture</code>. For CI, export the login into a <code>KEDGEWAY_AUTH</code> secret; it can go stale if Raven rotates refresh tokens.</dd>
         <dt>Migration is narrow</dt>
-        <dd><code>kedgeway migrate</code> is experimental. It bumps versions in manifests and lists manual steps; it does not rewrite source code and never runs cargo or npm.</dd>
+        <dd><code>kedgeway migrate</code> prints a guide and bumps versions in manifests. It lists manual steps, points at up to 20 legacy import sites, and cites a Raven doc only when its title or url is a migration document. It does not rewrite source code and never runs cargo or npm.</dd>
         <dt>Versions only</dt>
         <dd>It measures SDK version drift. It does not audit contract logic, security or runtime behavior.</dd>
         <dt>Scan limits</dt>

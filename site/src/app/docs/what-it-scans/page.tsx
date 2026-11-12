@@ -73,6 +73,26 @@ soroban-sdk = { workspace = true }`} />
         </table>
       </div>
       <p>An unknown version produces SDK_UNKNOWN or JS_SDK_UNKNOWN, never a guess.</p>
+      <h2>Lockfiles</h2>
+      <p>A manifest range like <code>^21</code> says little about what you build. When a lockfile exists, kedgeway reports the <strong>resolved</strong> version of each detected dependency and compares that instead of the manifest version. Evidence says which it used, for example <code>resolved 21.7.6 from Cargo.lock; manifest ^21</code>.</p>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead><tr><th scope="col">Lockfile</th><th scope="col">How the direct dependency is found</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>Cargo.lock</code></th><td>Among the entries for the crate, the one whose version satisfies the manifest requirement (Cargo rules). If none or several do, the dependency stays unresolved and the evidence says <code>ambiguous in Cargo.lock</code>.</td></tr>
+            <tr><th scope="row"><code>package-lock.json</code></th><td><code>packages[&quot;node_modules/&lt;name&gt;&quot;]</code> (v2 and v3), else <code>dependencies[&lt;name&gt;]</code> (v1).</td></tr>
+            <tr><th scope="row"><code>pnpm-lock.yaml</code></th><td>The importer&apos;s own entry (the root or the workspace member), else the single package version that satisfies the manifest range. Several candidates are reported as ambiguous. Lockfile versions 5 to 9, with a minimal parser.</td></tr>
+            <tr><th scope="row"><code>yarn.lock</code></th><td>The block whose descriptor is <code>name@&lt;manifest range&gt;</code> (classic) or <code>name@npm:&lt;range&gt;</code> (berry). Minimal parser.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul>
+        <li><strong>Ambiguous means fallback.</strong> When a lockfile cannot give one answer, kedgeway uses the manifest version and says so in the evidence. It never guesses.</li>
+        <li><strong>Where it looks.</strong> The nearest lockfile walking up from the manifest&apos;s folder to the scan root that has a verdict for that dependency. It never reads above the scan root. If a lockfile exists above it, the text report prints a <code>hint:</code>.</li>
+        <li><strong>Ranges that do not pin a major</strong> (such as <code>&lt;21</code>) are no longer unknown when a lockfile pins the dependency.</li>
+        <li><strong>Limits.</strong> Only these four lockfiles are read. Unusual pnpm or yarn layouts resolve to nothing and fall back to the manifest. Prerelease tags are ignored when testing a version against a requirement.</li>
+      </ul>
+
       <PrevNext href="/docs/what-it-scans" />
     </>
   );

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
@@ -21,6 +22,7 @@ export default function Findings() {
         <li><strong>warning:</strong> SDK_BEHIND, JS_SDK_BEHIND, SDK_UNKNOWN, JS_SDK_UNKNOWN, MANIFEST_UNPARSEABLE, DATA_DEGRADED</li>
         <li><strong>info:</strong> SDK_CURRENT, JS_SDK_CURRENT, NO_SDK_FOUND</li>
       </ul>
+      <p>When a lockfile resolves a dependency, the evidence says so, for example <code>resolved 21.7.6 from Cargo.lock; manifest ^21</code>, and the comparison uses the resolved version. When the lockfile is ambiguous the manifest version is used and the evidence notes it. See <Link href="/docs/what-it-scans">What it scans</Link>.</p>
       <p>The JavaScript checks compare against the current <code>@stellar/stellar-sdk</code> release. <code>@stellar/stellar-base</code> is compared with that same release.</p>
       <section className={styles.finding} aria-labelledby="sdk_deprecated">
         <h2 id="sdk_deprecated">SDK_DEPRECATED</h2>
@@ -116,7 +118,7 @@ export default function Findings() {
         <h2 id="data_degraded">DATA_DEGRADED</h2>
         <p className={styles.sev}>warning</p>
         <dl className={styles.defs}>
-          <dt>Meaning</dt><dd>{"One of the ecosystem sources failed or returned partial data. Related verdicts may be unknown or incomplete."}</dd>
+          <dt>Meaning</dt><dd>{"One of the ecosystem sources failed or returned partial data, or a stale or fallback cached snapshot was used. Related verdicts may be unknown or incomplete."}</dd>
           <dt>Evidence shown</dt><dd><code>{"Reported while collecting the snapshot observed <time>"}</code>{". The message names the failing source, for example "}<code>{"stellarDocs.get_doc_page: ..."}</code>{". The file column reads "}<code>{"(ecosystem data)"}</code>{"."}</dd>
           <dt>What to do</dt><dd>{"Run again. If it persists, check Raven availability and read the message for which source failed."}</dd>
         </dl>

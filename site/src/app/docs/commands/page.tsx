@@ -18,11 +18,21 @@ export default function Commands() {
       <p className={styles.lede}>Five commands: <code>diagnose</code>, <code>login</code>, <code>logout</code>, <code>migrate</code> and <code>mcp</code>.</p>
 
       <h2 id="diagnose">diagnose</h2>
-      <CodeBlock label="bash" code={"kedgeway diagnose [path] [--json] [--fixture <file>] [--fail-on <severity>]"} />
+      <CodeBlock label="bash" code={"kedgeway diagnose [path] [--format <text|json|sarif>] [--sarif <file>] [--fixture <file>] [--fail-on <severity>] [--offline] [--no-cache] [--max-age <duration>]"} />
       <p>Scans the repo at <code>path</code> (default: the current directory), fetches ecosystem data, and prints a report. Raven is used unless you pass <code>--fixture</code>.</p>
       <dl className={styles.defs}>
         <dt><code>--json</code></dt>
         <dd>Print the diagnosis as JSON instead of text. The object has <code>findings</code> (each with <code>severity</code>, <code>code</code>, <code>message</code>, <code>file</code>, <code>evidence</code>) and <code>summary</code> (<code>critical</code>, <code>warning</code>, <code>info</code>).</dd>
+        <dt><code>{"--format <text|json|sarif>"}</code></dt>
+        <dd>Choose the stdout format. <code>--json</code> is the same as <code>--format json</code>; using both exits with 1.</dd>
+        <dt><code>{"--sarif <file>"}</code></dt>
+        <dd>Also write a SARIF 2.1.0 log to <code>file</code>. Stdout still follows <code>--format</code>.</dd>
+        <dt><code>--offline</code></dt>
+        <dd>Use the cached ecosystem snapshot only and never call Raven. Exits 1 if there is no cache; contradicts <code>--no-cache</code>; ignored with a warning when <code>--fixture</code> is set. Also on <code>migrate</code>.</dd>
+        <dt><code>--no-cache</code></dt>
+        <dd>Ignore the cached snapshot and fetch live. The result is still written to the cache. Also on <code>migrate</code>.</dd>
+        <dt><code>{"--max-age <duration>"}</code></dt>
+        <dd>How old a cached snapshot may be before it is refetched: <code>30s</code>, <code>15m</code>, <code>24h</code>, <code>2d</code>. Default <code>24h</code>. Also on <code>migrate</code>. See <Link href="/docs/data-sources">Data sources</Link>.</dd>
         <dt><code>{"--fixture <file>"}</code></dt>
         <dd>Read the ecosystem snapshot from a JSON file instead of calling Raven. No login needed. See <Link href="/docs/fixtures">Fixtures</Link>.</dd>
         <dt><code>{"--fail-on <severity>"}</code></dt>
@@ -35,13 +45,16 @@ kedgeway diagnose . --json > report.json`} />
       <CodeBlock label="bash" code={"kedgeway login"} />
       <p>Starts a fresh OAuth authorization with Stellar Raven and stores the token. Prints <code>Logged in to Stellar Raven.</code> on success. See <Link href="/docs/authentication">Authentication</Link>.</p>
 
+      <CodeBlock code={"kedgeway login --export"} />
+      <p><code>login --export</code> prints your stored credentials as a base64 secret for CI and removes nothing. It only opens the browser flow if nothing is stored. Put the output in a <code>KEDGEWAY_AUTH</code> secret. See <Link href="/docs/ci">CI</Link>.</p>
+
       <h2 id="logout">logout</h2>
       <CodeBlock label="bash" code={"kedgeway logout"} />
       <p>Deletes the stored credentials. It prints whether anything was removed and exits with 0 either way.</p>
 
       <h2 id="migrate">migrate</h2>
       <CodeBlock code={"kedgeway migrate [path] [--write] [--fixture <file>]"} />
-      <p>Experimental. Plans SDK version bumps and prints a unified diff; it edits files only with <code>--write</code>. Exit 0 when there is nothing to do or the edits were applied, 2 on a dry run with a plan, 1 on error. See <Link href="/docs/migrate">Migration mode</Link>.</p>
+      <p>Experimental. Plans SDK version bumps and prints a unified diff; it edits files only with <code>--write</code>. Exit 0 for nothing to do, a manual-only dry run, or edits applied; 2 for a dry run with at least one automatic edit, or a write where some step was skipped; 1 on error. It edits manifests only and notes any lockfile it leaves stale, with a manual step to refresh it. See <Link href="/docs/migrate">Migration mode</Link>.</p>
 
       <h2 id="mcp">mcp</h2>
       <CodeBlock code={"kedgeway mcp"} />

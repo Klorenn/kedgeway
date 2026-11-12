@@ -24,7 +24,7 @@ export default function Page() {
   with:
     path: .
     fail-on: warning
-    fixture: fixtures/ecosystem-2026-11-11.json`} />
+    auth: \${{ secrets.KEDGEWAY_AUTH }}   # live Raven data; or use fixture: for offline`} />
       <p>Pin a release tag as above. <code>@main</code> is unpinned and can change under you.</p>
 
       <h2>Inputs and outputs</h2>
@@ -34,17 +34,42 @@ export default function Page() {
           <tbody>
             <tr><th scope="row"><code>path</code></th><td><code>.</code></td><td>Directory to scan.</td></tr>
             <tr><th scope="row"><code>fail-on</code></th><td><code>warning</code></td><td>Fail on any finding at or above this severity. Empty disables.</td></tr>
-            <tr><th scope="row"><code>fixture</code></th><td>none</td><td>Ecosystem snapshot JSON. Required for now.</td></tr>
+            <tr><th scope="row"><code>fixture</code></th><td>none</td><td>Ecosystem snapshot JSON (offline). Set this <strong>or</strong> <code>auth</code>.</td></tr>
+            <tr><th scope="row"><code>auth</code></th><td>none</td><td>Raven credentials from <code>kedgeway login --export</code>, as a secret. Set this <strong>or</strong> <code>fixture</code>.</td></tr>
             <tr><th scope="row"><code>json</code></th><td><code>false</code></td><td>Print JSON instead of text.</td></tr>
+            <tr><th scope="row"><code>sarif</code></th><td><code>false</code></td><td>Also write SARIF 2.1.0 to <code>$RUNNER_TEMP/kedgeway.sarif</code>.</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Outputs: <code>summary</code> (for example <code>critical=0 warning=1 info=2</code>) and <code>report-json</code> (the path of the JSON report under <code>RUNNER_TEMP</code>).</p>
+      <p>Outputs: <code>summary</code> (for example <code>critical=0 warning=1 info=2</code>) <code>report-json</code> (the path of the JSON report under <code>RUNNER_TEMP</code>) and <code>sarif</code> (the SARIF file path, only when <code>sarif</code> is on).</p>
 
-      <h2>A fixture is required</h2>
+      <h2>Auth or a fixture is required</h2>
+      <p>The action needs one of two inputs, and names both if neither is set.</p>
+      <ul>
+        <li><code>auth</code>: your <code>KEDGEWAY_AUTH</code> secret, for live Raven data. Export it with <code>kedgeway login --export</code>.</li>
+        <li><code>fixture</code>: a committed snapshot (see <Link href="/docs/fixtures">Fixtures</Link>). Offline and deterministic; you refresh it.</li>
+      </ul>
       <Callout kind="warning">
-        <p>OAuth in CI is not supported yet. Without <code>fixture</code> the action fails fast with a clear message. Commit a snapshot (see <Link href="/docs/fixtures">Fixtures</Link>) and refresh it from a machine where you are logged in.</p>
+        <p>The secret refreshes in memory only. If Raven rotates refresh tokens, the secret can go stale and must be re-exported when runs start failing. Treat it like a password.</p>
       </Callout>
+
+      <h2>SARIF and code scanning</h2>
+      <CodeBlock code={`permissions:
+  contents: read
+  security-events: write
+steps:
+  - uses: actions/checkout@v4
+  - id: kedgeway
+    uses: Klorenn/kedgeway@v0.1.0
+    with:
+      auth: \${{ secrets.KEDGEWAY_AUTH }}
+      sarif: "true"
+      fail-on: ""            # let the upload step report instead of failing here
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: \${{ steps.kedgeway.outputs.sarif }}`} />
+      <p>The log has one run for the tool <code>kedgeway</code>, a rule per finding code (12), and one result per finding with the repo-relative manifest path. Critical is an error, warning is a warning, info is a note. Findings that are not about a file, such as <code>DATA_DEGRADED</code> and <code>NO_SDK_FOUND</code>, have no location.</p>
 
       <h2>Exit codes and speed</h2>
       <p>The action runs <code>diagnose</code> once, always writes its outputs, then exits with the CLI&apos;s code: 0 when nothing met the threshold, 2 when a finding did, 1 on a tool error. It builds kedgeway from source on every run (<code>npm ci &amp;&amp; npm run build</code>), which is slow, until built <code>dist/</code> is committed on release tags.</p>

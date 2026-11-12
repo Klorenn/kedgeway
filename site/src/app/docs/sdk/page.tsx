@@ -36,12 +36,14 @@ export default function Page() {
             <tr><th scope="row"><code>createRavenEcosystem(opts?)</code></th><td>An <code>EcosystemPort</code> backed by Stellar Raven. Options: <code>authPath</code> and <code>interactive</code> (set <code>false</code> to fail fast instead of starting OAuth).</td></tr>
             <tr><th scope="row"><code>loadFixture(file)</code>, <code>FakeEcosystem</code></th><td>Offline snapshots. See <Link href="/docs/fixtures">Fixtures</Link>.</td></tr>
             <tr><th scope="row"><code>planMigration(facts, snapshot)</code></th><td>Builds a <code>MigrationPlan</code> of version bumps and manual steps.</td></tr>
+            <tr><th scope="row"><code>buildGuide(plan, snapshot, hits)</code></th><td>The migration guide: published version, protocol, steps, and the Raven notes whose title or url is a migration document.</td></tr>
+            <tr><th scope="row"><code>findImportHits(files, names)</code></th><td>Pure search for import lines of the given package names.</td></tr>
             <tr><th scope="row"><code>applyMigration(plan, {"{ write }"})</code></th><td>Dry run by default; edits files only when <code>write</code> is true.</td></tr>
             <tr><th scope="row"><code>migrate(opts)</code></th><td>Diagnose, plan and apply in one call. Adds <code>write?</code> to the diagnose options.</td></tr>
           </tbody>
         </table>
       </div>
-      <p>Types: <code>Diagnosis</code>, <code>Finding</code>, <code>Severity</code>, <code>EcosystemSnapshot</code>, <code>RepoFacts</code>, <code>MigrationPlan</code>, <code>MigrationStep</code>.</p>
+      <p>Types: <code>Diagnosis</code>, <code>Finding</code>, <code>Severity</code>, <code>EcosystemSnapshot</code>, <code>RepoFacts</code>, <code>MigrationPlan</code>, <code>MigrationStep</code>, <code>MigrationGuide</code>, <code>SourceHit</code>.</p>
 
       <h2>Example, offline</h2>
       <CodeBlock code={`import { diagnose } from "kedgeway";
