@@ -43,13 +43,13 @@ summary=$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1]
 } >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
 # Workflow commands go to stdout first so the runner turns them into annotations.
-if [ -n "$annotations_file" ] && [ -s "$annotations_file" ]; then cat "$annotations_file"; fi
+if [ -n "$annotations_file" ] && [ -s "$annotations_file" ]; then cat "$annotations_file" || exit 1; fi
 
 if [ "${KW_JSON:-false}" = "true" ]; then
-  cat "$report"
+  cat "$report" || exit 1
 else
   # Finding text is untrusted (it can contain manifest-derived strings): keep it on one line per field and make
   # sure no output line starts with "::" so it can never be read as a workflow command.
-  node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const c=s=>String(s).replace(/[\r\n]+/g," ");const out=[];for(const f of d.findings){out.push("["+c(f.severity).toUpperCase()+"] "+c(f.code)+"  "+c(f.file));out.push("  "+c(f.message))}out.push("","Summary: "+process.argv[2]);console.log(out.map(l=>l.startsWith("::")?" "+l:l).join("\n"))' "$report" "$summary"
+  node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const c=s=>String(s).replace(/[\r\n]+/g," ");const out=[];for(const f of d.findings){out.push("["+c(f.severity).toUpperCase()+"] "+c(f.code)+"  "+c(f.file));out.push("  "+c(f.message))}out.push("","Summary: "+process.argv[2]);console.log(out.map(l=>l.startsWith("::")?" "+l:l).join("\n"))' "$report" "$summary" || exit 1
 fi
 exit "$code"

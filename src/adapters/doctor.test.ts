@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -60,6 +60,13 @@ describe("runDoctor", () => {
     expect(byName(ok, "auth")).toMatchObject({ status: "ok", detail: expect.stringContaining("KEDGEWAY_AUTH") });
     const bad = await runDoctor(deps({ env: { KEDGEWAY_AUTH: "%%%" } }), {});
     expect(byName(bad, "auth")).toMatchObject({ status: "fail", detail: expect.stringContaining("KEDGEWAY_AUTH is not valid") });
+  });
+
+  it("fails when the auth path exists but cannot be read, instead of claiming it is missing", async () => {
+    await mkdir(join(dir, "auth.json"));
+    const auth = byName(await runDoctor(deps(), {}), "auth");
+    expect(auth?.status).toBe("fail");
+    expect(auth?.detail).not.toMatch(/does not exist/);
   });
 
   it("warns when there is no auth, or the auth file has no tokens, without modifying the file", async () => {

@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
@@ -137,6 +137,17 @@ describe("readOnlyAuthStore (used by doctor)", () => {
       expect((await store.load()).tokens?.access_token).toBe("REFRESHED");
       expect(await readFile(file, "utf8")).toBe(original);
       expect(await readdir(dir)).toEqual(["auth.json"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not treat an unreadable path as a missing file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "kw-ro-"));
+    try {
+      const file = join(dir, "auth.json");
+      await mkdir(file);
+      await expect(readOnlyAuthStore({}, file)).rejects.toThrow(/EISDIR|illegal operation on a directory/i);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

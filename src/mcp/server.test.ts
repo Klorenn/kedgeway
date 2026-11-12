@@ -164,6 +164,18 @@ describe("migrate tool", () => {
     expect(await readFile(join(dir, "repo/Cargo.toml"), "utf8")).toContain('"21.0.0"');
   });
 
+  it("does not call a failed write a dry run, and names the steps it could not apply", async () => {
+    await writeFile(join(dir, "repo/Cargo.toml"), `[dependencies]\nsoroban-sdk.version = "21.0.0"\n`);
+    const writer = await connectWith({ allowWrite: true });
+    const res = await writer.callTool({ name: "migrate", arguments: { path: join(dir, "repo"), fixture, write: true } });
+    await writer.close();
+    const summary = texts(res)[0] ?? "";
+    expect(res.isError).not.toBe(true);
+    expect(summary).not.toMatch(/dry run/i);
+    expect(summary).toMatch(/could not apply/i);
+    expect(await readFile(join(dir, "repo/Cargo.toml"), "utf8")).toContain("21.0.0");
+  });
+
   it("write: true applies the edits when allowWrite is on", async () => {
     const writer = await connectWith({ allowWrite: true });
     const res = await writer.callTool({ name: "migrate", arguments: { path: join(dir, "repo"), fixture, write: true } });

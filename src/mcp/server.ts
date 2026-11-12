@@ -109,10 +109,20 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
       try {
         const { plan, result, guide } = await migrate({ path, write, ...ecosystemFor(fixture) });
         const edits = plan.steps.filter((s) => s.kind !== "manual").length;
-        const head = result.written
-          ? `Updated ${result.changes.length} file(s): ${result.changes.map((c) => c.file).join(", ")}.`
-          : `Dry run: ${edits} edit(s), ${result.manual.length} manual step(s).`;
-        const follow = result.followUp.length > 0 ? ` Next run: ${result.followUp.join("; ")}.` : "";
+        const skipped =
+          result.skipped.length > 0
+            ? ` Could not apply: ${result.skipped.map((s) => `${s.step.file}: ${s.reason}`).join("; ")}.`
+            : "";
+        // `written` is false for a dry run and for a write that changed nothing. Only the request distinguishes them.
+        const head = write
+          ? result.written
+            ? `Updated ${result.changes.length} file(s): ${result.changes.map((c) => c.file).join(", ")}.${skipped}`
+            : `${edits} edit(s), ${result.manual.length} manual step(s).${skipped}`
+          : `Dry run: ${edits} edit(s), ${result.manual.length} manual step(s).${skipped}`;
+        const follow =
+          result.followUp.length > 0 && (result.changes.length > 0 || result.written)
+            ? ` Next run: ${result.followUp.join("; ")}.`
+            : "";
         const locks = plan.lockfiles && plan.lockfiles.length > 0 ? ` Lockfile(s) present (${plan.lockfiles.join(", ")}): refresh them yourself.` : "";
         const guideText = formatGuide(guide).trimEnd();
         return text(`${head}${follow}${locks}${guideText ? `\n\n${guideText}` : ""}`, JSON.stringify(plan, null, 2), result.diff);

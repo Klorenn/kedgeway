@@ -94,8 +94,9 @@ export class AuthStore {
   async clear(): Promise<boolean> {
     try {
       await readFile(this.path);
-    } catch {
-      return false;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw e;
     }
     await rm(this.path, { force: true });
     return true;
@@ -182,7 +183,9 @@ export async function readOnlyAuthStore(env: NodeJS.ProcessEnv = process.env, pa
   let stored: StoredAuth = {};
   try {
     stored = parseStored(JSON.parse(await readFile(path, "utf8"))) ?? {};
-  } catch {
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code !== undefined && code !== "ENOENT") throw e;
     stored = {}; // missing or corrupt: nothing to serve
   }
   return new MemoryAuthStore(stored, undefined, "snapshot");

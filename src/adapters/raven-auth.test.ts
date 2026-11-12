@@ -59,6 +59,11 @@ describe("AuthStore", () => {
     await mkdir(file, { recursive: true }); // a directory where the file should be -> EISDIR
     await expect(new AuthStore(file, () => undefined).load()).rejects.toThrow();
   });
+
+  it("does not report a missing file when clear cannot read the path", async () => {
+    await mkdir(file, { recursive: true });
+    await expect(new AuthStore(file, () => undefined).clear()).rejects.toThrow();
+  });
 });
 
 describe("FileOAuthProvider", () => {

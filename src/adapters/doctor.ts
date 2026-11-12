@@ -30,8 +30,11 @@ async function authCheck(d: DoctorDeps): Promise<DoctorCheck> {
   let text: string;
   try {
     text = await readFile(d.authPath, "utf8");
-  } catch {
-    return { name: "auth", status: "warn", detail: `none: run \`kedgeway login\` (or set KEDGEWAY_AUTH); ${d.authPath} does not exist` };
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      return { name: "auth", status: "warn", detail: `none: run \`kedgeway login\` (or set KEDGEWAY_AUTH); ${d.authPath} does not exist` };
+    }
+    return { name: "auth", status: "fail", detail: `could not read ${d.authPath}: ${msg(e)}` };
   }
   try {
     const parsed = JSON.parse(text) as { tokens?: unknown };

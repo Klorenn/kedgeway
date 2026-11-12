@@ -176,6 +176,13 @@ process.exit(${code});
     expect(r.outputs).toContain("summary=");
   });
 
+  it("fails when the text report cannot be rendered, instead of keeping the CLI's success code", async () => {
+    const broken = JSON.stringify({ summary: { critical: 0, warning: 0, info: 0 } });
+    const cli = await stubCli(broken, 0);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "false", KW_CLI: cli });
+    expect(r.code).toBe(1);
+  });
+
   it("propagates tool errors (exit 1) without writing outputs", async () => {
     const cli = await stubCli("", 1);
     const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: cli });
