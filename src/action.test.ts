@@ -26,7 +26,7 @@ describe("committed ecosystem fixture", () => {
 describe("action.yml", () => {
   it("declares the documented inputs and outputs and delegates to the run script", async () => {
     const y = await readFile(resolve(root, "action.yml"), "utf8");
-    for (const key of ["path:", "fail-on:", "fixture:", "json:", "summary:", "report-json:"]) {
+    for (const key of ["path:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:"]) {
       expect(y).toContain(key);
     }
     expect(y).toContain("using: composite");
@@ -47,7 +47,17 @@ describe("scripts/action-run.sh", () => {
 
   async function stubCli(json: string, code: number): Promise<string> {
     const f = join(tmp, "cli.mjs");
-    await writeFile(f, `console.log(${JSON.stringify(json)}); process.exit(${code});\n`);
+    await writeFile(
+      f,
+      `import { writeFileSync } from "node:fs";
+const a = process.argv.slice(2);
+writeFileSync(${JSON.stringify(join(tmp, "call.json"))}, JSON.stringify({ args: a, auth: process.env.KEDGEWAY_AUTH ?? null }));
+const i = a.indexOf("--sarif");
+if (i !== -1) writeFileSync(a[i + 1], "{}");
+console.log(${JSON.stringify(json)});
+process.exit(${code});
+`,
+    );
     return f;
   }
 
@@ -72,10 +82,46 @@ describe("scripts/action-run.sh", () => {
     summary: { critical: 0, warning: 1, info: 0 },
   });
 
-  it("fails fast with a clear message when no fixture is given", async () => {
-    const r = await run({ KW_PATH: ".", KW_FIXTURE: "", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: "x" });
+  const call = async (): Promise<{ args: string[]; auth: string | null }> =>
+    JSON.parse(await readFile(join(tmp, "call.json"), "utf8")) as { args: string[]; auth: string | null };
+
+  it("fails fast naming both inputs when neither fixture nor auth is given", async () => {
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "", KW_AUTH: "", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: "x" });
     expect(r.code).toBe(1);
-    expect(r.out).toMatch(/OAuth in CI isn't supported yet/);
+    expect(r.out).toMatch(/'fixture'/);
+    expect(r.out).toMatch(/'auth'/);
+  });
+
+  it("with auth and no fixture, exports KEDGEWAY_AUTH to the CLI and passes no --fixture", async () => {
+    const cli = await stubCli(report, 0);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "", KW_AUTH: "c2VjcmV0", KW_FAIL_ON: "", KW_JSON: "true", KW_CLI: cli });
+    expect(r.code).toBe(0);
+    const c = await call();
+    expect(c.auth).toBe("c2VjcmV0");
+    expect(c.args).not.toContain("--fixture");
+  });
+
+  it("with a fixture, does not export the auth secret", async () => {
+    const cli = await stubCli(report, 0);
+    await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_AUTH: "c2VjcmV0", KW_FAIL_ON: "", KW_JSON: "true", KW_CLI: cli });
+    const c = await call();
+    expect(c.auth).toBeNull();
+    expect(c.args).toEqual(expect.arrayContaining(["--fixture", "fx.json"]));
+  });
+
+  it("writes SARIF to RUNNER_TEMP and exposes the sarif output when requested", async () => {
+    const cli = await stubCli(report, 2);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "warning", KW_JSON: "false", KW_SARIF: "true", KW_CLI: cli });
+    expect(r.code).toBe(2);
+    expect((await call()).args).toEqual(expect.arrayContaining(["--sarif", join(tmp, "kedgeway.sarif")]));
+    expect(r.outputs).toContain(`sarif=${join(tmp, "kedgeway.sarif")}`);
+  });
+
+  it("does not ask for SARIF by default", async () => {
+    const cli = await stubCli(report, 0);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "false", KW_CLI: cli });
+    expect((await call()).args).not.toContain("--sarif");
+    expect(r.outputs).not.toContain("sarif=");
   });
 
   it("writes outputs even when fail-on trips, then exits with the CLI's code", async () => {

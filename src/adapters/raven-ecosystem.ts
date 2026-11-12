@@ -6,6 +6,8 @@ import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.
 import {
   AuthStore,
   FileOAuthProvider,
+  MemoryAuthStore,
+  defaultAuthStore,
   openInBrowser,
   startCallbackServer,
   type BrowserOpener,
@@ -84,7 +86,7 @@ function toSession(client: ClientLike): RavenSession {
  * transport.finishAuth(code) -> reconnect with a fresh client/transport.
  */
 export async function openRavenSession(
-  store: AuthStore = new AuthStore(),
+  store: AuthStore = defaultAuthStore(),
   url: string = RAVEN_URL,
   deps: ConnectDeps = realConnectDeps(url),
   options: { interactive?: boolean } = {},
@@ -103,6 +105,11 @@ export async function openRavenSession(
   } catch (e) {
     if (!(e instanceof UnauthorizedError)) throw e;
     await silentClient.close().catch(() => undefined);
+    if (store instanceof MemoryAuthStore) {
+      throw new Error(
+        "Raven rejected the credentials in KEDGEWAY_AUTH (expired or revoked). Run `kedgeway login --export` again and update the secret.",
+      );
+    }
     if (options.interactive === false) {
       throw new Error('Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.');
     }
@@ -147,8 +154,8 @@ export async function openRavenSession(
   }
 }
 
-export async function loginToRaven(store: AuthStore = new AuthStore()): Promise<void> {
-  await store.remove(["tokens", "clientInformation", "codeVerifier"]);
+export async function loginToRaven(store: AuthStore = new AuthStore(), opts: { preserve?: boolean } = {}): Promise<void> {
+  if (opts.preserve !== true) await store.remove(["tokens", "clientInformation", "codeVerifier"]);
   const session = await openRavenSession(store);
   await session.close();
 }

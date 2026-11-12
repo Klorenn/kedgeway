@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import { createKedgewayServer, runStdioServer } from "./server.js";
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
@@ -55,6 +55,33 @@ describe("kedgeway MCP server", () => {
     const parsed = JSON.parse(json ?? "") as { findings: { code: string }[]; summary: { critical: number } };
     expect(parsed.findings[0]?.code).toBe("SDK_DEPRECATED");
     expect(parsed.summary.critical).toBe(1);
+  });
+
+  it("diagnose with format sarif returns a SARIF log as the second text part", async () => {
+    const res = await client.callTool({ name: "diagnose", arguments: { path: join(dir, "repo"), fixture, format: "sarif" } });
+    const [summary, json] = texts(res);
+    expect(summary).toMatch(/1 critical/);
+    const log = JSON.parse(json ?? "") as { version: string; runs: { results: { ruleId: string }[] }[] };
+    expect(log.version).toBe("2.1.0");
+    expect(log.runs[0]?.results[0]?.ruleId).toBe("SDK_DEPRECATED");
+  });
+
+  it("diagnose without a fixture reports an invalid KEDGEWAY_AUTH as a clear tool error", async () => {
+    vi.stubEnv("KEDGEWAY_AUTH", "%%garbage%%");
+    try {
+      const res = await client.callTool({ name: "diagnose", arguments: { path: join(dir, "repo") } });
+      expect(res.isError).toBe(true);
+      const text = texts(res).join("");
+      expect(text).toMatch(/KEDGEWAY_AUTH is not valid/);
+      expect(text).not.toMatch(/\n\s+at /);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("diagnose rejects an unknown format", async () => {
+    const res = await client.callTool({ name: "diagnose", arguments: { path: join(dir, "repo"), fixture, format: "xml" } });
+    expect(res.isError).toBe(true);
   });
 
   it("diagnose reports when failOn is met", async () => {

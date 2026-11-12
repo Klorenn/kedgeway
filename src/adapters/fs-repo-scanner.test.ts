@@ -49,7 +49,7 @@ describe("scanRepo", () => {
     await put("contracts/token/Cargo.toml", `[dependencies]\nsoroban-sdk = { workspace = true }\n`);
     const facts = await scanRepo(dir);
     expect(facts.rustDeps).toEqual([
-      { name: "soroban-sdk", raw: "22.0.0", version: "22.0.0", major: 22, file: "contracts/token/Cargo.toml", declaredIn: "Cargo.toml" },
+      { name: "soroban-sdk", raw: "22.0.0", version: "22.0.0", major: 22, resolved: null, resolvedFrom: null, file: "contracts/token/Cargo.toml", declaredIn: "Cargo.toml" },
     ]);
   });
 
@@ -114,5 +114,12 @@ describe("scanRepo", () => {
     } finally {
       await chmod(join(dir, "locked"), 0o755);
     }
+  });
+
+  it("fills resolved/resolvedFrom from a lockfile", async () => {
+    await put("Cargo.toml", `[dependencies]\nsoroban-sdk = "^21"\n`);
+    await put("Cargo.lock", `[[package]]\nname = "soroban-sdk"\nversion = "21.7.6"\n`);
+    const facts = await scanRepo(dir);
+    expect(facts.rustDeps[0]).toMatchObject({ raw: "^21", resolved: "21.7.6", resolvedFrom: "Cargo.lock" });
   });
 });

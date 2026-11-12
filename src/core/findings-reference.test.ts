@@ -40,4 +40,11 @@ describe("FINDINGS_REFERENCE", () => {
       ].sort(),
     );
   });
+
+  it("mentions lockfile resolution and cached snapshots where they change a verdict", () => {
+    const by = Object.fromEntries(FINDINGS_REFERENCE.map((f) => [f.code, f.meaning]));
+    expect(by["SDK_DEPRECATED"]).toMatch(/lockfile/i);
+    expect(by["JS_SDK_BEHIND"]).toMatch(/lockfile/i);
+    expect(by["DATA_DEGRADED"]).toMatch(/cached snapshot/i);
+  });
 });

@@ -1,4 +1,5 @@
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
+import type { LockfileKind } from "./lockfile.js";
 import type { DetectedDep, RepoFacts } from "./repo-facts.js";
 
 export type Severity = "critical" | "warning" | "info";
@@ -10,7 +11,7 @@ export interface Finding {
   file: string;
   evidence: string;
   /** The dependency a finding is about; `file` is where its version is declared. */
-  dependency?: { name: string; raw: string; file: string };
+  dependency?: { name: string; raw: string; file: string; resolved?: string; resolvedFrom?: LockfileKind };
 }
 
 export interface Diagnosis {
@@ -29,7 +30,12 @@ function jsProvenance(s: EcosystemSnapshot): string {
 }
 
 function depRef(dep: DetectedDep): NonNullable<Finding["dependency"]> {
-  return { name: dep.name, raw: dep.raw, file: dep.declaredIn ?? dep.file };
+  return {
+    name: dep.name,
+    raw: dep.raw,
+    file: dep.declaredIn ?? dep.file,
+    ...(dep.resolved !== null && dep.resolvedFrom !== null ? { resolved: dep.resolved, resolvedFrom: dep.resolvedFrom } : {}),
+  };
 }
 
 function majorOf(version: string): number | null {
@@ -37,18 +43,36 @@ function majorOf(version: string): number | null {
   return m?.[1] === undefined ? null : Number.parseInt(m[1], 10);
 }
 
+/** The version used for comparisons: the lockfile-resolved one when present, else the manifest's. */
+function effective(dep: DetectedDep): { version: string | null; major: number | null } {
+  return dep.resolved === null ? { version: dep.version, major: dep.major } : { version: dep.resolved, major: majorOf(dep.resolved) };
+}
+
+/** Evidence prefix naming the lockfile basis ("" when the manifest version was used). */
+function basisOf(dep: DetectedDep): string {
+  if (dep.resolved === null) return dep.lockNote === undefined ? "" : `${dep.lockNote}; using manifest ${dep.raw || "(unspecified)"}: `;
+  return `resolved ${dep.resolved} from ${dep.resolvedFrom ?? "lockfile"}; manifest ${dep.raw || "(unspecified)"}: `;
+}
+
+function labelOf(name: string, dep: DetectedDep): string {
+  const raw = dep.raw || "(unspecified)";
+  return dep.resolved === null ? `${name} ${raw}` : `${name} ${raw} (resolved ${dep.resolved})`;
+}
+
 function diagnoseRustDep(dep: DetectedDep, s: EcosystemSnapshot): Finding {
   const { currentMajor, deprecatedVersions } = s.sorobanSdk;
   const base = { file: dep.file };
-  const label = `soroban-sdk ${dep.raw || "(unspecified)"}`;
+  const label = labelOf("soroban-sdk", dep);
+  const basis = basisOf(dep);
+  const eff = effective(dep);
 
-  if (dep.version === null || dep.major === null) {
+  if (eff.version === null || eff.major === null) {
     return {
       ...base,
       severity: "warning",
       code: "SDK_UNKNOWN",
       message: `${label}: version could not be determined, so it cannot be compared with the ecosystem.`,
-      evidence: `Version unparseable from manifest; no comparison made (${provenance(s)}).`,
+      evidence: `${basis}Version unparseable from manifest; no comparison made (${provenance(s)}).`,
     };
   }
   if (currentMajor === null) {
@@ -57,89 +81,91 @@ function diagnoseRustDep(dep: DetectedDep, s: EcosystemSnapshot): Finding {
       severity: "warning",
       code: "SDK_UNKNOWN",
       message: `${label}: current soroban-sdk major is unknown, so staleness cannot be judged.`,
-      evidence: `Current major evidence unavailable; no deprecation claim made (${provenance(s)}).`,
+      evidence: `${basis}Current major evidence unavailable; no deprecation claim made (${provenance(s)}).`,
     };
   }
   // Official docs win: a Scout "deprecated" entry only counts when it is below the current major.
   const scoutMajors = new Set(deprecatedVersions.map(majorOf).filter((m): m is number => m !== null));
-  if (dep.major < currentMajor && scoutMajors.has(dep.major)) {
+  if (eff.major < currentMajor && scoutMajors.has(eff.major)) {
     return {
       ...base,
       severity: "critical",
       code: "SDK_DEPRECATED",
       message: `${label} is on a major listed as deprecated (current: ${currentMajor}). Upgrade.`,
-      evidence: `major ${dep.major} < current major ${currentMajor} and appears in the Scout deprecated sample (${provenance(s)}).`,
+      evidence: `${basis}major ${eff.major} < current major ${currentMajor} and appears in the Scout deprecated sample (${provenance(s)}).`,
     };
   }
-  if (dep.major < currentMajor - 1) {
+  if (eff.major < currentMajor - 1) {
     return {
       ...base,
       severity: "critical",
       code: "SDK_DEPRECATED",
-      message: `${label} is ${currentMajor - dep.major} majors behind (current: ${currentMajor}). Treat as deprecated.`,
-      evidence: `major ${dep.major} < current major ${currentMajor} - 1 (${provenance(s)}).`,
+      message: `${label} is ${currentMajor - eff.major} majors behind (current: ${currentMajor}). Treat as deprecated.`,
+      evidence: `${basis}major ${eff.major} < current major ${currentMajor} - 1 (${provenance(s)}).`,
     };
   }
-  if (dep.major === currentMajor - 1) {
+  if (eff.major === currentMajor - 1) {
     return {
       ...base,
       severity: "warning",
       code: "SDK_BEHIND",
       message: `${label} is one major behind (current: ${currentMajor}).`,
-      evidence: `major ${dep.major} = current major ${currentMajor} - 1 (${provenance(s)}).`,
+      evidence: `${basis}major ${eff.major} = current major ${currentMajor} - 1 (${provenance(s)}).`,
     };
   }
   return {
     ...base,
     severity: "info",
     code: "SDK_CURRENT",
-    message: `${label} is on the current major (${currentMajor})${dep.major > currentMajor ? " or newer" : ""}.`,
-    evidence: `major ${dep.major} >= current major ${currentMajor} (${provenance(s)}).`,
+    message: `${label} is on the current major (${currentMajor})${eff.major > currentMajor ? " or newer" : ""}.`,
+    evidence: `${basis}major ${eff.major} >= current major ${currentMajor} (${provenance(s)}).`,
   };
 }
 
 function diagnoseJsDep(dep: DetectedDep, s: EcosystemSnapshot): Finding {
   const current = s.jsSdk.currentVersion;
   const currentMajor = current === null ? null : majorOf(current);
-  const label = `${dep.name} ${dep.raw || "(unspecified)"}`;
+  const label = labelOf(dep.name, dep);
+  const basis = basisOf(dep);
+  const eff = effective(dep);
   const base = { file: dep.file };
 
-  if (dep.major === null || currentMajor === null) {
+  if (eff.major === null || currentMajor === null) {
     return {
       ...base,
       severity: "warning",
       code: "JS_SDK_UNKNOWN",
       message: `${label}: cannot be compared with the current @stellar/stellar-sdk release.`,
       evidence:
-        dep.major === null
-          ? `Version unparseable from manifest (${jsProvenance(s)}).`
-          : `Current JS SDK version evidence unavailable (${jsProvenance(s)}).`,
+        eff.major === null
+          ? `${basis}Version unparseable from manifest (${jsProvenance(s)}).`
+          : `${basis}Current JS SDK version evidence unavailable (${jsProvenance(s)}).`,
     };
   }
-  if (dep.major < currentMajor - 1) {
+  if (eff.major < currentMajor - 1) {
     return {
       ...base,
       severity: "critical",
       code: "JS_SDK_DEPRECATED",
-      message: `${label} is ${currentMajor - dep.major} majors behind (current: ${current}). Treat as deprecated.`,
-      evidence: `major ${dep.major} < current major ${currentMajor} - 1 (${jsProvenance(s)}).`,
+      message: `${label} is ${currentMajor - eff.major} majors behind (current: ${current}). Treat as deprecated.`,
+      evidence: `${basis}major ${eff.major} < current major ${currentMajor} - 1 (${jsProvenance(s)}).`,
     };
   }
-  if (dep.major === currentMajor - 1) {
+  if (eff.major === currentMajor - 1) {
     return {
       ...base,
       severity: "warning",
       code: "JS_SDK_BEHIND",
       message: `${label} is one major behind (current: ${current}).`,
-      evidence: `major ${dep.major} = current major ${currentMajor} - 1 (${jsProvenance(s)}).`,
+      evidence: `${basis}major ${eff.major} = current major ${currentMajor} - 1 (${jsProvenance(s)}).`,
     };
   }
   return {
     ...base,
     severity: "info",
     code: "JS_SDK_CURRENT",
-    message: `${label} is on the current major (${currentMajor})${dep.major > currentMajor ? " or newer" : ""}.`,
-    evidence: `major ${dep.major} >= current major ${currentMajor} (${jsProvenance(s)}).`,
+    message: `${label} is on the current major (${currentMajor})${eff.major > currentMajor ? " or newer" : ""}.`,
+    evidence: `${basis}major ${eff.major} >= current major ${currentMajor} (${jsProvenance(s)}).`,
   };
 }
 

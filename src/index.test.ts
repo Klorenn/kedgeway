@@ -87,4 +87,11 @@ describe("public API", () => {
     expect(wet.result.written).toBe(true);
     expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toContain('"28.0.0"');
   });
+
+  it("exports the phase 3 surface", () => {
+    expect(sdk.toSarif).toBeTypeOf("function");
+    expect(sdk.buildSarif).toBeTypeOf("function");
+    expect(sdk.CachingEcosystem).toBeTypeOf("function");
+    expect(sdk.SnapshotCache).toBeTypeOf("function");
+  });
 });

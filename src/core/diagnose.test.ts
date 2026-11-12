@@ -21,6 +21,8 @@ const mk = (name: string, version: string | null, file: string): DetectedDep => 
   raw: version ?? "",
   version,
   major: version ? Number.parseInt(version, 10) : null,
+  resolved: null,
+  resolvedFrom: null,
   file,
 });
 const rust = (version: string | null, file = "Cargo.toml"): DetectedDep => mk("soroban-sdk", version, file);
@@ -159,5 +161,49 @@ describe("meetsThreshold", () => {
     expect(meetsThreshold(d, "info")).toBe(true);
     expect(meetsThreshold(d, "warning")).toBe(true);
     expect(meetsThreshold(d, "critical")).toBe(false);
+  });
+});
+
+describe("diagnose: lockfile resolution", () => {
+  const resolvedRust = (raw: string, resolved: string): DetectedDep => ({
+    ...mk("soroban-sdk", raw, "Cargo.toml"),
+    resolved,
+    resolvedFrom: "Cargo.lock",
+  });
+
+  it("compares the resolved version instead of the manifest range and says so in evidence", () => {
+    const d = diagnose(facts([resolvedRust("^21", "21.7.6")]), snap({ currentMajor: 23, deprecatedVersions: [] }));
+    expect(d.findings[0]).toMatchObject({ code: "SDK_DEPRECATED" });
+    expect(d.findings[0]?.evidence).toContain("resolved 21.7.6 from Cargo.lock; manifest ^21");
+  });
+
+  it("a lax manifest range can resolve to the current major", () => {
+    const d = diagnose(facts([resolvedRust("^22", "23.1.0")]), snap({ currentMajor: 23 }));
+    expect(d.findings[0]?.code).toBe("SDK_CURRENT");
+    expect(d.findings[0]?.message).toContain("resolved 23.1.0");
+  });
+
+  it("resolves an otherwise unparseable manifest range", () => {
+    const d = diagnose(facts([{ ...resolvedRust("<21", "20.9.0") , version: null, major: null }]), snap({ currentMajor: 23 }));
+    expect(d.findings[0]?.code).toBe("SDK_DEPRECATED");
+  });
+
+  it("uses the resolved version for JS deps too", () => {
+    const dep: DetectedDep = { ...mk("@stellar/stellar-sdk", "^13.0.0", "package.json"), resolved: "13.9.0", resolvedFrom: "package-lock.json" };
+    const d = diagnose(facts([], [dep]), snap());
+    expect(d.findings[0]?.code).toBe("JS_SDK_BEHIND");
+    expect(d.findings[0]?.evidence).toContain("resolved 13.9.0 from package-lock.json; manifest ^13.0.0");
+  });
+
+  it("mentions an ambiguous lockfile in evidence and falls back to the manifest", () => {
+    const dep: DetectedDep = { ...mk("soroban-sdk", "21.0.0", "Cargo.toml"), lockNote: "ambiguous in Cargo.lock: 21.1.0, 21.2.0 all satisfy 21" };
+    const d = diagnose(facts([dep]), snap());
+    expect(d.findings[0]?.code).toBe("SDK_DEPRECATED");
+    expect(d.findings[0]?.evidence).toContain("ambiguous in Cargo.lock");
+  });
+
+  it("keeps the dependency raw as the manifest value", () => {
+    const d = diagnose(facts([resolvedRust("^21", "21.7.6")]), snap());
+    expect(d.findings[0]?.dependency).toEqual({ name: "soroban-sdk", raw: "^21", file: "Cargo.toml", resolved: "21.7.6", resolvedFrom: "Cargo.lock" });
   });
 });

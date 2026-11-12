@@ -89,7 +89,7 @@ describe("resolveRustDeps", () => {
         { file: "a/Cargo.toml", manifest: member },
       ]),
     ).toEqual([
-      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, file: "a/Cargo.toml", declaredIn: "Cargo.toml" },
+      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, resolved: null, resolvedFrom: null, file: "a/Cargo.toml", declaredIn: "Cargo.toml" },
     ]);
   });
 
@@ -103,7 +103,7 @@ describe("resolveRustDeps", () => {
       { file: "contracts/a/Cargo.toml", manifest: member },
     ]);
     expect(deps).toEqual([
-      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, file: "contracts/a/Cargo.toml", declaredIn: "Cargo.toml" },
+      { name: "soroban-sdk", raw: "21.0.0", version: "21.0.0", major: 21, resolved: null, resolvedFrom: null, file: "contracts/a/Cargo.toml", declaredIn: "Cargo.toml" },
     ]);
   });
 
@@ -117,7 +117,7 @@ describe("resolveRustDeps", () => {
     const member = parseCargoManifest(`[dependencies]\nsoroban-sdk = { workspace = true }\n`);
     const deps = resolveRustDeps([{ file: "a/Cargo.toml", manifest: member }]);
     expect(deps).toEqual([
-      { name: "soroban-sdk", raw: "", version: null, major: null, file: "a/Cargo.toml" },
+      { name: "soroban-sdk", raw: "", version: null, major: null, resolved: null, resolvedFrom: null, file: "a/Cargo.toml" },
     ]);
   });
 });
@@ -133,10 +133,10 @@ describe("parsePackageJsonDeps", () => {
     );
     expect(deps).toEqual(
       expect.arrayContaining([
-        { name: "@stellar/stellar-sdk", raw: "^12.1.0", version: "12.1.0", major: 12, file: "package.json" },
-        { name: "soroban-client", raw: "~1.0.1", version: "1.0.1", major: 1, file: "package.json" },
-        { name: "stellar-sdk", raw: ">=10.0.0", version: "10.0.0", major: 10, file: "package.json" },
-        { name: "@stellar/stellar-base", raw: "12.0.0", version: "12.0.0", major: 12, file: "package.json" },
+        { name: "@stellar/stellar-sdk", raw: "^12.1.0", version: "12.1.0", major: 12, resolved: null, resolvedFrom: null, file: "package.json" },
+        { name: "soroban-client", raw: "~1.0.1", version: "1.0.1", major: 1, resolved: null, resolvedFrom: null, file: "package.json" },
+        { name: "stellar-sdk", raw: ">=10.0.0", version: "10.0.0", major: 10, resolved: null, resolvedFrom: null, file: "package.json" },
+        { name: "@stellar/stellar-base", raw: "12.0.0", version: "12.0.0", major: 12, resolved: null, resolvedFrom: null, file: "package.json" },
       ]),
     );
     expect(deps).toHaveLength(4);

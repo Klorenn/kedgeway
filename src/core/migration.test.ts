@@ -21,6 +21,8 @@ const dep = (name: string, raw: string, file: string, declaredIn?: string): Dete
     raw,
     version: bad ? null : (m?.[0] ?? null),
     major: bad ? null : Number(m?.[1]),
+    resolved: null,
+    resolvedFrom: null,
     file,
     ...(declaredIn ? { declaredIn } : {}),
   };
@@ -183,5 +185,57 @@ describe("planMigration: only plain versions are edited", () => {
       ["bump-rust-dep", "28.0.0"],
       ["bump-rust-dep", "28.0.0"],
     ]);
+  });
+});
+
+describe("planMigration: lockfile resolution", () => {
+  it("still edits the manifest, bumping based on the resolved verdict", () => {
+    const d: DetectedDep = { ...dep("soroban-sdk", "^21", "a/Cargo.toml"), resolved: "21.7.6", resolvedFrom: "Cargo.lock" };
+    const plan = planMigration(facts([d]), snap());
+    expect(plan.steps).toEqual([
+      expect.objectContaining({ kind: "bump-rust-dep", file: "a/Cargo.toml", from: "^21", to: "^28.0.0" }),
+    ]);
+  });
+
+  it("does nothing when the resolved version is already current", () => {
+    const d: DetectedDep = { ...dep("soroban-sdk", "^21", "a/Cargo.toml"), resolved: "28.0.1", resolvedFrom: "Cargo.lock" };
+    expect(planMigration(facts([d]), snap()).steps).toEqual([]);
+  });
+});
+
+describe("planMigration: lockfile follow-ups", () => {
+  const locked = (name: string, raw: string, file: string, resolved: string, from: DetectedDep["resolvedFrom"]): DetectedDep => ({
+    ...dep(name, raw, file),
+    resolved,
+    resolvedFrom: from,
+  });
+
+  it("emits a refresh-the-lockfile manual step instead of a no-op bump when the manifest already allows the current major (Rust)", () => {
+    const plan = planMigration(facts([locked("soroban-sdk", "^28", "a/Cargo.toml", "27.0.5", "Cargo.lock")]), snap());
+    expect(plan.steps).toEqual([
+      expect.objectContaining({ kind: "manual", file: "a/Cargo.toml", findingCode: "SDK_BEHIND", reason: expect.stringContaining("cargo update -p soroban-sdk") }),
+    ]);
+    expect(plan.steps.some((s) => s.kind !== "manual")).toBe(false);
+  });
+
+  it("does the same for JS with the matching package manager command", () => {
+    const plan = planMigration(facts([], [locked("@stellar/stellar-sdk", "^17.0.0", "w/package.json", "16.5.0", "pnpm-lock.yaml")]), snap());
+    expect(plan.steps).toEqual([
+      expect.objectContaining({ kind: "manual", reason: expect.stringContaining("pnpm update @stellar/stellar-sdk") }),
+    ]);
+  });
+
+  it("still bumps the manifest when its own major is behind, and notes the lockfiles involved", () => {
+    const plan = planMigration(
+      facts([locked("soroban-sdk", "^21", "a/Cargo.toml", "21.7.6", "Cargo.lock")], [locked("@stellar/stellar-sdk", "^12.0.0", "w/package.json", "12.1.0", "yarn.lock")]),
+      snap(),
+    );
+    expect(plan.steps.map((s) => s.kind)).toEqual(["bump-rust-dep", "bump-js-dep"]);
+    expect(plan.lockfiles).toEqual(["Cargo.lock", "yarn.lock"]);
+    expect(plan.followUp).toEqual(["cargo update -p soroban-sdk", "yarn install"]);
+  });
+
+  it("omits lockfiles when no touched dependency has one", () => {
+    expect(planMigration(facts([dep("soroban-sdk", "21.0.0", "a/Cargo.toml")]), snap()).lockfiles).toBeUndefined();
   });
 });

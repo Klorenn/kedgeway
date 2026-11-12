@@ -4,7 +4,19 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+
+- feat(lockfile): `Cargo.lock`, `package-lock.json` (v1/v2/v3), `pnpm-lock.yaml` and `yarn.lock` (classic and berry) resolution of the DIRECT dependency (Cargo: the entry satisfying the manifest requirement, else `ambiguous in Cargo.lock`; pnpm: the importer's entry; yarn: the `name@range` descriptor). `DetectedDep` gains `resolved`, `resolvedFrom` and an optional `lockNote`; diagnosis compares `resolved ?? version` and evidence names the lockfile (`resolved 21.7.6 from Cargo.lock; manifest ^21`). `migrate` still edits manifests only; when the manifest already allows the current major but the lock is older it emits a "refresh the lockfile" manual step and always notes touched lockfiles. The text report hints at a lockfile above the scan root.
+- feat(cache): the ecosystem snapshot is cached at `$XDG_CACHE_HOME/kedgeway/snapshot.json` (mode 0600, exclusive temp file, directory 0700); degraded snapshots are never cached and cached degraded or future-dated snapshots count as stale. `diagnose` and `migrate` gain `--offline`, `--no-cache` and `--max-age <duration>` (default `24h`; `--offline --no-cache` is rejected; `--offline` is ignored with `--fixture`); a failed Raven fetch falls back to the cache, and stale or fallback snapshots raise `DATA_DEGRADED`.
+- feat(auth): `kedgeway login --export` prints the stored credentials as a base64 blob for CI. The `KEDGEWAY_AUTH` environment variable (base64 or base64url, whitespace tolerated) replaces `auth.json`, is never written to disk and refreshes in memory only. Caveat: if Raven rotates refresh tokens the secret can go stale and must be re-exported (see SECURITY.md). `login --export` never removes stored credentials.
+- feat(action): new `auth` input (secret, sets `KEDGEWAY_AUTH`); the action now requires `fixture` or `auth` and names both when neither is set.
+- feat(sarif): `kedgeway diagnose --sarif <file>` writes SARIF 2.1.0 with the 12 finding codes as rules; `diagnose --format <text|json|sarif>` chooses stdout (`--json` stays, and conflicts with `--format`). URIs are percent-encoded, realpath-relative, with absolute `file://` URIs outside the working directory. Action input `sarif` and output `sarif` (`$RUNNER_TEMP/kedgeway.sarif`); MCP `diagnose` accepts `format: "sarif"`. SDK: `buildSarif`, `toSarif`, `SnapshotCache`, `CachingEcosystem`.
+- docs: README sections for lockfile resolution, the snapshot cache, CI authentication and SARIF; SECURITY.md notes the scope and rotation of the exported token.
+
 ### Changed
+
+- Finding descriptions mention lockfile-resolved versions and cached snapshots.
+- `DATA_DEGRADED` is also raised when a stale or fallback cached snapshot is used.
 
 - `migrate` hardening: git guard never fails open (only "git missing" or "not a repository" count as no repo; `-z` parsing, timeout, scrubbed `GIT_DIR`); writes re-read files first, abort the batch on any change, and use atomic same-directory renames preserving mode; symlinked manifests are never edited.
 - `package.json` edits now replace only the affected spans instead of re-serialising the file (byte-exact elsewhere, including BOM, minified layout and big numbers).

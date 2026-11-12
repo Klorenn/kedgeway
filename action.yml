@@ -15,11 +15,19 @@ inputs:
     required: false
     default: warning
   fixture:
-    description: Path to an ecosystem snapshot JSON. Required for now (OAuth in CI is not supported yet).
+    description: Path to an ecosystem snapshot JSON (offline). Set this or `auth`.
+    required: false
+    default: ""
+  auth:
+    description: Raven credentials from `kedgeway login --export`, passed as a secret (becomes KEDGEWAY_AUTH). Set this or `fixture`.
     required: false
     default: ""
   json:
     description: Print the report as JSON instead of text ("true" or "false").
+    required: false
+    default: "false"
+  sarif:
+    description: Also write a SARIF 2.1.0 report to RUNNER_TEMP/kedgeway.sarif ("true" or "false").
     required: false
     default: "false"
 
@@ -30,6 +38,9 @@ outputs:
   report-json:
     description: Path to the JSON report written under RUNNER_TEMP.
     value: ${{ steps.run.outputs.report-json }}
+  sarif:
+    description: Path to the SARIF report (only when the `sarif` input is "true").
+    value: ${{ steps.run.outputs.sarif }}
 
 runs:
   using: composite
@@ -50,6 +61,8 @@ runs:
         KW_PATH: ${{ inputs.path }}
         KW_FAIL_ON: ${{ inputs.fail-on }}
         KW_FIXTURE: ${{ inputs.fixture }}
+        KW_AUTH: ${{ inputs.auth }}
         KW_JSON: ${{ inputs.json }}
+        KW_SARIF: ${{ inputs.sarif }}
         KW_CLI: ${{ github.action_path }}/dist/cli.js
       run: bash "$GITHUB_ACTION_PATH/scripts/action-run.sh"

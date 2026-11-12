@@ -9,6 +9,7 @@ import {
   type ManifestError,
   type RepoFacts,
 } from "../core/repo-facts.js";
+import { lockfileHints, resolveLockfiles } from "./lockfile-resolver.js";
 
 const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", ".next", "vendor", "build", "coverage"]);
 const MAX_DEPTH = 4;
@@ -71,5 +72,7 @@ export async function scanRepo(path: string): Promise<RepoFacts> {
     (rel, e) => fail(rel, e instanceof Error ? e.message : String(e)),
   );
 
-  return { root, rustDeps: resolveRustDeps(manifests), jsDeps, manifestErrors };
+  const facts = await resolveLockfiles(root, { root, rustDeps: resolveRustDeps(manifests), jsDeps, manifestErrors });
+  const hints = await lockfileHints(root, facts);
+  return hints.length > 0 ? { ...facts, hints } : facts;
 }

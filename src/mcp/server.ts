@@ -6,7 +6,7 @@ import { z } from "zod";
 import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import { FINDINGS_REFERENCE } from "../core/findings-reference.js";
 import type { EcosystemPort } from "../ports/ecosystem.js";
-import { diagnoseDetailed, migrate, resolveEcosystem } from "../sdk.js";
+import { diagnoseDetailed, migrate, resolveEcosystem, toSarif } from "../sdk.js";
 
 export interface KedgewayServerOptions {
   /** Ecosystem used when a tool call has no fixture. Defaults to live Raven. */
@@ -48,13 +48,15 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
         path: z.string().describe("Directory of the repository to scan"),
         fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
         failOn: SeveritySchema.optional().describe("Report whether any finding is at or above this severity"),
+        format: z.enum(["json", "sarif"]).optional().describe('Second text part: the Diagnosis JSON (default) or a SARIF 2.1.0 log'),
       },
       annotations: { readOnlyHint: true },
     },
-    async ({ path, fixture, failOn }) => {
+    async ({ path, fixture, failOn, format }) => {
       try {
-        const { diagnosis } = await diagnoseDetailed({ path, ...ecosystemFor(fixture) });
-        return text(summarize(diagnosis, failOn), JSON.stringify(diagnosis, null, 2));
+        const detailed = await diagnoseDetailed({ path, ...ecosystemFor(fixture) });
+        const body = format === "sarif" ? toSarif(detailed) : detailed.diagnosis;
+        return text(summarize(detailed.diagnosis, failOn), JSON.stringify(body, null, 2));
       } catch (e) {
         return failure(e);
       }
@@ -110,7 +112,8 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
           ? `Updated ${result.changes.length} file(s): ${result.changes.map((c) => c.file).join(", ")}.`
           : `Dry run: ${edits} edit(s), ${result.manual.length} manual step(s).`;
         const follow = result.followUp.length > 0 ? ` Next run: ${result.followUp.join("; ")}.` : "";
-        return text(`${head}${follow}`, JSON.stringify(plan, null, 2), result.diff);
+        const locks = plan.lockfiles && plan.lockfiles.length > 0 ? ` Lockfile(s) present (${plan.lockfiles.join(", ")}): refresh them yourself.` : "";
+        return text(`${head}${follow}${locks}`, JSON.stringify(plan, null, 2), result.diff);
       } catch (e) {
         return failure(e);
       }

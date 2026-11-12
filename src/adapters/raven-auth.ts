@@ -101,13 +101,74 @@ export class AuthStore {
     return true;
   }
 
-  private async write(data: StoredAuth): Promise<void> {
+  protected async write(data: StoredAuth): Promise<void> {
     await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
     const tmp = `${this.path}.${process.pid}.tmp`;
     await writeFile(tmp, JSON.stringify(data, null, 2), { mode: 0o600 });
     await chmod(tmp, 0o600);
     await rename(tmp, this.path);
   }
+}
+
+/** What `login --export` shares and `KEDGEWAY_AUTH` carries: client registration and tokens, nothing transient. */
+export function encodeAuth(auth: StoredAuth): string {
+  const { clientInformation, tokens } = auth;
+  return Buffer.from(JSON.stringify({ clientInformation, tokens }), "utf8").toString("base64");
+}
+
+export function decodeAuth(blob: string): StoredAuth {
+  const bad = (why: string): Error => new Error(`KEDGEWAY_AUTH is not valid (${why}). Re-create it with \`kedgeway login --export\`.`);
+  const text = blob.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/"); // tolerate wrapping and base64url
+  if (text === "" || !/^[A-Za-z0-9+/]+=*$/.test(text)) throw bad("not base64");
+  let raw: unknown;
+  try {
+    raw = JSON.parse(Buffer.from(text, "base64").toString("utf8"));
+  } catch {
+    throw bad("not base64-encoded JSON");
+  }
+  const parsed = parseStored(raw);
+  if (!parsed) throw bad("unexpected shape");
+  if (!parsed.tokens) throw bad("no tokens");
+  const out: StoredAuth = { tokens: parsed.tokens };
+  if (parsed.clientInformation) out.clientInformation = parsed.clientInformation;
+  return out;
+}
+
+/** Auth held only in memory (used for `KEDGEWAY_AUTH` in CI): refreshed tokens are never written to disk. */
+export class MemoryAuthStore extends AuthStore {
+  private data: StoredAuth;
+
+  constructor(initial: StoredAuth, path?: string) {
+    super(path);
+    this.data = { ...initial };
+  }
+
+  override load(): Promise<StoredAuth> {
+    return Promise.resolve({ ...this.data });
+  }
+
+  override clear(): Promise<boolean> {
+    const had = this.data.tokens !== undefined || this.data.clientInformation !== undefined;
+    this.data = {};
+    return Promise.resolve(had);
+  }
+
+  protected override write(data: StoredAuth): Promise<void> {
+    this.data = { ...data };
+    return Promise.resolve();
+  }
+}
+
+/** The store live Raven calls use: `KEDGEWAY_AUTH` (in memory) when set, else `auth.json`. */
+export function defaultAuthStore(env: NodeJS.ProcessEnv = process.env): AuthStore {
+  const blob = env["KEDGEWAY_AUTH"];
+  return blob !== undefined && blob.trim() !== "" ? new MemoryAuthStore(decodeAuth(blob)) : new AuthStore();
+}
+
+/** Base64 blob of the stored auth, or null when nothing usable is stored. */
+export async function exportAuth(store: AuthStore): Promise<string | null> {
+  const stored = await store.load();
+  return stored.tokens ? encodeAuth(stored) : null;
 }
 
 export type BrowserOpener = (url: string) => Promise<void>;

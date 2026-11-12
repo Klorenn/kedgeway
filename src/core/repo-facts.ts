@@ -1,4 +1,5 @@
 import { parse as parseToml } from "smol-toml";
+import type { LockfileKind } from "./lockfile.js";
 
 export interface DetectedDep {
   name: string;
@@ -6,6 +7,11 @@ export interface DetectedDep {
   version: string | null;
   major: number | null;
   file: string;
+  /** Version pinned by the nearest lockfile, when one exists. Diagnosis prefers it over `version`. */
+  resolved: string | null;
+  resolvedFrom: LockfileKind | null;
+  /** Set when a lockfile exists but cannot attribute a single entry to this dependency ("ambiguous in ..."). */
+  lockNote?: string;
   /** For workspace-inherited deps: the manifest that actually declares the version. */
   declaredIn?: string;
 }
@@ -21,6 +27,8 @@ export interface RepoFacts {
   jsDeps: DetectedDep[];
   /** Manifests or directories that could not be read/parsed; their contents are unknown. */
   manifestErrors: ManifestError[];
+  /** Non-finding advice for the text report (for example a lockfile above the scan root). */
+  hints?: string[];
 }
 
 export const RUST_PACKAGES = ["soroban-sdk"] as const;
@@ -41,7 +49,7 @@ export function parseVersion(raw: string): { version: string | null; major: numb
 }
 
 function toDep(name: string, raw: string, file: string): DetectedDep {
-  return { name, raw, ...parseVersion(raw), file };
+  return { name, raw, ...parseVersion(raw), file, resolved: null, resolvedFrom: null };
 }
 
 // ---------- Cargo ----------

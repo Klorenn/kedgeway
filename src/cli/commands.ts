@@ -1,23 +1,78 @@
 import { Command, CommanderError } from "commander";
 import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import type { RepoFacts } from "../core/repo-facts.js";
-import { diagnoseDetailed, migrate, type MigrateOutcome } from "../sdk.js";
+import { parseDuration } from "../core/duration.js";
+import { CachingEcosystem, SnapshotCache, DEFAULT_MAX_AGE_MS } from "../adapters/snapshot-cache.js";
+import { diagnoseDetailed, migrate, toSarif, type MigrateOutcome } from "../sdk.js";
 import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 
 export interface CliIo {
   stdout: (text: string) => void;
   stderr: (text: string) => void;
   createRavenPort: () => EcosystemPort;
-  login: () => Promise<void>;
+  /** `preserve` keeps any stored registration/tokens (used by `login --export`). */
+  login: (opts?: { preserve?: boolean }) => Promise<void>;
   logout: () => Promise<boolean>;
+  /** Base64 blob of the stored credentials, or null when none are stored. */
+  exportAuth: () => Promise<string | null>;
+  writeFile: (path: string, text: string) => Promise<void>;
+  /** Snapshot cache directory (default `$XDG_CACHE_HOME/kedgeway`). Tests pass a temp dir. */
+  cacheDir?: string;
+  /** Repository root used to make SARIF uris relative (default `process.cwd()`). */
+  cwd?: () => string;
+  /** Environment for warnings (default `process.env`). */
+  env?: NodeJS.ProcessEnv;
   /** Runs the stdio MCP server until the client disconnects. */
   startMcp: (opts: { allowWrite: boolean }) => Promise<void>;
 }
 
-interface DiagnoseOptions {
+interface CacheFlags {
+  offline?: boolean;
+  /** Commander sets this to false for `--no-cache`. */
+  cache?: boolean;
+  maxAge?: string;
+}
+
+interface DiagnoseOptions extends CacheFlags {
   json?: boolean;
   fixture?: string;
   failOn?: string;
+  sarif?: string;
+  format?: string;
+}
+
+/** The ecosystem source for a run: a fixture, or live Raven behind the snapshot cache. */
+function ecosystemFor(opts: CacheFlags & { fixture?: string }, io: CliIo): { fixture: string } | { ecosystem: EcosystemPort } {
+  if (opts.fixture) return { fixture: opts.fixture };
+  const maxAgeMs = opts.maxAge === undefined ? DEFAULT_MAX_AGE_MS : (parseDuration(opts.maxAge) ?? DEFAULT_MAX_AGE_MS);
+  return {
+    ecosystem: new CachingEcosystem(io.createRavenPort(), new SnapshotCache(io.cacheDir), {
+      offline: opts.offline === true,
+      noCache: opts.cache === false,
+      maxAgeMs,
+    }),
+  };
+}
+
+/** Validates the cache flags; false means the run must stop with exit 1 (a message was printed). */
+function checkMaxAge(opts: CacheFlags & { fixture?: string }, io: CliIo): boolean {
+  if (opts.maxAge !== undefined && parseDuration(opts.maxAge) === null) {
+    io.stderr(`Invalid --max-age value "${opts.maxAge}" (expected e.g. 30m, 24h or 2d)\n`);
+    return false;
+  }
+  if (opts.offline === true && opts.cache === false) {
+    io.stderr("kedgeway: --offline and --no-cache contradict each other (offline reads only the cache)\n");
+    return false;
+  }
+  if (opts.offline === true && opts.fixture) io.stderr("kedgeway: --offline is ignored because --fixture is set\n");
+  return true;
+}
+
+function withCacheFlags(cmd: Command): Command {
+  return cmd
+    .option("--offline", "use the cached ecosystem snapshot only; error if there is none")
+    .option("--no-cache", "ignore the cached snapshot (a fresh fetch is still written to the cache)")
+    .option("--max-age <duration>", "how old a cached snapshot may be before it is refetched (e.g. 30m, 24h, 2d)", "24h");
 }
 
 function isSeverity(v: string): v is Severity {
@@ -31,6 +86,7 @@ export function formatReport(facts: RepoFacts, snapshot: EcosystemSnapshot, d: D
   lines.push(
     `Ecosystem: soroban-sdk current major ${major === null ? "unknown" : major}, observed ${snapshot.observedAt}`,
   );
+  for (const h of facts.hints ?? []) lines.push(`hint: ${h}`);
   lines.push("");
   for (const f of d.findings) {
     lines.push(`[${f.severity.toUpperCase()}] ${f.code}  ${f.file}`);
@@ -47,13 +103,28 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
     io.stderr(`Invalid --fail-on value "${opts.failOn}" (expected critical, warning or info)\n`);
     return 1;
   }
+  if (opts.json && opts.format !== undefined) {
+    io.stderr("kedgeway: --json and --format cannot be combined (--json is --format json)\n");
+    return 1;
+  }
+  const format = opts.format ?? (opts.json ? "json" : "text");
+  if (format !== "text" && format !== "json" && format !== "sarif") {
+    io.stderr(`Invalid --format value "${format}" (expected text, json or sarif)\n`);
+    return 1;
+  }
+  if (!checkMaxAge(opts, io)) return 1;
   const threshold = opts.failOn as Severity | undefined;
   try {
-    const { facts, snapshot, diagnosis } = await diagnoseDetailed({
-      path,
-      ...(opts.fixture ? { fixture: opts.fixture } : { ecosystem: io.createRavenPort() }),
-    });
-    io.stdout(opts.json ? `${JSON.stringify(diagnosis, null, 2)}\n` : formatReport(facts, snapshot, diagnosis));
+    const detailed = await diagnoseDetailed({ path, ...ecosystemFor(opts, io) });
+    const { facts, snapshot, diagnosis } = detailed;
+    const sarif =
+      opts.sarif !== undefined || format === "sarif"
+        ? `${JSON.stringify(toSarif(detailed, { cwd: io.cwd?.() ?? process.cwd() }), null, 2)}\n`
+        : "";
+    if (opts.sarif !== undefined) await io.writeFile(opts.sarif, sarif);
+    io.stdout(
+      format === "sarif" ? sarif : format === "json" ? `${JSON.stringify(diagnosis, null, 2)}\n` : formatReport(facts, snapshot, diagnosis),
+    );
     if (threshold && meetsThreshold(diagnosis, threshold)) {
       return 2;
     }
@@ -64,7 +135,7 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
   }
 }
 
-interface MigrateOptions {
+interface MigrateOptions extends CacheFlags {
   dryRun?: boolean;
   write?: boolean;
   fixture?: string;
@@ -94,6 +165,9 @@ export function formatMigration(o: MigrateOutcome, write: boolean): string {
     lines.push("", "Next, run:");
     for (const c of result.followUp) lines.push(`  ${c}`);
   }
+  if (plan.lockfiles && plan.lockfiles.length > 0) {
+    lines.push("", `Lockfile(s) present (${plan.lockfiles.join(", ")}): these edits change manifests only; refresh the lockfile(s) with the commands above or the manual steps, then re-run kedgeway diagnose.`);
+  }
   const edits = plan.steps.filter((s) => s.kind !== "manual").length;
   lines.push(
     "",
@@ -107,13 +181,10 @@ async function runMigrate(path: string, opts: MigrateOptions, io: CliIo): Promis
     io.stderr("kedgeway: --dry-run and --write are mutually exclusive\n");
     return 1;
   }
+  if (!checkMaxAge(opts, io)) return 1;
   const write = opts.write === true;
   try {
-    const outcome = await migrate({
-      path,
-      write,
-      ...(opts.fixture ? { fixture: opts.fixture } : { ecosystem: io.createRavenPort() }),
-    });
+    const outcome = await migrate({ path, write, ...ecosystemFor(opts, io) });
     io.stdout(formatMigration(outcome, write));
     if (write) return outcome.result.skipped.length > 0 ? 2 : 0;
     return outcome.plan.steps.some((s) => s.kind !== "manual") ? 2 : 0;
@@ -132,18 +203,18 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     .exitOverride()
     .configureOutput({ writeOut: (s) => io.stdout(s), writeErr: (s) => io.stderr(s) });
 
-  program
-    .command("diagnose [path]")
+  withCacheFlags(program.command("diagnose [path]"))
     .description("Scan a repo and report toolchain staleness")
-    .option("--json", "print Diagnosis as JSON")
+    .option("--json", "print Diagnosis as JSON (same as --format json)")
+    .option("--format <format>", "stdout format: text | json | sarif")
+    .option("--sarif <file>", "also write a SARIF 2.1.0 report to <file>")
     .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")
     .option("--fail-on <severity>", "exit 2 if any finding is at or above: critical | warning | info")
     .action(async (path: string | undefined, opts: DiagnoseOptions) => {
       exitCode = await runDiagnose(path ?? ".", opts, io);
     });
 
-  program
-    .command("migrate [path]")
+  withCacheFlags(program.command("migrate [path]"))
     .description("Plan (default, dry run) or apply (--write) SDK version bumps. Experimental.")
     .option("--dry-run", "print the planned edits as a diff without writing (default)")
     .option("--write", "apply the edits to the manifests")
@@ -155,8 +226,23 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   program
     .command("login")
     .description("Authenticate with Stellar Raven (OAuth)")
-    .action(async () => {
+    .option("--export", "print the stored credentials as a base64 blob for CI (KEDGEWAY_AUTH); logs in first if needed")
+    .action(async (opts: { export?: boolean }) => {
       try {
+        if (opts.export) {
+          if ((io.env ?? process.env)["KEDGEWAY_AUTH"]?.trim()) {
+            io.stderr("kedgeway: KEDGEWAY_AUTH is set in this environment; it is ignored here. Exporting the credentials stored by `kedgeway login`.\n");
+          }
+          let blob = await io.exportAuth();
+          if (blob === null) {
+            await io.login({ preserve: true });
+            blob = await io.exportAuth();
+          }
+          if (blob === null) throw new Error("No credentials were stored after login; nothing to export.");
+          io.stderr("kedgeway: the blob on stdout is a SECRET (it contains Raven tokens). Store it as a CI secret; never commit or log it.\n");
+          io.stdout(`${blob}\n`);
+          return;
+        }
         await io.login();
         io.stdout("Logged in to Stellar Raven.\n");
       } catch (e) {

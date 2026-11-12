@@ -1,5 +1,6 @@
 import { diagnose, type Finding } from "./diagnose.js";
-import type { RepoFacts } from "./repo-facts.js";
+import type { LockfileKind } from "./lockfile.js";
+import { parseVersion, type RepoFacts } from "./repo-facts.js";
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
 
 export type MigrationKind = "bump-rust-dep" | "bump-js-dep" | "replace-legacy-package" | "manual";
@@ -24,6 +25,8 @@ export interface MigrationPlan {
   steps: MigrationStep[];
   /** Commands the user should run afterwards; kedgeway never runs them. */
   followUp: string[];
+  /** Lockfiles that pin dependencies this plan touches. The edits never update them. */
+  lockfiles?: LockfileKind[];
 }
 
 const LEGACY_REPLACEMENT = "@stellar/stellar-sdk";
@@ -43,6 +46,31 @@ function importHints(name: string): string {
     `Update imports manually after replacing ${name} with ${LEGACY_REPLACEMENT}. ` +
     `Find them with rg -n -e <pattern> using the patterns: import .* from ['"]${name}['"] and require\\(['"]${name}['"]\\)`
   );
+}
+
+function refreshCommand(d: NonNullable<Finding["dependency"]>): string {
+  switch (d.resolvedFrom) {
+    case "Cargo.lock":
+      return `cargo update -p ${d.name}`;
+    case "pnpm-lock.yaml":
+      return `pnpm update ${d.name}`;
+    case "yarn.lock":
+      return `yarn upgrade ${d.name}`;
+    default:
+      return `npm update ${d.name}`;
+  }
+}
+
+/** The lockfile pins an older version than a manifest that already allows the current major: bumping the manifest would be a no-op. */
+function lockHeldBack(d: NonNullable<Finding["dependency"]>, currentMajor: number | null): boolean {
+  if (d.resolved === undefined || currentMajor === null) return false;
+  const major = parseVersion(d.raw).major;
+  return major !== null && major >= currentMajor;
+}
+
+function majorOfVersion(v: string | null): number | null {
+  const m = v === null ? null : /^(\d+)/.exec(v);
+  return m?.[1] === undefined ? null : Number.parseInt(m[1], 10);
 }
 
 export function planMigration(facts: RepoFacts, snapshot: EcosystemSnapshot): MigrationPlan {
@@ -79,6 +107,10 @@ export function planMigration(facts: RepoFacts, snapshot: EcosystemSnapshot): Mi
     switch (f.code) {
       case "SDK_DEPRECATED":
       case "SDK_BEHIND": {
+        if (d && lockHeldBack(d, snapshot.sorobanSdk.currentMajor)) {
+          manual(f, `${f.message} The manifest (${d.raw}) already allows the current major but ${d.resolvedFrom ?? "the lockfile"} pins ${d.resolved}. Refresh the lockfile: ${refreshCommand(d)}`);
+          break;
+        }
         const prefix = d ? prefixOf(d.raw, "=~^") : null;
         if (!d || prefix === null || rustTarget === null) {
           manual(f, `${f.message} The version constraint is not a plain version, so it is left for you to update.`);
@@ -105,6 +137,10 @@ export function planMigration(facts: RepoFacts, snapshot: EcosystemSnapshot): Mi
             f,
             `${f.message} The snapshot has no current ${d.name} version; upgrading @stellar/stellar-sdk pulls a compatible @stellar/stellar-base, otherwise pick the version yourself.`,
           );
+          break;
+        }
+        if (lockHeldBack(d, majorOfVersion(jsTarget))) {
+          manual(f, `${f.message} The manifest (${d.raw}) already allows the current major but ${d.resolvedFrom ?? "the lockfile"} pins ${d.resolved}. Refresh the lockfile: ${refreshCommand(d)}`);
           break;
         }
         const prefix = prefixOf(d.raw, "^~");
@@ -160,8 +196,21 @@ export function planMigration(facts: RepoFacts, snapshot: EcosystemSnapshot): Mi
     }
   }
 
+  const lockOf = new Map<string, LockfileKind>();
+  for (const dd of [...facts.rustDeps, ...facts.jsDeps]) {
+    if (dd.resolvedFrom !== null) lockOf.set(`${dd.declaredIn ?? dd.file}\u0000${dd.name}`, dd.resolvedFrom);
+  }
+  const touched = new Set<LockfileKind>();
+  for (const st of steps) {
+    const k = lockOf.get(`${st.file}\u0000${st.dependency}`);
+    if (k) touched.add(k);
+  }
+  const lockfiles = [...touched].sort();
+
   const followUp: string[] = [];
   if (steps.some((s) => s.kind === "bump-rust-dep")) followUp.push("cargo update -p soroban-sdk");
-  if (steps.some((s) => s.kind === "bump-js-dep" || s.kind === "replace-legacy-package")) followUp.push("npm install");
-  return { root: facts.root, steps, followUp };
+  if (steps.some((s) => s.kind === "bump-js-dep" || s.kind === "replace-legacy-package")) {
+    followUp.push(touched.has("pnpm-lock.yaml") ? "pnpm install" : touched.has("yarn.lock") ? "yarn install" : "npm install");
+  }
+  return { root: facts.root, steps, followUp, ...(lockfiles.length > 0 ? { lockfiles } : {}) };
 }

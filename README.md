@@ -45,11 +45,15 @@ npm link        # optional: exposes `kedgeway`
 
 ```sh
 kedgeway login                                # force the OAuth flow
+kedgeway login --export                       # print credentials as a base64 secret for CI
 kedgeway logout                               # delete stored credentials
 kedgeway diagnose [path]                      # human-readable report
 kedgeway diagnose . --json                    # Diagnosis as JSON
 kedgeway diagnose . --fail-on warning         # exit 2 on any finding >= warning
 kedgeway diagnose . --fixture snapshot.json   # offline, no Raven
+kedgeway diagnose . --offline                 # use the cached Raven snapshot
+kedgeway diagnose . --sarif kedgeway.sarif    # also write SARIF 2.1.0
+kedgeway diagnose . --format sarif            # print SARIF instead of the report
 kedgeway migrate [path]                       # experimental: plan SDK bumps (dry run)
 kedgeway migrate [path] --write               # apply them
 kedgeway mcp                                  # MCP server over stdio
@@ -64,6 +68,11 @@ Raven is OAuth-protected. Each run tries stored credentials silently; only on a 
 | `--json` | Print the Diagnosis as JSON |
 | `--fixture <file>` | Use an ecosystem snapshot JSON instead of Raven (offline) |
 | `--fail-on <severity>` | Exit 2 if any finding is at or above `critical`, `warning` or `info` |
+| `--format <text\|json\|sarif>` | `diagnose` only: stdout format. `--json` is `--format json`; combining the two exits 1 |
+| `--sarif <file>` | `diagnose` only: also write SARIF 2.1.0 to `file` (stdout follows `--format`) |
+| `--offline` | `diagnose` / `migrate`: use the cached ecosystem snapshot only; exit 1 if there is none. Contradicts `--no-cache` (exit 1); ignored, with a warning, when `--fixture` is set |
+| `--no-cache` | `diagnose` / `migrate`: ignore the cached snapshot and fetch live (the result is still written to the cache) |
+| `--max-age <duration>` | `diagnose` / `migrate`: how old a cached snapshot may be before it is refetched. `30s`, `15m`, `24h`, `2d`; default `24h` |
 
 ### Exit codes
 
@@ -94,7 +103,35 @@ kedgeway detects `soroban-sdk` in every `Cargo.toml` (string and table forms, re
 | `MANIFEST_UNPARSEABLE` | warning | A manifest or directory could not be read or parsed, so it was not checked |
 | `DATA_DEGRADED` | warning | Part of the ecosystem data could not be fetched or parsed |
 
-Version ranges that do not pin a major (`<21`, `a || b`) are reported as `*_UNKNOWN`.
+Version ranges that do not pin a major (`<21`, `a || b`) are reported as `*_UNKNOWN`, unless a lockfile pins the dependency (see below).
+
+## Lockfile resolution
+
+A manifest range like `^21` says little about what you actually build. When a lockfile exists, kedgeway reports the **resolved** version of each detected dependency and uses it (`resolved ?? manifest version`) for every comparison. Evidence says which one it used, for example `resolved 21.7.6 from Cargo.lock; manifest ^21: major 21 < ...`.
+
+kedgeway resolves the **direct** dependency, never "the highest entry in the file":
+
+| Lockfile | How the direct dependency is found |
+| -------- | ---------------------------------- |
+| `Cargo.lock` | Among the entries for the crate, the one whose version satisfies the manifest requirement (Cargo rules: bare `21` is `^21`, plus `~`, `=`, `>=`, `<`, wildcards). If none or several satisfy, the dependency stays unresolved and evidence says `ambiguous in Cargo.lock: ...`; the manifest version is then used |
+| `package-lock.json` | `packages["node_modules/<name>"]` (v2/v3), else `dependencies[<name>]` (v1) |
+| `pnpm-lock.yaml` | The importer's (`.` or the member path) `dependencies` / `devDependencies` / `optionalDependencies` entry; else the one package version satisfying the manifest range (several: `ambiguous in pnpm-lock.yaml`). Minimal parser, lockfile v5 to v9 |
+| `yarn.lock` | The block whose descriptor is `name@<manifest range>` (classic) or `name@npm:<manifest range>` (berry; the `resolution` field is a fallback for the version). Minimal parser |
+
+The lockfile is the nearest one walking up from the manifest's directory to the scan root that has a verdict for that dependency; kedgeway never reads above the scan root (if one exists above it, the text report prints a `hint:`). `kedgeway migrate` still edits the **manifest** only: it decides from the resolved verdict, then bumps the manifest. When the manifest already allows the current major but the lockfile pins an older version, the bump would be a no-op, so migrate emits a manual step to refresh the lockfile instead (`cargo update -p soroban-sdk`, `npm update <name>`, `pnpm update <name>` or `yarn upgrade <name>`). Whenever a planned file has a lockfile, migrate also reminds you that the edits do not update it. `DetectedDep` (SDK and facts) gains `resolved` and `resolvedFrom`.
+
+## Snapshot cache and offline mode
+
+After every successful Raven fetch, kedgeway writes the ecosystem snapshot to `$XDG_CACHE_HOME/kedgeway/snapshot.json` (default `~/.cache/kedgeway/`, mode 0600). Later runs reuse it:
+
+- A snapshot with `DATA_DEGRADED` notes is never written to the cache, and a cached one that carries notes counts as stale.
+- Fresh cache (younger than `--max-age`, default `24h`, and not dated in the future): used without calling Raven.
+- Stale cache: refetched. If Raven then fails, the stale cache is used and a `DATA_DEGRADED` finding says `using cached snapshot from <observedAt>`.
+- `--offline`: never calls Raven. Errors with exit 1 if there is no cache; a stale cache is used with a `DATA_DEGRADED` finding (`snapshot is N hours old`).
+- `--no-cache`: skips reading the cache (and the failure fallback) but still writes the fresh snapshot.
+- `--fixture` bypasses the cache entirely.
+
+Applies to `diagnose` and `migrate`.
 
 ## Migration mode (experimental)
 
@@ -134,7 +171,7 @@ ESM only (Node >= 22.12). The package `exports` map has no `default` or `require
 
 | Tool | Input | Returns |
 | ---- | ----- | ------- |
-| `diagnose` | `{ path, fixture?, failOn? }` | a text summary and the Diagnosis JSON |
+| `diagnose` | `{ path, fixture?, failOn?, format? }` | a text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with `format: "sarif"` |
 | `findings_reference` | none | the 12 finding codes with severity, meaning and what `migrate` does for them |
 | `migrate` | `{ path, fixture?, write? }` | summary, plan JSON and unified diff; dry run unless `write: true` |
 | `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
@@ -159,21 +196,60 @@ The MCP server never starts an OAuth flow: without stored Raven credentials, liv
   with:
     path: .
     fail-on: warning
-    fixture: fixtures/ecosystem-2026-11-11.json
+    auth: ${{ secrets.KEDGEWAY_AUTH }}   # live Raven data; or use `fixture:` for offline
 ```
 
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
 | `path` | `.` | directory to scan |
 | `fail-on` | `warning` | fail on any finding at or above this severity; empty disables |
-| `fixture` | none | ecosystem snapshot JSON (required for now) |
+| `fixture` | none | ecosystem snapshot JSON (offline). Set this **or** `auth` |
+| `auth` | none | Raven credentials from `kedgeway login --export`, as a secret. Set this **or** `fixture` |
 | `json` | `false` | print JSON instead of text |
+| `sarif` | `false` | also write SARIF 2.1.0 to `$RUNNER_TEMP/kedgeway.sarif` |
 
 Pin a release tag as above; `@main` is unpinned and can change under you. The action builds kedgeway from source on every run (`npm ci && npm run build`), which is slow, until built `dist/` is committed on release tags.
 
-Outputs: `summary` (`critical=0 warning=1 info=2`) and `report-json` (path to the JSON report under `RUNNER_TEMP`).
+Outputs: `summary` (`critical=0 warning=1 info=2`), `report-json` (path to the JSON report under `RUNNER_TEMP`) and `sarif` (path to the SARIF file, only when `sarif: true`).
 
-OAuth in CI isn't supported yet, so without `fixture` the action fails fast with a clear message. Commit a snapshot (see `fixtures/ecosystem-2026-11-11.json` for the shape) and refresh it from a machine where you are logged in.
+The action needs a data source and fails fast, naming both inputs, if you set neither:
+
+- `fixture`: a committed snapshot (see `fixtures/ecosystem-2026-11-11.json` for the shape). Offline and deterministic; refresh it yourself.
+- `auth`: live Raven data using stored OAuth credentials.
+
+### CI authentication
+
+Log in once on your machine, then store the credentials as a repository secret:
+
+```sh
+kedgeway login --export | pbcopy     # macOS; use xclip/wl-copy elsewhere
+```
+
+Create a repository secret named `KEDGEWAY_AUTH` with that value (Settings, Secrets and variables, Actions). `login --export` never removes stored credentials and only opens the browser flow when nothing is stored; it prints only a base64 JSON blob (OAuth client registration and tokens) to stdout and warns on stderr that it is a secret; it logs you in first if you are not.
+
+At runtime `KEDGEWAY_AUTH` replaces `auth.json`: kedgeway decodes it, never writes it to disk and refreshes the token in memory only. The decoder accepts base64 wrapped across lines and base64url. If Raven rejects it (expired or revoked) the run fails with a pointer to re-export; a malformed value fails with a one-line `KEDGEWAY_AUTH is not valid` message (CLI and MCP). If Raven rotates refresh tokens, the in-memory refresh cannot update the secret, so it can go stale: re-export when runs start failing. Outside the action you can set `KEDGEWAY_AUTH` yourself (for example `KEDGEWAY_AUTH=... kedgeway diagnose .`). Treat the value like a password and see [SECURITY.md](SECURITY.md) for scope and rotation.
+
+### SARIF and code scanning
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+steps:
+  - uses: actions/checkout@v4
+  - id: kedgeway
+    uses: Klorenn/kedgeway@v0.1.0
+    with:
+      auth: ${{ secrets.KEDGEWAY_AUTH }}
+      sarif: "true"
+      fail-on: ""            # let the upload step report instead of failing here
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: ${{ steps.kedgeway.outputs.sarif }}
+```
+
+The SARIF 2.1.0 log has one run for tool `kedgeway`, a rule per finding code (12) with `shortDescription`, `fullDescription` and a default level (`critical` is `error`, `warning` is `warning`, `info` is `note`), and one result per finding with `ruleId`, `level`, `message.text` and the repo-relative manifest path (`uriBaseId: "%SRCROOT%"`). Findings that are not about a file (`DATA_DEGRADED`, `NO_SDK_FOUND`) have no location. URIs are percent-encoded and relative to the directory you run from (resolved with realpath); `%SRCROOT%` is declared in `originalUriBaseIds` with a description only. If the scan path lies outside the working directory, URIs are absolute `file://` ones without a `uriBaseId`. Locally: `kedgeway diagnose . --sarif kedgeway.sarif`, `--format sarif`, or the MCP `diagnose` tool with `format: "sarif"`.
 
 ## CI
 
@@ -194,7 +270,7 @@ jobs:
       - run: kedgeway diagnose . --fail-on warning --fixture snapshot.json
 ```
 
-OAuth in CI is not supported yet, so `--fixture` is the offline path: commit an ecosystem snapshot and refresh it from a machine where you are logged in.
+For live data in CI set the `KEDGEWAY_AUTH` secret (see [CI authentication](#ci-authentication)); `--fixture` remains the fully offline path.
 
 ## Data sources
 
@@ -207,6 +283,9 @@ OAuth in CI is not supported yet, so `--fixture` is the offline path: commit an 
 - If the software-versions page changes shape, kedgeway reports `DATA_DEGRADED` / `SDK_UNKNOWN` instead of guessing.
 - Scout's deprecated set is a capped sample and can disagree with the docs; matching is by major.
 - `@stellar/stellar-base` is compared against the `@stellar/stellar-sdk` major.
+- Lockfile parsing for `pnpm-lock.yaml` and `yarn.lock` is minimal; unusual layouts resolve to nothing and fall back to the manifest version. Prerelease tags are ignored when testing a version against a manifest requirement. Only `Cargo.lock`, `package-lock.json`, `pnpm-lock.yaml` and `yarn.lock` are read.
+- The snapshot cache is a single global file; `--max-age` applies to its `observedAt`.
+- `KEDGEWAY_AUTH` refreshes tokens in memory only. If Raven rotates refresh tokens, the stored secret can go stale and must be re-exported.
 - Scanning stops at depth 4 and skips `node_modules`, `target`, `dist`, `.git`, `.next`, `vendor`, `build`, `coverage`.
 - Migration is experimental and limited to the version bumps described above; it does not rewrite source code.
 - The live OAuth flow is not covered by automated tests.
@@ -216,7 +295,6 @@ OAuth in CI is not supported yet, so `--fixture` is the offline path: commit an 
 Not shipped yet:
 
 - [ ] Publish to npm
-- [ ] Non-interactive auth for CI
 - [ ] Guided migration, not just diagnosis
 
 ## The name
