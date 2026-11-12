@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs `kedgeway diagnose` exactly once and exposes the results as step outputs.
-# Inputs come from the environment (set by action.yml): KW_PATH, KW_FAIL_ON, KW_FIXTURE, KW_AUTH, KW_JSON, KW_SARIF, KW_ANNOTATIONS, KW_CLI.
+# Inputs come from the environment (set by action.yml): KW_PATH, KW_REPO, KW_FAIL_ON, KW_FIXTURE, KW_AUTH, KW_JSON, KW_SARIF, KW_ANNOTATIONS, KW_CLI.
 set -uo pipefail
 
 if [ -z "${KW_FIXTURE:-}" ] && [ -z "${KW_AUTH:-}" ]; then
@@ -9,11 +9,20 @@ if [ -z "${KW_FIXTURE:-}" ] && [ -z "${KW_AUTH:-}" ]; then
 fi
 
 report="${RUNNER_TEMP:?RUNNER_TEMP is required}/kedgeway-report.json"
+target="${KW_PATH:-.}"
+if [ -n "${KW_REPO:-}" ]; then
+  case "$KW_REPO" in
+    -*) echo "::error title=kedgeway::The 'repo' input must be a URL or owner/repo, not an option."; exit 1 ;;
+  esac
+  target="$KW_REPO" # a remote source: the CLI clones it (shallow, temp dir) and validates it
+fi
 annotations_file=""
-if [ "${KW_ANNOTATIONS:-}" = "true" ] || { [ -z "${KW_ANNOTATIONS:-}" ] && [ "${GITHUB_ACTIONS:-}" = "true" ]; }; then
+if [ -n "${KW_REPO:-}" ]; then
+  : # annotations carry repo-relative paths that do not exist in this checkout, so none are emitted for a remote repo
+elif [ "${KW_ANNOTATIONS:-}" = "true" ] || { [ -z "${KW_ANNOTATIONS:-}" ] && [ "${GITHUB_ACTIONS:-}" = "true" ]; }; then
   annotations_file="${RUNNER_TEMP:?RUNNER_TEMP is required}/kedgeway-annotations.txt"
 fi
-args=(diagnose "${KW_PATH:-.}" --json)
+args=(diagnose "$target" --json)
 if [ -n "$annotations_file" ]; then args+=(--annotations "$annotations_file"); fi
 if [ -n "${KW_FIXTURE:-}" ]; then
   args+=(--fixture "$KW_FIXTURE") # offline: the auth secret is not needed, so it is not exported

@@ -7,13 +7,16 @@ import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.
 import { FINDINGS_REFERENCE } from "../core/findings-reference.js";
 import type { EcosystemPort } from "../ports/ecosystem.js";
 import { formatGuide } from "../core/guide.js";
-import { diagnoseDetailed, migrate, resolveEcosystem, toSarif } from "../sdk.js";
+import { diagnoseDetailed, diagnoseRemote, migrate, migrateRemote, resolveEcosystem, toSarif } from "../sdk.js";
+import type { RemoteRepoOptions } from "../adapters/remote-repo.js";
 
 export interface KedgewayServerOptions {
   /** Ecosystem used when a tool call has no fixture. Defaults to live Raven. */
   ecosystem?: EcosystemPort;
   /** Allow `migrate` with write=true to edit files. Off by default (`kedgeway mcp --allow-write`). */
   allowWrite?: boolean;
+  /** Overrides for cloning remote sources (git exec, fetch, temp root). Tests inject fakes. */
+  remote?: Omit<RemoteRepoOptions, "ref">;
 }
 
 const version = (createRequire(import.meta.url)("../../package.json") as { version: string }).version;
@@ -26,6 +29,11 @@ function text(...parts: string[]): { content: { type: "text"; text: string }[] }
 
 function failure(e: unknown): { isError: true; content: { type: "text"; text: string }[] } {
   return { isError: true, ...text(`kedgeway: ${e instanceof Error ? e.message : String(e)}`) };
+}
+
+/** Exactly one of `path` / `url` must be given. */
+function checkTarget(path: string | undefined, url: string | undefined): void {
+  if ((path === undefined) === (url === undefined)) throw new Error("give either path or url (exactly one)");
 }
 
 function summarize(d: Diagnosis, failOn: Severity | undefined): string {
@@ -46,16 +54,22 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
       description:
         "Scan a Stellar/Soroban repo for outdated soroban-sdk and JS SDK dependencies, grounded on live ecosystem data. Returns a text summary and the Diagnosis JSON.",
       inputSchema: {
-        path: z.string().describe("Directory of the repository to scan"),
+        path: z.string().optional().describe("Directory of the repository to scan (give this or url)"),
+        url: z.string().optional().describe("Remote repository to scan: https/ssh git URL or owner/repo (shallow-cloned to a temp dir, then deleted). Give this or path"),
+        ref: z.string().optional().describe("Branch or tag to scan (url only)"),
         fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
         failOn: SeveritySchema.optional().describe("Report whether any finding is at or above this severity"),
         format: z.enum(["json", "sarif"]).optional().describe('Second text part: the Diagnosis JSON (default) or a SARIF 2.1.0 log'),
       },
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ path, fixture, failOn, format }) => {
+    async ({ path, url, ref, fixture, failOn, format }) => {
       try {
-        const detailed = await diagnoseDetailed({ path, ...ecosystemFor(fixture) });
+        checkTarget(path, url);
+        const detailed =
+          url !== undefined
+            ? await diagnoseRemote({ source: url, ...(ref === undefined ? {} : { ref }), ...opts.remote, allowHttp: false, ...ecosystemFor(fixture) })
+            : await diagnoseDetailed({ path: path as string, ...ecosystemFor(fixture) });
         const body = format === "sarif" ? toSarif(detailed) : detailed.diagnosis;
         return text(summarize(detailed.diagnosis, failOn), JSON.stringify(body, null, 2));
       } catch (e) {
@@ -96,18 +110,31 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
       description:
         "Print a migration guide and plan SDK version bumps for a Stellar/Soroban repo. Dry run by default: returns a summary (including the guide), the plan JSON and a unified diff. With write=true (only if the server runs with --allow-write) it edits the manifests, refusing if they have uncommitted git changes. Never runs cargo or npm, and never rewrites source.",
       inputSchema: {
-        path: z.string().describe("Directory of the repository"),
+        path: z.string().optional().describe("Directory of the repository (give this or url)"),
+        url: z.string().optional().describe("Remote repository (https/ssh git URL or owner/repo): dry run only, never written. Give this or path"),
+        ref: z.string().optional().describe("Branch or tag (url only)"),
         fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
         write: z.boolean().optional().default(false).describe("Apply the edits (default false: dry run). Requires the server to be started with --allow-write."),
       },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     },
-    async ({ path, fixture, write }) => {
+    async ({ path, url, ref, fixture, write }) => {
+      try {
+        checkTarget(path, url);
+      } catch (e) {
+        return failure(e);
+      }
+      if (url !== undefined && write) {
+        return failure(new Error("remote sources are dry-run only (write is never applied to a url); clone it and run migrate locally."));
+      }
       if (write && opts.allowWrite !== true) {
         return failure(new Error("write is disabled. Restart the server with `kedgeway mcp --allow-write` to let migrate edit files (dry run still works)."));
       }
       try {
-        const { plan, result, guide } = await migrate({ path, write, ...ecosystemFor(fixture) });
+        const { plan, result, guide } =
+          url !== undefined
+            ? await migrateRemote({ source: url, ...(ref === undefined ? {} : { ref }), ...opts.remote, allowHttp: false, ...ecosystemFor(fixture) })
+            : await migrate({ path: path as string, write, ...ecosystemFor(fixture) });
         const edits = plan.steps.filter((s) => s.kind !== "manual").length;
         const skipped =
           result.skipped.length > 0

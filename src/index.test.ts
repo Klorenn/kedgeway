@@ -42,6 +42,10 @@ describe("public API", () => {
       "formatGuide",
       "migrationDocs",
       "findImportHits",
+      "parseRepoSource",
+      "resolveRepoSource",
+      "diagnoseRemote",
+      "migrateRemote",
     ]) {
       expect(sdk).toHaveProperty(name);
       expect((sdk as Record<string, unknown>)[name]).toBeTypeOf("function");

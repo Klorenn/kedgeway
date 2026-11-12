@@ -18,9 +18,11 @@ export default function Commands() {
       <p>Prints the installed version, read from <code>package.json</code>, and exits with 0.</p>
 
       <h2 id="diagnose">diagnose</h2>
-      <CodeBlock code={"kedgeway diagnose [path] [--json] [--format <text|json|sarif|annotations>] [--sarif <file>] [--annotations <file>] [--fixture <file>] [--fail-on <severity>] [--offline] [--no-cache] [--max-age <duration>]"} />
-      <p>Scans the repo at <code>path</code> (default: the current directory), fetches ecosystem data, and prints a report. Raven is used unless you pass <code>--fixture</code>.</p>
+      <CodeBlock code={"kedgeway diagnose [path-or-url] [--ref <ref>] [--json] [--format <text|json|sarif|annotations>] [--sarif <file>] [--annotations <file>] [--fixture <file>] [--fail-on <severity>] [--offline] [--no-cache] [--max-age <duration>]"} />
+      <p>Scans the repo at <code>path-or-url</code> (default: the current directory), fetches ecosystem data, and prints a report. Raven is used unless you pass <code>--fixture</code>. The source is a local path, a git URL (<code>https://</code>, <code>ssh://</code> or <code>git@host:owner/repo</code>) or the GitHub shorthand <code>owner/repo</code>. An existing local directory takes precedence over the shorthand. A remote source is shallow-cloned into a temporary directory and deleted afterwards. See <Link href="/docs/what-it-scans#remote-repositories">Remote repositories</Link>.</p>
       <dl className={styles.defs}>
+        <dt><code>{"--ref <ref>"}</code></dt>
+        <dd>Branch or tag to scan when the source is a remote repository. It may repeat the <code>/tree/&lt;ref&gt;</code> of the URL but not contradict it. With a local path it is an error and exits with 1. Also on <code>migrate</code>.</dd>
         <dt><code>--json</code></dt>
         <dd>Print the diagnosis as JSON instead of text. The object has <code>findings</code> (each with <code>severity</code>, <code>code</code>, <code>message</code>, <code>file</code>, <code>evidence</code>) and <code>summary</code> (<code>critical</code>, <code>warning</code>, <code>info</code>).</dd>
         <dt><code>{"--format <text|json|sarif|annotations>"}</code></dt>
@@ -41,7 +43,9 @@ export default function Commands() {
         <dd>Exit with code 2 if any finding is at or above <code>critical</code>, <code>warning</code> or <code>info</code>. Any other value is an error and exits with 1.</dd>
       </dl>
       <CodeBlock code={`kedgeway diagnose ./my-contract --fail-on critical
-kedgeway diagnose . --json > report.json`} />
+kedgeway diagnose . --json > report.json
+kedgeway diagnose https://github.com/o/r
+kedgeway diagnose o/r --ref v1.2.0 --fail-on warning`} />
 
       <h2 id="init">init</h2>
       <CodeBlock code={"kedgeway init [path] [--force] [--print]"} />
@@ -81,8 +85,10 @@ kedgeway diagnose . --json > report.json`} />
       <p>Exit 0 when nothing failed (warnings do not fail it), 1 when any check failed.</p>
 
       <h2 id="migrate">migrate</h2>
-      <CodeBlock code={"kedgeway migrate [path] [--dry-run] [--write] [--fixture <file>] [--offline] [--no-cache] [--max-age <duration>]"} />
+      <CodeBlock code={"kedgeway migrate [path-or-url] [--ref <ref>] [--dry-run] [--write] [--fixture <file>] [--offline] [--no-cache] [--max-age <duration>]"} />
       <p>Prints a migration guide and a unified diff of SDK version bumps. The default is a dry run, and <code>--dry-run</code> is that same mode made explicit. <code>--write</code> applies the manifest edits. Passing both <code>--dry-run</code> and <code>--write</code> exits 1. <code>--offline</code>, <code>--no-cache</code> and <code>--max-age</code> behave as they do on <code>diagnose</code>. Exit 0 for nothing to do, a manual-only dry run, or edits applied; 2 for a dry run with at least one automatic edit, or a write where some step was skipped; 1 on error, including a refused write. It edits manifests only and notes any lockfile it leaves stale, with a manual step to refresh it. See <Link href="/docs/migrate">Migration guide</Link>.</p>
+      <p><code>path-or-url</code> accepts the same sources as <code>diagnose</code>. Migrating a remote source is a dry run only: <code>--write</code> exits with 2 and prints <code>remote sources are dry-run only; clone it and run migrate locally</code>.</p>
+      <CodeBlock code={"kedgeway migrate https://gitlab.com/group/sub/r"} />
 
       <h2 id="mcp">mcp</h2>
       <CodeBlock code={"kedgeway mcp [--allow-write]"} />
@@ -95,7 +101,7 @@ kedgeway diagnose . --json > report.json`} />
           <tbody>
             <tr><th scope="row"><code>0</code></th><td><code>diagnose</code>: finished, and no <code>--fail-on</code> threshold was hit. <code>migrate</code>: nothing to do, only manual steps, or the edits were applied. <code>init</code>: the workflow was written, or printed with <code>--print</code>. <code>doctor</code> and <code>logout</code>: finished. A <code>warn</code> from <code>doctor</code> still exits 0.</td></tr>
             <tr><th scope="row"><code>1</code></th><td>Tool error: an invalid flag (including <code>--fail-on</code>, <code>--format</code> or <code>--max-age</code>), <code>--json</code> combined with <code>--format</code>, <code>--offline</code> with <code>--no-cache</code>, a login failure, a failed <code>doctor</code> check, <code>init</code> finding an existing workflow without <code>--force</code> or failing to write it, or a scan or network failure.</td></tr>
-            <tr><th scope="row"><code>2</code></th><td><code>diagnose</code>: a finding met <code>--fail-on</code>. <code>migrate</code>: a dry run has an automatic edit, or <code>--write</code> skipped a step. <code>doctor</code> never exits 2.</td></tr>
+            <tr><th scope="row"><code>2</code></th><td><code>diagnose</code>: a finding met <code>--fail-on</code>. <code>migrate</code>: a dry run has an automatic edit, <code>--write</code> skipped a step, or <code>--write</code> was passed with a remote source. <code>doctor</code> never exits 2.</td></tr>
           </tbody>
         </table>
       </div>

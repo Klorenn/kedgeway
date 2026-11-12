@@ -65,12 +65,29 @@ kedgeway diagnose . --offline                 # use the cached Raven snapshot
 kedgeway diagnose . --sarif kedgeway.sarif    # also write SARIF 2.1.0
 kedgeway diagnose . --format sarif            # print SARIF instead of the report
 kedgeway diagnose . --format annotations      # GitHub annotations, then the report
+kedgeway diagnose https://github.com/o/r      # a remote repo (shallow clone, temp dir removed)
+kedgeway diagnose o/r --ref v1.2.0            # GitHub shorthand, a branch or tag
 kedgeway migrate [path]                       # guide plus a dry-run plan
-kedgeway migrate [path] --write               # apply them
+kedgeway migrate [path] --write               # apply them (local paths only)
+kedgeway migrate https://github.com/o/r       # dry-run plan for a remote repo
 kedgeway mcp                                  # MCP server over stdio
 ```
 
 Raven is OAuth-protected. Each run tries stored credentials silently; only on a 401 does it open the browser (authorization code + PKCE). Credentials live in `~/.config/kedgeway/auth.json` (mode 0600).
+
+### Remote repositories
+
+`diagnose` and `migrate` take a local path, a git URL or `owner/repo`:
+
+- Accepted: `https://github.com/o/r` (optional `.git`, trailing slash, `/tree/<ref>/...`), `https://gitlab.com/group/sub/r`, `git@github.com:o/r.git`, `ssh://git@host/o/r`, and the shorthand `o/r` (GitHub; only when it has exactly one slash and no such directory exists locally: an existing local path always wins).
+- Rejected with exit 1: `file://`, `javascript:` and every scheme except http(s)/ssh, URLs with embedded credentials (`https://user:pass@...`), refs outside `[A-Za-z0-9._/-]` or starting with `-`, and hosts that are not public DNS names: IP literals in any notation (`127.0.0.1`, `0x7f.1`, `2130706433`, `[::1]`), `localhost`, single-label names and `.local` / `.internal` / `.localhost` / `.lan` names. This is a syntactic check (it does not stop DNS rebinding). The MCP server accepts https and ssh only, never http. Rejection messages never echo the input. When a bare `o/r` is treated as GitHub (no such local path), one stderr line says so, so a typo is visible.
+- `--ref <ref>` picks a branch or tag; it may repeat the ref of a `/tree/<ref>` URL but not contradict it. Only the first path segment after `/tree/` is taken as the ref; use `--ref` for branches with slashes.
+- What happens: `git clone --depth 1 --single-branch --no-tags` into a fresh private temp directory (mode 0700, 60 s timeout, `GIT_TERMINAL_PROMPT=0`, no shell), the scan runs there, and the directory is deleted afterwards, also on errors. Nothing else is fetched or executed (no `cargo`, no `npm`, no hooks).
+- Hardening of the clone: it runs with `core.symlinks=false` (symlinks in the repo are checked out as plain text files), `http.followRedirects=false`, git-lfs filters disabled (`GIT_LFS_SKIP_SMUDGE=1`, `filter.lfs.*` emptied), `protocol.allow=never` with only the transport of that URL re-enabled, and `GIT_SSH_COMMAND="ssh -oBatchMode=yes"` unless you set your own. Independently of that, every file read during a scan (manifests, lockfiles, toolchain files, JS/TS sources) must be a regular file, never a symlink or device, and is size-capped (manifests 5 MB, lockfiles 25 MB), so a hostile repo cannot make kedgeway read `/etc/...`, hang on `/dev/stdin` or stream `/dev/zero`. Error text is cut to 2000 characters, credentials in it are masked, and the temp path is replaced by the repo name.
+- Private repositories need git credentials already configured on the machine (SSH agent, credential helper); kedgeway never prompts for or stores them.
+- If `git` is not installed and the host is github.com, kedgeway downloads the codeload tarball and unpacks it with Node only (regular files only; `..` and absolute paths rejected; the download is streamed and aborted past 50 MB, unpacked size capped at 50 MB and 20 000 entries).
+- Output looks like a local run: the report header shows `github.com/o/r@main` instead of the temp path, finding `file` values are relative to the repository root, and SARIF/annotation paths are relative (no `file://`). Exit codes are unchanged.
+- `migrate` on a remote source is a dry run only. `--write` exits 2 with `remote sources are dry-run only; clone it and run migrate locally`.
 
 ### Flags
 
@@ -82,6 +99,7 @@ Raven is OAuth-protected. Each run tries stored credentials silently; only on a 
 | `--format <text\|json\|sarif\|annotations>` | `diagnose` only: stdout format (`annotations` prints GitHub workflow commands, then the text report). `--json` is `--format json`; combining the two exits 1 |
 | `--annotations <file>` | `diagnose` only: also write the GitHub annotations to `file` |
 | `--sarif <file>` | `diagnose` only: also write SARIF 2.1.0 to `file` (stdout follows `--format`) |
+| `--ref <ref>` | `diagnose` / `migrate`: branch or tag to scan when the source is a remote repository (error with a local path) |
 | `--offline` | `diagnose` / `migrate`: use the cached ecosystem snapshot only; exit 1 if there is none. Contradicts `--no-cache` (exit 1); ignored, with a warning, when `--fixture` is set |
 | `--no-cache` | `diagnose` / `migrate`: ignore the cached snapshot and fetch live (the result is still written to the cache) |
 | `--max-age <duration>` | `diagnose` / `migrate`: how old a cached snapshot may be before it is refetched. `30s`, `15m`, `24h`, `2d`; default `24h` |
@@ -220,6 +238,8 @@ const diagnosis = await diagnose({ path: ".", ecosystem: createRavenEcosystem() 
 // or offline: await diagnose({ path: ".", fixture: "snapshot.json" });
 ```
 
+Remote repositories: `await diagnoseRemote({ source: "https://github.com/o/r", ref: "main", fixture: "snapshot.json" })` (same options as `diagnose`, plus `ref`) clones, scans and cleans up; `parseRepoSource(input)` is the pure parser, `resolveRepoSource(input)` also checks the disk, and `migrateRemote` returns a dry-run plan.
+
 Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, `planMigration`, `applyMigration`, `migrate`, `buildGuide`, `formatGuide`, `migrationDocs`, `findImportHits`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`, `MigrationPlan`, `MigrationStep`, `MigrationGuide`, `SourceHit`.
 
 ESM only (Node >= 22.12). The package `exports` map has no `default` or `require` condition, so `require("kedgeway")` is not supported. Type declarations (`dist/index.d.ts`) are emitted by the build and checked before publishing.
@@ -230,9 +250,9 @@ ESM only (Node >= 22.12). The package `exports` map has no `default` or `require
 
 | Tool | Input | Returns |
 | ---- | ----- | ------- |
-| `diagnose` | `{ path, fixture?, failOn?, format? }` | a text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with `format: "sarif"` |
+| `diagnose` | `{ path \| url, ref?, fixture?, failOn?, format? }` | a text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with `format: "sarif"` |
 | `findings_reference` | none | the 18 finding codes with severity, meaning and what `migrate` does for them |
-| `migrate` | `{ path, fixture?, write? }` | summary including the guide, plan JSON and unified diff; dry run unless `write: true` |
+| `migrate` | `{ path \| url, ref?, fixture?, write? }` | summary including the guide, plan JSON and unified diff; dry run unless `write: true` |
 | `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
 
 Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
@@ -246,6 +266,8 @@ Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
 ```
 
 The MCP server never starts an OAuth flow: without stored Raven credentials, live calls fail immediately with `Run "kedgeway login" first`. Run `kedgeway login` once in a terminal (or pass `fixture`). `diagnose`, `migrate` and `ecosystem_snapshot` read the `path` / `fixture` you give them from the local disk; `migrate` with `write: true` edits files there, but only if you started the server with `kedgeway mcp --allow-write`; without it `write: true` returns an error and dry runs still work. The `migrate` tool is annotated as destructive and non-read-only.
+
+`diagnose` and `migrate` take either `path` or `url` (exactly one; a URL or `owner/repo` is shallow-cloned to a temp dir and deleted afterwards, see [Remote repositories](#remote-repositories)). `migrate` with `url` is always a dry run: `write: true` is an error even with `--allow-write`.
 
 ## GitHub Action
 
@@ -261,6 +283,7 @@ The MCP server never starts an OAuth flow: without stored Raven credentials, liv
 | Input | Default | Meaning |
 | ----- | ------- | ------- |
 | `path` | `.` | directory to scan |
+| `repo` | none | repository URL (or `owner/repo`) to scan instead of `path`; shallow-cloned and deleted afterwards. Annotations are not emitted for it (their paths are not in your checkout) |
 | `fail-on` | `warning` | fail on any finding at or above this severity; empty disables |
 | `fixture` | none | ecosystem snapshot JSON (offline). Set this **or** `auth` |
 | `auth` | none | Raven credentials from `kedgeway login --export`, as a secret. Set this **or** `fixture` |

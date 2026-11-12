@@ -33,6 +33,7 @@ export default function Page() {
           <thead><tr><th scope="col">Input</th><th scope="col">Default</th><th scope="col">Meaning</th></tr></thead>
           <tbody>
             <tr><th scope="row"><code>path</code></th><td><code>.</code></td><td>Directory to scan.</td></tr>
+            <tr><th scope="row"><code>repo</code></th><td>none</td><td>Repository URL or <code>owner/repo</code> to scan instead of <code>path</code>. It is shallow-cloned and deleted afterwards. Annotations are not emitted for it, because its paths are not in the checkout.</td></tr>
             <tr><th scope="row"><code>fail-on</code></th><td><code>warning</code></td><td>Fail on any finding at or above this severity. Empty disables.</td></tr>
             <tr><th scope="row"><code>fixture</code></th><td>none</td><td>Ecosystem snapshot JSON (offline). Set this <strong>or</strong> <code>auth</code>.</td></tr>
             <tr><th scope="row"><code>auth</code></th><td>none</td><td>Raven credentials from <code>kedgeway login --export</code>, as a secret. Set this <strong>or</strong> <code>fixture</code>.</td></tr>

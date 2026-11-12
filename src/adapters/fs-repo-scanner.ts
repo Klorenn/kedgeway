@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
+import { MAX_MANIFEST_BYTES, readRegularFile } from "./safe-read.js";
 import { join, resolve } from "node:path";
 import {
   parseCargoManifest,
@@ -65,11 +66,14 @@ export async function scanRepo(path: string): Promise<RepoFacts> {
       const base = rel.split("/").pop();
       const kind = toolchainFileKind(rel);
       if (base === "Cargo.toml") {
-        const manifest = parseCargoManifest(await readFile(abs, "utf8"));
+        const manifestText = await readRegularFile(abs, MAX_MANIFEST_BYTES);
+        if (manifestText === null) return fail(rel, "not a regular file or larger than 5 MB; skipped");
+        const manifest = parseCargoManifest(manifestText);
         if (manifest.error) fail(rel, manifest.error);
         else manifests.push({ file: rel, manifest });
       } else if (base === "package.json") {
-        const text = await readFile(abs, "utf8");
+        const text = await readRegularFile(abs, MAX_MANIFEST_BYTES);
+        if (text === null) return fail(rel, "not a regular file or larger than 5 MB; skipped");
         const r = parsePackageJsonDeps(text, rel);
         if (r.error) fail(rel, r.error);
         else {
@@ -77,8 +81,8 @@ export async function scanRepo(path: string): Promise<RepoFacts> {
           toolchainParts.push(scanToolchainText(rel, text));
         }
       } else if (kind !== null) {
-        if ((await stat(abs)).size > MAX_TOOLCHAIN_FILE_BYTES) return;
-        toolchainParts.push(scanToolchainText(rel, await readFile(abs, "utf8")));
+        const text = await readRegularFile(abs, MAX_TOOLCHAIN_FILE_BYTES); // null: symlink, special or too large (not a hand-written pin)
+        if (text !== null) toolchainParts.push(scanToolchainText(rel, text));
       }
     },
     (rel, e) => fail(rel, e instanceof Error ? e.message : String(e)),

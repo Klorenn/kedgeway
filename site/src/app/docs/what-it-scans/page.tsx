@@ -96,6 +96,19 @@ soroban-sdk = { workspace = true }`} />
         <li><strong>Tested on real files.</strong> The parsers run against seven real lockfiles from public repositories (Cargo.lock v4, package-lock v3, pnpm-lock v9, yarn classic and berry). Repositories and commits are listed in <code>fixtures/lockfiles/SOURCES.md</code> in the kedgeway repo.</li>
       </ul>
 
+      <h2 id="remote-repositories">Remote repositories</h2>
+      <p><code>diagnose</code> and <code>migrate</code> can scan a repository you have not cloned. Pass a git URL or <code>owner/repo</code> instead of a path. See <Link href="/docs/commands#diagnose">Commands</Link> for the accepted forms and <code>--ref</code>.</p>
+      <ul>
+        <li><strong>How it fetches.</strong> kedgeway runs <code>git clone --depth 1 --single-branch --no-tags</code> into a private temporary directory, scans it, and deletes it afterwards, also when the scan fails. Nothing from the repository is executed.</li>
+        <li><strong>Private repositories.</strong> Git credentials must already be configured, through an SSH agent or a credential helper. kedgeway never asks for or stores them.</li>
+        <li><strong>Without git.</strong> For GitHub repositories, kedgeway downloads the source tarball and unpacks it with Node only, capped at 50 MB and 20,000 entries.</li>
+        <li><strong>Rejected.</strong> <code>file://</code> and every other scheme, URLs with embedded credentials, and unsafe refs exit with 1.</li>
+        <li><strong>Output.</strong> The report header shows <code>github.com/o/r@main</code> instead of the temporary path. Finding, SARIF and annotation paths stay relative to the repository root.</li>
+        <li><strong>Migrate.</strong> A remote <code>migrate</code> is a dry run only.</li>
+      </ul>
+      <CodeBlock code={`kedgeway diagnose https://github.com/o/r
+kedgeway diagnose o/r --ref v1.2.0`} />
+
       <h2>Toolchain checks</h2>
       <p>Beyond the SDKs, kedgeway reads the toolchain the repo pins. Every finding points at a file and line.</p>
       <ul>

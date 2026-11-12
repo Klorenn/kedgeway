@@ -26,7 +26,7 @@ describe("committed ecosystem fixture", () => {
 describe("action.yml", () => {
   it("declares the documented inputs and outputs and delegates to the run script", async () => {
     const y = await readFile(resolve(root, "action.yml"), "utf8");
-    for (const key of ["path:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "version:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
+    for (const key of ["path:", "repo:", "KW_REPO:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "version:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
       expect(y).toContain(key);
     }
     expect(y).toContain("using: composite");
@@ -109,6 +109,24 @@ process.exit(${code});
     const c = await call();
     expect(c.auth).toBe("c2VjcmV0");
     expect(c.args).not.toContain("--fixture");
+  });
+
+  it("repo input is passed instead of path, without annotations", async () => {
+    const cli = await stubCli(report, 0);
+    const r = await run({ KW_PATH: "ignored", KW_REPO: "https://github.com/o/r", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "true", KW_CLI: cli, GITHUB_ACTIONS: "true" });
+    expect(r.code).toBe(0);
+    const c = await call();
+    expect(c.args[0]).toBe("diagnose");
+    expect(c.args[1]).toBe("https://github.com/o/r");
+    expect(c.args).not.toContain("ignored");
+    expect(c.args).not.toContain("--annotations");
+  });
+
+  it("repo input that looks like an option is refused", async () => {
+    const cli = await stubCli(report, 0);
+    const r = await run({ KW_REPO: "--ref=x", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "true", KW_CLI: cli });
+    expect(r.code).toBe(1);
+    expect(r.out).toMatch(/repo/);
   });
 
   it("with a fixture, does not export the auth secret", async () => {

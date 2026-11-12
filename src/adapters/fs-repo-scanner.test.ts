@@ -187,3 +187,20 @@ describe("scanRepo", () => {
     });
   });
 });
+
+describe("scanRepo and special files", () => {
+  it("never follows symlinked manifests or toolchain files", async () => {
+    await symlink("/dev/zero", join(dir, "Cargo.toml"));
+    await symlink("/dev/stdin", join(dir, "package.json"));
+    await symlink("/dev/zero", join(dir, "rust-toolchain.toml"));
+    const facts = await scanRepo(dir);
+    expect(facts.rustDeps).toEqual([]);
+    expect(facts.jsDeps).toEqual([]);
+  });
+  it("skips an oversized manifest with a manifest error instead of reading it", async () => {
+    await put("Cargo.toml", `# ${"x".repeat(5_000_001)}\n[dependencies]\nsoroban-sdk = "21"\n`);
+    const facts = await scanRepo(dir);
+    expect(facts.rustDeps).toEqual([]);
+    expect(facts.manifestErrors[0]?.file).toBe("Cargo.toml");
+  });
+});

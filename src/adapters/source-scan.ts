@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
+import { readRegularFile } from "./safe-read.js";
 import { join, resolve } from "node:path";
 import { findImportHits, type SourceHit } from "../core/source-hits.js";
 
@@ -46,9 +47,8 @@ export async function scanImportHits(root: string, names: readonly string[]): Pr
       if (!entry.isFile() || !SOURCE_EXT.has(extOf(entry.name))) continue;
       const full = join(abs, relPath);
       try {
-        const st = await stat(full);
-        if (!st.isFile() || st.size > MAX_BYTES) continue;
-        files.push({ file: relPath, text: await readFile(full, "utf8") });
+        const text = await readRegularFile(full, MAX_BYTES);
+        if (text !== null) files.push({ file: relPath, text });
       } catch {
         continue;
       }

@@ -7,9 +7,16 @@ export {
   toSarif,
   toAnnotations,
   migrate,
+  diagnoseRemote,
+  migrateRemote,
+  parseRepoSource,
+  resolveRepoSource,
   planMigration,
   applyMigration,
   type MigrateOptions,
+  type RemoteDiagnoseOptions,
+  type RemoteSource,
+  type RepoSource,
   type MigrateOutcome,
   type DiagnoseOptions,
   type DetailedDiagnosis,
@@ -33,3 +40,4 @@ export type { MigrationPlan, MigrationStep, MigrationKind } from "./core/migrati
 export { buildGuide, formatGuide, migrationDocs, type MigrationGuide, type GuideDoc } from "./core/guide.js";
 export { findImportHits, type SourceHit } from "./core/source-hits.js";
 export type { MigrationResult, FileChange } from "./adapters/migration-apply.js";
+export type { RemoteExec, RemoteFetch, RemoteRepoOptions } from "./adapters/remote-repo.js";

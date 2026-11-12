@@ -1,4 +1,5 @@
-import { access, readFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
+import { MAX_LOCKFILE_BYTES, readRegularFile } from "./safe-read.js";
 import { dirname, join } from "node:path";
 import { indexLockfile, type LockIndex, type LockfileKind } from "../core/lockfile.js";
 import { JS_PACKAGES, RUST_PACKAGES, type DetectedDep, type RepoFacts } from "../core/repo-facts.js";
@@ -40,10 +41,7 @@ export async function resolveLockfiles(root: string, facts: RepoFacts): Promise<
     const key = `${dir}/${kind}`;
     let hit = cache.get(key);
     if (!hit) {
-      hit = readFile(join(root, dir, kind), "utf8").then(
-        (text) => indexLockfile(kind, text, names),
-        () => null,
-      );
+      hit = readRegularFile(join(root, dir, kind), MAX_LOCKFILE_BYTES).then((text) => (text === null ? null : indexLockfile(kind, text, names)));
       cache.set(key, hit);
     }
     return hit;

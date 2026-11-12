@@ -66,7 +66,10 @@ npm install -g kedgeway
 kedgeway login
 
 # 3. Diagnose
-kedgeway diagnose ./my-contract --fail-on warning`;
+kedgeway diagnose ./my-contract --fail-on warning
+
+# Or scan a remote repository
+kedgeway diagnose https://github.com/o/r`;
 
 export default function Home() {
   return (

@@ -8,7 +8,9 @@ import { doctorOk, formatDoctor, type DoctorCheck } from "../core/doctor.js";
 import { parseDuration } from "../core/duration.js";
 import { CachingEcosystem, SnapshotCache, DEFAULT_MAX_AGE_MS } from "../adapters/snapshot-cache.js";
 import { formatGuide } from "../core/guide.js";
-import { diagnoseDetailed, migrate, toAnnotations, toSarif, type MigrateOutcome } from "../sdk.js";
+import { diagnoseDetailed, diagnoseRemote, migrate, migrateRemote, resolveRepoSource, toAnnotations, toSarif, type DetailedDiagnosis, type MigrateOutcome } from "../sdk.js";
+import type { RemoteRepoOptions } from "../adapters/remote-repo.js";
+import type { RemoteSource } from "../core/remote-source.js";
 import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 
 export interface CliIo {
@@ -35,6 +37,8 @@ export interface CliIo {
   env?: NodeJS.ProcessEnv;
   /** Runs the stdio MCP server until the client disconnects. */
   startMcp: (opts: { allowWrite: boolean }) => Promise<void>;
+  /** Overrides for cloning remote sources (git exec, fetch, temp root). Tests inject fakes. */
+  remote?: Omit<RemoteRepoOptions, "ref">;
 }
 
 interface CacheFlags {
@@ -45,6 +49,7 @@ interface CacheFlags {
 }
 
 interface DiagnoseOptions extends CacheFlags {
+  ref?: string;
   json?: boolean;
   fixture?: string;
   failOn?: string;
@@ -87,6 +92,22 @@ function withCacheFlags(cmd: Command): Command {
     .option("--max-age <duration>", "how old a cached snapshot may be before it is refetched (e.g. 30m, 24h, 2d)", "24h");
 }
 
+type Target = { kind: "local"; path: string } | { kind: "remote"; source: RemoteSource };
+
+/** A local path (always wins when it exists) or a remote repository; throws with a user-facing message otherwise. */
+async function resolveTarget(input: string, ref: string | undefined, io: CliIo): Promise<Target> {
+  const source = await resolveRepoSource(input) // relative to process.cwd(), like the local scanner;
+  if (source.kind === "local") {
+    if (ref !== undefined) throw new Error("--ref only applies to a remote repository (a URL or owner/repo)");
+    return { kind: "local", path: input };
+  }
+  if (ref !== undefined && source.ref !== undefined && source.ref !== ref) {
+    throw new Error(`--ref ${ref} conflicts with the ref in the URL (${source.ref})`);
+  }
+  if (!/[:@]/.test(input)) io.stderr(`kedgeway: treating '${input}' as ${source.display}\n`); // a typo'd local path must be visible
+  return { kind: "remote", source };
+}
+
 function isSeverity(v: string): v is Severity {
   return v === "critical" || v === "warning" || v === "info";
 }
@@ -127,7 +148,11 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
   if (!checkMaxAge(opts, io)) return 1;
   const threshold = opts.failOn as Severity | undefined;
   try {
-    const detailed = await diagnoseDetailed({ path, ...ecosystemFor(opts, io) });
+    const target = await resolveTarget(path, opts.ref, io);
+    const detailed: DetailedDiagnosis =
+      target.kind === "local"
+        ? await diagnoseDetailed({ path, ...ecosystemFor(opts, io) })
+        : await diagnoseRemote({ source: target.source, ...(opts.ref === undefined ? {} : { ref: opts.ref }), ...io.remote, ...ecosystemFor(opts, io) });
     const { facts, snapshot, diagnosis } = detailed;
     const sarif =
       opts.sarif !== undefined || format === "sarif"
@@ -156,6 +181,7 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
 }
 
 interface MigrateOptions extends CacheFlags {
+  ref?: string;
   dryRun?: boolean;
   write?: boolean;
   fixture?: string;
@@ -206,7 +232,15 @@ async function runMigrate(path: string, opts: MigrateOptions, io: CliIo): Promis
   if (!checkMaxAge(opts, io)) return 1;
   const write = opts.write === true;
   try {
-    const outcome = await migrate({ path, write, ...ecosystemFor(opts, io) });
+    const target = await resolveTarget(path, opts.ref, io);
+    if (target.kind === "remote" && write) {
+      io.stderr("kedgeway: remote sources are dry-run only; clone it and run migrate locally\n");
+      return 2;
+    }
+    const outcome =
+      target.kind === "local"
+        ? await migrate({ path, write, ...ecosystemFor(opts, io) })
+        : await migrateRemote({ source: target.source, ...(opts.ref === undefined ? {} : { ref: opts.ref }), ...io.remote, ...ecosystemFor(opts, io) });
     io.stdout(formatMigration(outcome, write));
     if (write) return outcome.result.skipped.length > 0 ? 2 : 0;
     return outcome.plan.steps.some((s) => s.kind !== "manual") ? 2 : 0;
@@ -226,8 +260,9 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     .exitOverride()
     .configureOutput({ writeOut: (s) => io.stdout(s), writeErr: (s) => io.stderr(s) });
 
-  withCacheFlags(program.command("diagnose [path]"))
-    .description("Scan a repo and report toolchain staleness")
+  withCacheFlags(program.command("diagnose [path-or-url]"))
+    .description("Scan a repo (a local path, a git URL or owner/repo) and report toolchain staleness")
+    .option("--ref <ref>", "branch or tag to scan when the source is a remote repository")
     .option("--json", "print Diagnosis as JSON (same as --format json)")
     .option("--format <format>", "stdout format: text | json | sarif | annotations (GitHub annotations, then the text report)")
     .option("--annotations <file>", "also write GitHub Actions annotations to <file>")
@@ -238,8 +273,9 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       exitCode = await runDiagnose(path ?? ".", opts, io);
     });
 
-  withCacheFlags(program.command("migrate [path]"))
-    .description("Print a migration guide and plan SDK version bumps (dry run). --write applies the manifest edits.")
+  withCacheFlags(program.command("migrate [path-or-url]"))
+    .description("Print a migration guide and plan SDK version bumps (dry run). --write applies the manifest edits (local paths only).")
+    .option("--ref <ref>", "branch or tag to scan when the source is a remote repository (dry run only)")
     .option("--dry-run", "print the planned edits as a diff without writing (default)")
     .option("--write", "apply the edits to the manifests")
     .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { MAX_MANIFEST_BYTES } from "./safe-read.js";
 import { chmod, lstat, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { unifiedDiff } from "../core/diff.js";
@@ -57,8 +58,13 @@ export async function applyMigration(plan: MigrationPlan, opts: ApplyOptions): P
   for (const [file, steps] of byFile) {
     let before: string;
     try {
-      if ((await lstat(join(plan.root, file))).isSymbolicLink()) {
+      const st = await lstat(join(plan.root, file));
+      if (st.isSymbolicLink()) {
         for (const step of steps) skipped.push({ step, reason: `${file} is a symlink; kedgeway never edits through symlinks` });
+        continue;
+      }
+      if (!st.isFile() || st.size > MAX_MANIFEST_BYTES) {
+        for (const step of steps) skipped.push({ step, reason: `${file} is not a regular file of at most 5 MB` });
         continue;
       }
       before = await readFile(join(plan.root, file), "utf8");

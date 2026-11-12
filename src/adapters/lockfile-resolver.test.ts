@@ -119,3 +119,30 @@ describe("resolveLockfiles", () => {
     expect(await lockfileHints(root, { ...f, rustDeps: [dep("soroban-sdk", "^21", "Cargo.toml")] })).toEqual([]);
   });
 });
+
+describe("resolveLockfiles and symlinks", () => {
+  it("ignores a Cargo.lock that is a symlink to a file outside the repo", async () => {
+    const { mkdtemp, rm, symlink, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const outside = await mkdtemp(join(tmpdir(), "kw-out-"));
+    const root = await mkdtemp(join(tmpdir(), "kw-root-"));
+    try {
+      await writeFile(join(outside, "Cargo.lock"), '[[package]]\nname = "soroban-sdk"\nversion = "21.7.7"\n');
+      await symlink(join(outside, "Cargo.lock"), join(root, "Cargo.lock"));
+      const facts = {
+        root,
+        rustDeps: [{ name: "soroban-sdk", raw: "21.0.0", file: "Cargo.toml", kind: "dependencies" }],
+        jsDeps: [],
+        manifestErrors: [],
+      };
+      const out = await resolveLockfiles(root, facts as never);
+      expect(out.rustDeps[0]?.resolved).toBeUndefined();
+      await symlink("/dev/zero", join(root, "package-lock.json")); // must neither hang nor read
+      await resolveLockfiles(root, facts as never);
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
