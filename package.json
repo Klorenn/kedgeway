@@ -1,6 +1,6 @@
 {
   "name": "kedgeway",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": false,
   "description": "Diagnose how outdated a Stellar/Soroban repo toolchain is, grounded on live ecosystem data from Stellar Raven",
   "license": "MIT",

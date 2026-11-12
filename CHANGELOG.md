@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-12
+
 ### Fixed
 
 - fix(auth): stored Raven sessions are reused silently again. Raven rotates the refresh token on every refresh; `kedgeway doctor` refreshed through an in-memory copy and discarded the new refresh token, leaving `auth.json` with one Raven had replaced, and when a later refresh was answered with `invalid_grant` the SDK's `invalidateCredentials("tokens")` made the silent attempt delete the tokens from `auth.json`. Interactive commands then reopened the browser login (with a new client registration), the MCP server failed with `Not logged in to Raven`, and `doctor` reported `auth.json has no tokens`. Now `doctor` writes refreshed tokens back; a silent attempt never deletes stored credentials (it hides them for that attempt only) and never registers a new client; an interactive attempt deletes rejected tokens only if they are still the ones on disk; and when another process rotated the tokens during the silent attempt, kedgeway re-reads `auth.json` (again after about 300 ms) and retries once with them. `KEDGEWAY_AUTH` keeps refreshing in memory, now shared by all calls in one process.

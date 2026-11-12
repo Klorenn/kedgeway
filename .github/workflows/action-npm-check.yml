@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: kedgeway
-        uses: Klorenn/kedgeway@v0.3.0
+        uses: Klorenn/kedgeway@v0.3.1
         with:
           path: .
           fail-on: warning
