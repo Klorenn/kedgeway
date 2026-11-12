@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Changed
+
+- feat(action): when pinned to a semver tag (`@v1.2.3`) the action installs that exact version with `npm install -g kedgeway@1.2.3` instead of building from source; a version that is not on npm fails with an error (no silent fallback). Other refs (`@main`, SHAs, branches, the local `./`) still build from source. New `version` input overrides the detected version (`source` forces the build). Detection lives in `scripts/resolve-version.sh`.
+
 ## [0.1.0] - 2026-11-12
 
 ### Added

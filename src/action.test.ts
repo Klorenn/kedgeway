@@ -26,11 +26,11 @@ describe("committed ecosystem fixture", () => {
 describe("action.yml", () => {
   it("declares the documented inputs and outputs and delegates to the run script", async () => {
     const y = await readFile(resolve(root, "action.yml"), "utf8");
-    for (const key of ["path:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
+    for (const key of ["path:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "version:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
       expect(y).toContain(key);
     }
     expect(y).toContain("using: composite");
-    expect(y).toContain("github.action_path");
+    expect(y).toContain("GITHUB_ACTION_PATH");
     expect(y).toContain("scripts/action-run.sh");
   });
 });

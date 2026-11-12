@@ -250,9 +250,10 @@ The MCP server never starts an OAuth flow: without stored Raven credentials, liv
 | `auth` | none | Raven credentials from `kedgeway login --export`, as a secret. Set this **or** `fixture` |
 | `json` | `false` | print JSON instead of text |
 | `sarif` | `false` | also write SARIF 2.1.0 to `$RUNNER_TEMP/kedgeway.sarif` |
+| `version` | action tag | kedgeway version to run: empty uses the tag you pinned, a semver (`1.2.3`) overrides it, `source` builds the checked-out action |
 | `annotations` | on in Actions | emit GitHub annotations (file and line) for each finding; `"false"` disables |
 
-Pin a release tag as above; `@main` is unpinned and can change under you. The action builds kedgeway from source on every run (`npm ci && npm run build`), which is slow, until built `dist/` is committed on release tags.
+Pin a release tag as above: `@v1.2.3` installs exactly kedgeway 1.2.3 from npm (no build) and fails with a clear error if that version is not published. Any other ref (`@main`, a SHA, a branch, or the local `./` in this repo's own CI) builds the checked-out source (`npm ci && npm run build`), which is slower; `@main` is unpinned and can change under you. The `version` input overrides the detected version (strict semver such as `1.2.3`, or `source` to force the source build). A pinned tag therefore runs what the npm registry holds for that version (installed with `--ignore-scripts`), not the code at the git tag; `version: source` keeps the git tag as the trust anchor.
 
 Outputs: `summary` (`critical=0 warning=1 info=2`), `report-json` (path to the JSON report under `RUNNER_TEMP`) and `sarif` (path to the SARIF file, only when `sarif: true`).
 

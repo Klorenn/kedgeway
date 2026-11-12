@@ -22,7 +22,7 @@
   ],
   "type": "module",
   "bin": {
-    "kedgeway": "./dist/cli.js"
+    "kedgeway": "dist/cli.js"
   },
   "engines": {
     "node": ">=22.12"

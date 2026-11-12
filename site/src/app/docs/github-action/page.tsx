@@ -38,6 +38,7 @@ export default function Page() {
             <tr><th scope="row"><code>auth</code></th><td>none</td><td>Raven credentials from <code>kedgeway login --export</code>, as a secret. Set this <strong>or</strong> <code>fixture</code>.</td></tr>
             <tr><th scope="row"><code>json</code></th><td><code>false</code></td><td>Print JSON instead of text.</td></tr>
             <tr><th scope="row"><code>sarif</code></th><td><code>false</code></td><td>Also write SARIF 2.1.0 to <code>$RUNNER_TEMP/kedgeway.sarif</code>.</td></tr>
+            <tr><th scope="row"><code>version</code></th><td>the pinned tag</td><td>kedgeway version to run. Accepts a semver such as <code>1.2.3</code>, or <code>source</code> to force the source build.</td></tr>
             <tr><th scope="row"><code>annotations</code></th><td>on in Actions</td><td>Emit a GitHub annotation, with file and line, for each finding. Set <code>&quot;false&quot;</code> to disable.</td></tr>
           </tbody>
         </table>
@@ -83,7 +84,7 @@ steps:
       <p>The log has one run for the tool <code>kedgeway</code>, a rule per finding code (12), and one result per finding with the repo-relative manifest path. Critical is an error, warning is a warning, info is a note. Findings that are not about a file, such as <code>DATA_DEGRADED</code> and <code>NO_SDK_FOUND</code>, have no location.</p>
 
       <h2>Exit codes and speed</h2>
-      <p>The action runs <code>diagnose</code> once, always writes its outputs, then exits with the CLI&apos;s code: 0 when nothing met the threshold, 2 when a finding did, 1 on a tool error. It builds kedgeway from source on every run (<code>npm ci &amp;&amp; npm run build</code>), which is slow, until built <code>dist/</code> is committed on release tags.</p>
+      <p>The action runs <code>diagnose</code> once, always writes its outputs, then exits with the CLI&apos;s code: 0 when nothing met the threshold, 2 when a finding did, 1 on a tool error. Pinning a release tag (<code>uses: Klorenn/kedgeway@v1.2.3</code>) installs exactly that version from npm with no build step, and fails with a clear error if the version is not published. Any other ref (<code>@main</code>, a commit SHA, a branch) builds the checked-out source with <code>npm ci &amp;&amp; npm run build</code>, which is slower, and <code>@main</code> is unpinned. The npm install path applies to tags cut after this change; <code>v0.1.0</code> still builds from source.</p>
       <PrevNext href="/docs/github-action" />
     </>
   );

@@ -31,6 +31,11 @@ inputs:
     required: false
     default: "false"
 
+  version:
+    description: kedgeway version to run. Empty uses the version of the action tag you pinned (`@v1.2.3` installs kedgeway 1.2.3 from npm). Any other ref (`@main`, a SHA, a branch, the local `./`) builds the checked-out source. Set a semver such as `1.2.3` to override, or `source` to force the source build.
+    required: false
+    default: ""
+
   annotations:
     description: Emit GitHub annotations (error/warning/notice with file and line) for each finding ("true" or "false"). Empty means true inside GitHub Actions.
     required: false
@@ -50,14 +55,48 @@ outputs:
 runs:
   using: composite
   steps:
+    # Runs before any nested `uses:` step: inside a composite action the runner overwrites
+    # github.action_ref with the nested action's ref once one has run (actions/runner#2473).
+    - name: Resolve kedgeway version
+      id: resolve
+      shell: bash
+      env:
+        KW_ACTION_REF: ${{ github.action_ref }}
+        KW_VERSION_INPUT: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        version=$(bash "$GITHUB_ACTION_PATH/scripts/resolve-version.sh" "$KW_ACTION_REF" "$KW_VERSION_INPUT")
+        echo "ref=${KW_ACTION_REF:-local}" >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - uses: actions/setup-node@v4
       with:
         node-version: 22
 
-    - name: Build kedgeway
+    - name: Install kedgeway
+      id: install
       shell: bash
-      working-directory: ${{ github.action_path }}
-      run: npm ci && npm run build
+      env:
+        KW_ACTION_REF: ${{ steps.resolve.outputs.ref }}
+        KW_VERSION: ${{ steps.resolve.outputs.version }}
+      run: |
+        set -euo pipefail
+        version="${KW_VERSION:?resolve step did not run}"
+        if [ "$version" = "source" ]; then
+          echo "Building kedgeway from source (ref: $KW_ACTION_REF)"
+          (cd "$GITHUB_ACTION_PATH" && npm ci && npm run build)
+          cli="$GITHUB_ACTION_PATH/dist/cli.js"
+        else
+          echo "Installing kedgeway@$version from npm"
+          prefix="${RUNNER_TEMP:?RUNNER_TEMP is required}/kedgeway-npm"
+          if ! npm install -g --ignore-scripts --prefix "$prefix" "kedgeway@$version"; then
+            echo "::error title=kedgeway::Could not install kedgeway@$version from npm. Check that this version is published, or set the 'version' input to 'source' to build from the checked-out action."
+            exit 1
+          fi
+          cli="$(npm root -g --prefix "$prefix")/kedgeway/dist/cli.js"
+        fi
+        test -f "$cli" || { echo "::error title=kedgeway::Resolved kedgeway entry point not found: $cli"; exit 1; }
+        echo "cli=$cli" >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
     - name: Run kedgeway diagnose
       id: run
@@ -70,5 +109,5 @@ runs:
         KW_JSON: ${{ inputs.json }}
         KW_SARIF: ${{ inputs.sarif }}
         KW_ANNOTATIONS: ${{ inputs.annotations }}
-        KW_CLI: ${{ github.action_path }}/dist/cli.js
+        KW_CLI: ${{ steps.install.outputs.cli }}
       run: bash "$GITHUB_ACTION_PATH/scripts/action-run.sh"
