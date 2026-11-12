@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-12
+
 ### Added
 
 - feat(remote): diagnose a repository by URL. `kedgeway diagnose <path-or-url>` and `kedgeway migrate <path-or-url>` accept `https://` / `ssh://` / `git@host:o/r` URLs (GitHub `/tree/<ref>` and GitLab `/-/tree/<ref>` included) and the `owner/repo` GitHub shorthand (an existing local path always wins), with `--ref <ref>`. The repo is cloned with `git clone --depth 1 --single-branch --no-tags` (execFile, no shell, `GIT_TERMINAL_PROMPT=0`, 60 s timeout, SIGKILL) into a 0700 temp dir that is always removed; without git on a github.com source, the codeload tarball is fetched and unpacked with Node only (regular files, no `..`/absolute paths, 50 MB and 20k entries caps). `file://`, `javascript:`, non-http(s)/ssh schemes, embedded credentials and unsafe refs are rejected. The report header shows `github.com/o/r@ref`, finding files and SARIF/annotation paths stay repo-relative. `migrate --write` on a remote source exits 2 (dry run only).
