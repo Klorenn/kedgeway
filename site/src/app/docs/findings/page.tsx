@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Findings — kedgeway docs",
-  description: "Every kedgeway finding code: severity, meaning, evidence and what to do.",
-  alternates: { canonical: "/docs/findings" },
-  openGraph: { title: "Findings — kedgeway docs", description: "Every kedgeway finding code: severity, meaning, evidence and what to do.", url: "/docs/findings", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Findings — kedgeway docs", "Every kedgeway finding code: severity, meaning, evidence and what to do.", "/docs/findings");
 
 export default function Findings() {
   return (
@@ -109,9 +105,9 @@ export default function Findings() {
         <h2 id="manifest_unparseable">MANIFEST_UNPARSEABLE</h2>
         <p className={styles.sev}>warning</p>
         <dl className={styles.defs}>
-          <dt>Meaning</dt><dd>{"A Cargo.toml or package.json could not be read or parsed. Its dependencies were not checked."}</dd>
+          <dt>Meaning</dt><dd>{"A Cargo.toml, a package.json, or a directory could not be read or parsed. Its dependencies were not checked."}</dd>
           <dt>Evidence shown</dt><dd>{"The parser or file-system error message."}</dd>
-          <dt>What to do</dt><dd>{"Fix the file (for example invalid TOML or JSON) and run again. Until then that manifest is unchecked."}</dd>
+          <dt>What to do</dt><dd>{"Fix the file or the unreadable directory (for example invalid TOML or JSON, or a permission error) and run again. Until then that path is unchecked."}</dd>
         </dl>
       </section>
       <section className={styles.finding} aria-labelledby="data_degraded">

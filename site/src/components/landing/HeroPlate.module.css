@@ -1,0 +1,10 @@
+.plate { display: flex; flex-direction: column; gap: var(--space-16); padding-bottom: 56px; }
+/* --w is the horse width: 342 mobile, 960 desktop, never wider than the stage. The hoof line is at y = 91 of the
+   180:101 viewBox, so the ground overlaps the horse box by (101 - 91) / 180 of its width. */
+.stage { --w: min(100cqw, 342px); container-type: inline-size; display: flex; flex-direction: column; align-items: center; }
+.horse { position: relative; z-index: 1; width: var(--w); }
+.ground { width: 100%; margin-top: calc(var(--w) * -10 / 180); }
+@media (min-width: 768px) {
+  .plate { gap: var(--space-24); padding-bottom: var(--space-96); }
+  .stage { --w: min(100cqw, 960px); }
+}

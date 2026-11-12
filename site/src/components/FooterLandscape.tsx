@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { backdropSrc } from "@/lib/backdrop";
 import { COMMON, startDither } from "@/lib/dither-gl";
+import styles from "./FooterLandscape.module.css";
 
 // Four ridgelines, far to near. u_p.x = canvas height in CSS px (so drift can be expressed in px/s).
 const FRAG = `${COMMON}
@@ -34,9 +36,11 @@ void main() {
 }
 `;
 
-/** Full-bleed dithered mountain band at the very bottom of the page. Static under reduced motion. */
+/** Dithered ridges, 4 layers in parallax (2 / 3.4 / 4.8 / 6.2 px/s, 20 fps); the far one also follows scroll at 0.1x.
+ *  Fills its band (see FooterBand). Static (t = 30 s) under reduced motion; PNG frame 1 without WebGL. */
 export default function FooterLandscape() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const [fallback, setFallback] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -54,8 +58,17 @@ export default function FooterLandscape() {
         return [ch, shift, 0, 0];
       },
     });
+    if (!handle.ok) setFallback(backdropSrc("landscape"));
     return () => handle.destroy();
   }, []);
 
-  return <canvas ref={ref} aria-hidden="true" style={{ display: "block", width: "100%", height: "38vh", imageRendering: "pixelated", background: "#0b0b0c" }} />;
+  return (
+    <div className={styles.fill}>
+      <canvas ref={ref} aria-hidden="true" className={styles.canvas} />
+      {fallback ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className={styles.canvas} src={fallback} alt="" width={1440} height={342} decoding="async" style={{ objectFit: "cover", objectPosition: "bottom" }} />
+      ) : null}
+    </div>
+  );
 }

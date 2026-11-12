@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Commands — kedgeway docs",
-  description: "Every kedgeway command, flag and exit code.",
-  alternates: { canonical: "/docs/commands" },
-  openGraph: { title: "Commands — kedgeway docs", description: "Every kedgeway command, flag and exit code.", url: "/docs/commands", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Commands — kedgeway docs", "Every kedgeway command, flag and exit code.", "/docs/commands");
 
 export default function Commands() {
   return (
@@ -18,7 +14,7 @@ export default function Commands() {
       <p className={styles.lede}>Six commands: <code>diagnose</code>, <code>login</code>, <code>logout</code>, <code>doctor</code>, <code>migrate</code> and <code>mcp</code>.</p>
 
       <h2 id="diagnose">diagnose</h2>
-      <CodeBlock label="bash" code={"kedgeway diagnose [path] [--format <text|json|sarif|annotations>] [--sarif <file>] [--annotations <file>] [--fixture <file>] [--fail-on <severity>] [--offline] [--no-cache] [--max-age <duration>]"} />
+      <CodeBlock code={"kedgeway diagnose [path] [--json] [--format <text|json|sarif|annotations>] [--sarif <file>] [--annotations <file>] [--fixture <file>] [--fail-on <severity>] [--offline] [--no-cache] [--max-age <duration>]"} />
       <p>Scans the repo at <code>path</code> (default: the current directory), fetches ecosystem data, and prints a report. Raven is used unless you pass <code>--fixture</code>.</p>
       <dl className={styles.defs}>
         <dt><code>--json</code></dt>
@@ -30,7 +26,7 @@ export default function Commands() {
         <dt><code>{"--annotations <file>"}</code></dt>
         <dd>Also write the GitHub annotations to <code>file</code>. Stdout still follows <code>--format</code>. The line is a best-effort scan of the manifest. See <Link href="/docs/github-action">GitHub Action</Link>.</dd>
         <dt><code>--offline</code></dt>
-        <dd>Use the cached ecosystem snapshot only and never call Raven. Exits 1 if there is no cache; contradicts <code>--no-cache</code>; ignored with a warning when <code>--fixture</code> is set. Also on <code>migrate</code>.</dd>
+        <dd>Use the cached ecosystem snapshot only and never call Raven. Exits 1 if there is no cache; contradicts <code>--no-cache</code>; ignored with a warning when <code>--fixture</code> is set. Also on <code>migrate</code>. On <code>doctor</code> the same flag only skips the Raven reachability check.</dd>
         <dt><code>--no-cache</code></dt>
         <dd>Ignore the cached snapshot and fetch live. The result is still written to the cache. Also on <code>migrate</code>.</dd>
         <dt><code>{"--max-age <duration>"}</code></dt>
@@ -40,25 +36,25 @@ export default function Commands() {
         <dt><code>{"--fail-on <severity>"}</code></dt>
         <dd>Exit with code 2 if any finding is at or above <code>critical</code>, <code>warning</code> or <code>info</code>. Any other value is an error and exits with 1.</dd>
       </dl>
-      <CodeBlock label="bash" code={`kedgeway diagnose ./my-contract --fail-on critical
+      <CodeBlock code={`kedgeway diagnose ./my-contract --fail-on critical
 kedgeway diagnose . --json > report.json`} />
 
       <h2 id="login">login</h2>
-      <CodeBlock label="bash" code={"kedgeway login"} />
+      <CodeBlock code={"kedgeway login"} />
       <p>Starts a fresh OAuth authorization with Stellar Raven and stores the token. Prints <code>Logged in to Stellar Raven.</code> on success. See <Link href="/docs/authentication">Authentication</Link>.</p>
 
-      <CodeBlock label="bash" code={"kedgeway login --no-browser"} />
+      <CodeBlock code={"kedgeway login --no-browser"} />
       <p><code>login --no-browser</code> is for machines without a browser. It prints the authorization URL instead of opening it. Open the URL anywhere, sign in, then paste the redirect URL (or just its <code>code</code>) back into the terminal. A pasted URL is checked against the login attempt's OAuth state; a bare code carries none. Or forward the callback port with <code>ssh -L</code> and let the redirect land on kedgeway directly. It combines with <code>--export</code>. See <Link href="/docs/authentication#headless">Headless login</Link>.</p>
 
       <CodeBlock code={"kedgeway login --export"} />
-      <p><code>login --export</code> prints your stored credentials as a base64 secret for CI and removes nothing. It only opens the browser flow if nothing is stored. Put the output in a <code>KEDGEWAY_AUTH</code> secret. See <Link href="/docs/ci">CI</Link>.</p>
+      <p><code>login --export</code> prints your stored credentials as a base64 secret for CI and removes nothing. It logs in first only when nothing is stored, and it opens a browser unless you also pass <code>--no-browser</code>. Stdout is the secret; stderr warns that it is one. If <code>KEDGEWAY_AUTH</code> is already set in the environment, that value is ignored and the stored login is what gets exported. Put the output in a <code>KEDGEWAY_AUTH</code> secret. See <Link href="/docs/ci">CI</Link>.</p>
 
       <h2 id="logout">logout</h2>
-      <CodeBlock label="bash" code={"kedgeway logout"} />
+      <CodeBlock code={"kedgeway logout"} />
       <p>Deletes the stored credentials. It prints whether anything was removed and exits with 0 either way.</p>
 
       <h2 id="doctor">doctor</h2>
-      <CodeBlock label="bash" code={"kedgeway doctor [--offline]"} />
+      <CodeBlock code={"kedgeway doctor [--offline]"} />
       <p>A self-check that changes nothing. It prints one line per check, <code>ok</code>, <code>warn</code>, <code>fail</code> or <code>skip</code>:</p>
       <ul>
         <li>Node version (22.12 or newer).</li>
@@ -69,24 +65,25 @@ kedgeway diagnose . --json > report.json`} />
       <p>Exit 0 when nothing failed (warnings do not fail it), 1 when any check failed.</p>
 
       <h2 id="migrate">migrate</h2>
-      <CodeBlock code={"kedgeway migrate [path] [--write] [--fixture <file>]"} />
-      <p>Experimental. Plans SDK version bumps and prints a unified diff; it edits files only with <code>--write</code>. Exit 0 for nothing to do, a manual-only dry run, or edits applied; 2 for a dry run with at least one automatic edit, or a write where some step was skipped; 1 on error. It edits manifests only and notes any lockfile it leaves stale, with a manual step to refresh it. See <Link href="/docs/migrate">Migration mode</Link>.</p>
+      <CodeBlock code={"kedgeway migrate [path] [--dry-run] [--write] [--fixture <file>] [--offline] [--no-cache] [--max-age <duration>]"} />
+      <p>Prints a migration guide and a unified diff of SDK version bumps. The default is a dry run, and <code>--dry-run</code> is that same mode made explicit. <code>--write</code> applies the manifest edits. Passing both <code>--dry-run</code> and <code>--write</code> exits 1. <code>--offline</code>, <code>--no-cache</code> and <code>--max-age</code> behave as they do on <code>diagnose</code>. Exit 0 for nothing to do, a manual-only dry run, or edits applied; 2 for a dry run with at least one automatic edit, or a write where some step was skipped; 1 on error, including a refused write. It edits manifests only and notes any lockfile it leaves stale, with a manual step to refresh it. See <Link href="/docs/migrate">Migration guide</Link>.</p>
 
       <h2 id="mcp">mcp</h2>
-      <CodeBlock code={"kedgeway mcp"} />
-      <p>Runs an MCP server over stdio. It never starts OAuth: log in first. See <Link href="/docs/mcp">MCP server</Link>.</p>
+      <CodeBlock code={"kedgeway mcp [--allow-write]"} />
+      <p>Runs an MCP server over stdio. It never starts OAuth: log in first. <code>--allow-write</code> lets the migrate tool edit files; without it, <code>write: true</code> returns an error and dry runs still work. See <Link href="/docs/mcp">MCP server</Link>.</p>
 
       <h2 id="exit-codes">Exit codes</h2>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <thead><tr><th scope="col">Code</th><th scope="col">Meaning</th></tr></thead>
           <tbody>
-            <tr><th scope="row"><code>0</code></th><td>The run finished and no <code>--fail-on</code> threshold was hit.</td></tr>
-            <tr><th scope="row"><code>1</code></th><td>Tool error: an invalid <code>--fail-on</code> value, a bad flag, a login failure, or a scan or network failure.</td></tr>
-            <tr><th scope="row"><code>2</code></th><td>A finding met the <code>--fail-on</code> threshold.</td></tr>
+            <tr><th scope="row"><code>0</code></th><td><code>diagnose</code>: finished, and no <code>--fail-on</code> threshold was hit. <code>migrate</code>: nothing to do, only manual steps, or the edits were applied. <code>doctor</code> and <code>logout</code>: finished. A <code>warn</code> from <code>doctor</code> still exits 0.</td></tr>
+            <tr><th scope="row"><code>1</code></th><td>Tool error: an invalid flag (including <code>--fail-on</code>, <code>--format</code> or <code>--max-age</code>), <code>--json</code> combined with <code>--format</code>, <code>--offline</code> with <code>--no-cache</code>, a login failure, a failed <code>doctor</code> check, or a scan or network failure.</td></tr>
+            <tr><th scope="row"><code>2</code></th><td><code>diagnose</code>: a finding met <code>--fail-on</code>. <code>migrate</code>: a dry run has an automatic edit, or <code>--write</code> skipped a step. <code>doctor</code> never exits 2.</td></tr>
           </tbody>
         </table>
       </div>
+      <p><code>logout</code> exits 0 whether or not a credentials file was deleted. <code>--help</code> exits 0. An unknown command or flag exits 1.</p>
       <PrevNext href="/docs/commands" />
     </>
   );

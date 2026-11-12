@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "TypeScript SDK — kedgeway docs",
-  description: "Call kedgeway diagnose and migrate from your own TypeScript or JavaScript code.",
-  alternates: { canonical: "/docs/sdk" },
-  openGraph: { title: "TypeScript SDK — kedgeway docs", description: "Call kedgeway diagnose and migrate from your own TypeScript or JavaScript code.", url: "/docs/sdk", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("TypeScript SDK — kedgeway docs", "Call kedgeway diagnose and migrate from your own TypeScript or JavaScript code.", "/docs/sdk");
 
 export default function Page() {
   return (
@@ -40,6 +36,8 @@ export default function Page() {
             <tr><th scope="row"><code>findImportHits(files, names)</code></th><td>Pure search for import lines of the given package names.</td></tr>
             <tr><th scope="row"><code>applyMigration(plan, {"{ write }"})</code></th><td>Dry run by default; edits files only when <code>write</code> is true.</td></tr>
             <tr><th scope="row"><code>migrate(opts)</code></th><td>Diagnose, plan and apply in one call. Adds <code>write?</code> to the diagnose options.</td></tr>
+            <tr><th scope="row"><code>{"toSarif(detailed, { cwd? })"}</code></th><td>A SARIF 2.1.0 log. Same document as <code>diagnose --format sarif</code> or <code>--sarif</code>.</td></tr>
+            <tr><th scope="row"><code>{"toAnnotations(detailed, { cwd? })"}</code></th><td>GitHub workflow commands, one per finding. Same lines as <code>--format annotations</code>.</td></tr>
           </tbody>
         </table>
       </div>

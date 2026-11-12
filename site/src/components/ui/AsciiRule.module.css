@@ -1,0 +1,6 @@
+.rule { display: flex; align-items: baseline; width: 100%; color: var(--color-ink-2); overflow: hidden; white-space: pre; }
+.rule > span { flex: none; }
+.label { flex: 0 1 auto; margin: 0; min-width: 0; overflow: hidden; text-overflow: clip; white-space: pre; font-family: var(--font-mono); font-size: 14px; line-height: 20px; font-weight: 400; text-transform: uppercase; color: var(--color-ink); text-wrap: nowrap; }
+.rule > .dashes { flex: 1 1 0; min-width: 0; overflow: hidden; }
+.endMobile { display: none; }
+@media (max-width: 767px) { .brand { display: none; } .endMobile { display: inline; } }

@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "GitHub Action — kedgeway docs",
-  description: "Run kedgeway in GitHub Actions and fail a build on SDK drift.",
-  alternates: { canonical: "/docs/github-action" },
-  openGraph: { title: "GitHub Action — kedgeway docs", description: "Run kedgeway in GitHub Actions and fail a build on SDK drift.", url: "/docs/github-action", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("GitHub Action — kedgeway docs", "Run kedgeway in GitHub Actions and fail a build on SDK drift.", "/docs/github-action");
 
 export default function Page() {
   return (

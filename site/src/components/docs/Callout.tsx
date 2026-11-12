@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import PixelIcon from "@/components/icons/pixel";
 import styles from "./Callout.module.css";
 
 interface CalloutProps {
@@ -7,14 +6,11 @@ interface CalloutProps {
   children: ReactNode;
 }
 
-/** A note or warning: 2px left rule, pixel icon and a mono label. */
+/** A note or warning: surface panel with a mono label. No icons (the only icons are X and GitHub). */
 export default function Callout({ kind = "note", children }: CalloutProps) {
   return (
     <aside className={kind === "warning" ? `${styles.callout} ${styles.warning}` : styles.callout}>
-      <div className={styles.head}>
-        <PixelIcon name={kind === "warning" ? "warning" : "file"} size={16} />
-        <span>{kind === "warning" ? "Warning" : "Note"}</span>
-      </div>
+      <p className={`t-overline ${styles.head}`}>{kind === "warning" ? "Warning" : "Note"}</p>
       <div className={styles.body}>{children}</div>
     </aside>
   );

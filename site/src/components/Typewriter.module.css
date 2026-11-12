@@ -1,3 +1,0 @@
-.cursor { display: inline-block; width: 0.6em; height: 1.05em; margin-left: 1px; background: var(--ink); vertical-align: text-bottom; animation: blink 1s steps(2, start) infinite; }
-@keyframes blink { to { visibility: hidden; } }
-@media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }

@@ -1,0 +1,15 @@
+/* Both variants exist; the desktop one shows once the container is wide enough for its column count. */
+.wrap { container-type: inline-size; width: 100%; color: var(--color-ink-2); overflow-x: clip; }
+/* Only when the block is wider than its box (set by AsciiBlock): a real, focusable scroller. */
+.wrap[data-scroll="true"] { overflow-x: auto; }
+.panel { background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-8); }
+.d, .m { margin: 0; color: var(--color-ink-2); }
+.panel .d, .panel .m { padding: var(--space-24); }
+.panel .m { padding: var(--space-16); }
+.d { display: none; }
+.m { display: block; }
+.em { font-weight: 400; color: var(--color-ink); }
+@container (min-width: 588px) { .min588 .d { display: block; } .min588 .m { display: none; } }
+@container (min-width: 687px) { .min687 .d { display: block; } .min687 .m { display: none; } }
+@container (min-width: 1193px) { .min1193 .d { display: block; } .min1193 .m { display: none; } }
+@container (min-width: 479px) { .min479 .d { display: block; } .min479 .m { display: none; } }

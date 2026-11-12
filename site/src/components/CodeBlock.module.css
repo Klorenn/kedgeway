@@ -1,9 +1,8 @@
-/* The one allowed surface: code only (see BRAND.md). */
-.block { position: relative; background: #101113; border: 1px solid var(--rule); border-radius: 2px; margin: 0 0 1.25rem; min-width: 0; }
-.pre { margin: 0; padding: 1rem 4.5rem 1rem 1.25rem; overflow-x: auto; font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.7; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.block { background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-8); margin: 0 0 var(--space-24); min-width: 0; overflow: hidden; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); padding: var(--space-8) var(--space-8) var(--space-8) var(--space-24); border-bottom: 1px solid var(--color-rule); color: var(--color-ink-2); }
+.pre { margin: 0; padding: var(--space-24); overflow-x: auto; color: var(--color-ink); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
 .pre code { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
-.copy { position: absolute; top: 0.6rem; right: 1rem; font: inherit; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); background: none; border: 0; padding: 0.25rem 0; cursor: pointer; }
-.copy:hover { color: var(--ink); }
-@media print { .block { background: #fff; border-color: #ccc; } .copy { display: none; } .pre { color: #000; } }
-.copyLabel { display: inline-flex; align-items: center; gap: 0.35rem; }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.copy { padding: var(--space-8) var(--space-16); background: none; border: 1px solid var(--color-rule); border-radius: var(--radius-4); color: var(--color-ink-2); cursor: pointer; font-family: var(--font-mono); font-size: 14px; line-height: 24px; font-weight: 400; }
+.copy:hover { background: var(--color-bg); color: var(--color-ink); }
+@media (max-width: 767px) { .header { padding-left: var(--space-16); } }
+@media print { .copy { padding: var(--space-8) var(--space-16); background: none; border: 1px solid var(--color-rule); border-radius: var(--radius-4); color: var(--color-ink-2); cursor: pointer; font-family: var(--font-mono); font-size: 14px; line-height: 24px; font-weight: 400; } }

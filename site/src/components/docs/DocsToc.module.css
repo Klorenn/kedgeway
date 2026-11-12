@@ -1,7 +1,9 @@
-.toc { display: none; font-family: var(--font-mono); font-size: 0.75rem; }
-.label { color: var(--ink-2); text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.6875rem; margin: 0 0 0.6rem; }
+.toc { display: none; }
+.label { margin: 0 0 var(--space-8); color: var(--color-ink-2); }
 .list { list-style: none; margin: 0; padding: 0; }
-.link { display: block; padding: 0.25rem 0 0.25rem 0.75rem; border-left: 1px solid var(--rule); color: var(--ink-2); text-decoration: none; line-height: 1.4; }
-.link:hover { color: var(--ink); }
-.link[data-active="true"] { color: var(--ink); border-left-color: var(--ink); }
-@media (min-width: 80rem) { .toc { display: block; position: sticky; top: 6rem; align-self: start; max-height: calc(100svh - 7rem); overflow-y: auto; } }
+.link { position: relative; display: block; padding: var(--space-8) var(--space-16); color: var(--color-ink-2); font-family: var(--font-mono); font-size: 14px; line-height: 24px; }
+.link::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--color-rule); }
+.link:hover { color: var(--color-ink); }
+.link[data-active="true"] { color: var(--color-ink); }
+.link[data-active="true"]::before { width: 2px; background: var(--color-ink); }
+@media (min-width: 1280px) { .toc { display: block; position: sticky; top: 96px; align-self: start; max-height: calc(100svh - 112px); overflow-y: auto; } }

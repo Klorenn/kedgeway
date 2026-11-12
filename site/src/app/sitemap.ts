@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { DOCS_FLAT } from "@/data/docs-nav";
 
-const BASE = "https://kedgeway.xyz";
+const BASE = "https://kedgeway.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = ["/", ...DOCS_FLAT.map((p) => p.href).filter((h) => h !== "/")];

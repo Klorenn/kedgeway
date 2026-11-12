@@ -40,7 +40,7 @@ export default function DocsToc() {
   if (headings.length < 2) return <div className={styles.toc} aria-hidden="true" />;
   return (
     <nav className={styles.toc} aria-label="On this page">
-      <p className={styles.label}>On this page</p>
+      <p className={`t-overline ${styles.label}`}>On this page</p>
       <ul className={styles.list}>
         {headings.map((h) => (
           <li key={h.id}>

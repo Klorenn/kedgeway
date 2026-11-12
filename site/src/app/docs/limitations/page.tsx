@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
+import Link from "next/link";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Limitations — kedgeway docs",
-  description: "What kedgeway does not do, so you can judge its output.",
-  alternates: { canonical: "/docs/limitations" },
-  openGraph: { title: "Limitations — kedgeway docs", description: "What kedgeway does not do, so you can judge its output.", url: "/docs/limitations", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Limitations — kedgeway docs", "What kedgeway does not do, so you can judge its output.", "/docs/limitations");
 
 export default function Limitations() {
   return (
@@ -36,7 +33,7 @@ export default function Limitations() {
         <dt>Versions only</dt>
         <dd>It measures SDK version drift. It does not audit contract logic, security or runtime behavior.</dd>
         <dt>Scan limits</dt>
-        <dd>Four folders deep, with common build and dependency folders skipped. See What it scans.</dd>
+        <dd>Four folders deep, with common build and dependency folders skipped. See <Link href="/docs/what-it-scans">What it scans</Link>.</dd>
         <dt>Platforms</dt>
         <dd>Developed and checked on macOS. The browser-opening code has a Windows branch, but Windows has not been verified.</dd>
         <dt>Not on npm yet</dt>

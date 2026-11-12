@@ -1,118 +1,221 @@
-/* kedgeway brand system: see BRAND.md. Ink on near-black; the only chroma is --construct. */
+/* kedgeway design system. Source: REDESIGN.md (Figma wins). Only this file may contain hex values. */
+
+/* ---------- Tokens: Dark is the default ---------- */
 :root {
-  --bg: #0b0b0c;
-  --ink: #f2efe9;
-  --ink-2: #9a978f;
-  --ink-3: #4a4a4f;
-  --rule: #1f1f22;
-  --construct: #c8322b;
+  --color-bg: #0b0b0c;
+  --color-surface: #141416;
+  --color-ink: #f2efe9;
+  --color-ink-2: #9a978f;
+  --color-ink-3: #4a4a4f; /* decorative only: dither, ticks, evidence lines. Never text. */
+  --color-rule: #1f1f22;
+  --color-accent: #c9a27e; /* clickable elements only */
+  --color-on-accent: #0b0b0c;
+
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-56: 56px;
+  --space-64: 64px;
+  --space-80: 80px;
+  --space-96: 96px;
+  --space-120: 120px;
+  --space-160: 160px;
+
+  --radius-4: 4px;
+  --radius-8: 8px;
+  --scrim: 0.8;
+
   --font-sans: var(--font-geist), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  --gutter: 16px;
-  --space-section: clamp(5rem, 11vw, 9rem);
+
+  /* layout: margins fluid 24 (<=768) -> 120 (>=1440); content capped at 1200 */
+  --content-max: 1200px;
+  --margin: clamp(var(--space-24), calc(24px + (100vw - 768px) * 0.1428), var(--space-120));
+  --gutter: var(--space-16);
+  --section-top: var(--space-64);
+  --section-bottom: var(--space-80);
+  --section-gap: var(--space-40);
+
   color-scheme: dark;
 }
 
+/* Paper: follows the OS unless the page pins a theme. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-bg: #f4f2ee;
+    --color-surface: #ebe8e2;
+    --color-ink: #111111;
+    --color-ink-2: #5c5a55;
+    --color-ink-3: #a6a39c;
+    --color-rule: #ddd9d1;
+    --color-accent: #8a5a3b;
+    --color-on-accent: #f4f2ee;
+    color-scheme: light;
+  }
+}
+:root[data-theme="paper"] {
+  --color-bg: #f4f2ee;
+  --color-surface: #ebe8e2;
+  --color-ink: #111111;
+  --color-ink-2: #5c5a55;
+  --color-ink-3: #a6a39c;
+  --color-rule: #ddd9d1;
+  --color-accent: #8a5a3b;
+  --color-on-accent: #f4f2ee;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --color-bg: #0b0b0c;
+  --color-surface: #141416;
+  --color-ink: #f2efe9;
+  --color-ink-2: #9a978f;
+  --color-ink-3: #4a4a4f;
+  --color-rule: #1f1f22;
+  --color-accent: #c9a27e;
+  --color-on-accent: #0b0b0c;
+  color-scheme: dark;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: var(--space-24);
+    --section-top: var(--space-96);
+    --section-bottom: var(--space-120);
+    --section-gap: var(--space-64);
+  }
+}
+
+/* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; background: var(--color-bg); }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink-2);
+  background: var(--color-bg);
+  color: var(--color-ink-2);
   font-family: var(--font-sans);
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  font-size: 17px;
+  line-height: 1.6; /* 27.2px */
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
 img, svg, canvas { display: block; max-width: 100%; }
-
-/* body links: 1px underline in ink-2, no color change */
-a { color: inherit; text-decoration: none; }
-/* Prose links: a 1px ink-2 underline, with an ink underline growing in from the left on hover. */
-a:where(:not([class])) {
-  background-image: linear-gradient(var(--ink), var(--ink)), linear-gradient(var(--ink-2), var(--ink-2));
-  background-size: 0 1px, 100% 1px;
-  background-position: 0 calc(100% - 0.06em), 0 calc(100% - 0.06em);
-  background-repeat: no-repeat;
-  transition: background-size 0.15s ease-out;
-}
-a:where(:not([class])):hover { background-size: 100% 1px, 100% 1px; }
-:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
-
-h1, h2, h3 { font-family: var(--font-sans); font-weight: 500; color: var(--ink); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
-h1 { font-size: clamp(2rem, 8vw, 3rem); line-height: 1.05; }
-h2 { font-size: clamp(1.75rem, 2.6vw, 2.25rem); line-height: 1.1; letter-spacing: -0.025em; }
-h3 { font-size: 1.0625rem; line-height: 1.3; letter-spacing: -0.01em; font-weight: 500; }
-/* Two-line section headings: statement in ink, consequence in ink-2, same size. */
-h2 { text-wrap: balance; }
-.line2 { display: block; color: var(--ink-2); }
-
-/* Headings are single-tone: any <em> inside renders like the rest of the heading. */
-h1 em, h2 em { font-style: normal; font-weight: inherit; color: inherit; }
 p { margin: 0; }
-strong { color: var(--ink); font-weight: 600; }
-
-/* faint static grain */
-body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: 0.03; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+strong { color: var(--color-ink); font-weight: 600; }
 code, pre, kbd { font-family: var(--font-mono); }
+:not(pre) > code { font-size: 14px; color: var(--color-ink); background: var(--color-surface); border-radius: var(--radius-4); padding: 1px 6px; overflow-wrap: anywhere; }
 
-.wrap { width: 100%; max-width: 72rem; margin-inline: auto; padding-inline: var(--gutter); }
-.col { width: 100%; max-width: 40rem; margin-inline: auto; padding-inline: var(--gutter); }
-.colWide { width: 100%; max-width: 64rem; margin-inline: auto; padding-inline: var(--gutter); }
+/* Links. Bare anchors are text links: accent, underline on hover. Classed anchors style themselves. */
+a { color: inherit; text-decoration: none; }
+a:where(:not([class])) { color: var(--color-accent); text-decoration: underline; text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:where(:not([class])):hover { text-decoration-thickness: 2px; }
+
+/* Focus: 2px accent ring, 2px offset, on every interactive element. */
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: var(--radius-4); }
+
+h1, h2, h3, h4 { font-family: var(--font-sans); font-weight: 500; color: var(--color-ink); margin: 0; text-wrap: balance; }
+
+/* ---------- Typography (REDESIGN section 2). Mobile first; desktop from 768, fluid until 1024. ---------- */
+.t-hero { font-size: 40px; line-height: 44px; font-weight: 500; font-family: var(--font-sans); letter-spacing: -0.03em; }        /* Display/Mobile */
+.t-heading { font-size: 28px; line-height: 32px; font-weight: 500; font-family: var(--font-sans); letter-spacing: -0.02em; }      /* Heading/Mobile */
+@media (min-width: 768px) {
+  .t-hero { font-size: clamp(56px, 7.2vw, 72px); line-height: 1; letter-spacing: -0.04em; }                                                         /* Hero/Sans 72/72 */
+  .t-heading { font-size: clamp(32px, 3.5vw, 36px); line-height: 1.1; letter-spacing: -0.025em; }                                                    /* Heading/Sans 36/39.6 */
+}
+.t-display-og { font-size: 60px; line-height: 60px; font-weight: 500; letter-spacing: -0.02em; }
+.t-card { font-family: var(--font-sans); font-size: 20px; line-height: 28px; font-weight: 500; letter-spacing: -0.01em; } /* Heading/Card */
+.t-stat { font-family: var(--font-sans); font-size: 48px; line-height: 56px; font-weight: 500; letter-spacing: -0.03em; color: var(--color-ink); } /* Stat */
+.t-body { font-family: var(--font-sans); font-size: 17px; line-height: 27.2px; font-weight: 400; }
+.t-body-medium { font-family: var(--font-sans); font-size: 17px; line-height: 27.2px; font-weight: 500; }
+.t-body-small { font-family: var(--font-sans); font-size: 15px; line-height: 24px; font-weight: 400; }
+.t-overline { font-family: var(--font-mono); font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.08em; text-transform: uppercase; }
+.t-mono-label { font-family: var(--font-mono); font-size: 14px; line-height: 24px; font-weight: 400; }
+.t-button { font-family: var(--font-mono); font-size: 14px; line-height: 16px; font-weight: 500; }
+.t-command { font-family: var(--font-mono); font-size: 14px; line-height: 22px; font-weight: 400; }
+.t-command-strong { font-family: var(--font-mono); font-size: 14px; line-height: 22px; font-weight: 600; }
+.t-wordmark-nav { font-family: var(--font-mono); font-size: 20px; line-height: 26px; font-weight: 500; letter-spacing: -0.01em; }
+.t-wordmark-display { font-family: var(--font-mono); font-size: 48px; line-height: 56px; font-weight: 500; letter-spacing: -0.01em; }
+.t-wordmark-giant { font-family: var(--font-mono); font-size: clamp(72px, 15vw, 216px); line-height: 1; font-weight: 500; letter-spacing: -0.04em; white-space: nowrap; }
+.t-ascii-art { font-family: var(--font-mono); font-size: 14px; line-height: 14px; font-weight: 400; white-space: pre; font-variant-ligatures: none; }
+.t-ascii-table { font-family: var(--font-mono); font-size: 14px; line-height: 20px; font-weight: 400; white-space: pre; font-variant-ligatures: none; }
+
+/* Element defaults map to the styles above. */
+h1 { font-size: 40px; line-height: 44px; letter-spacing: -0.03em; }
+h2 { font-size: 28px; line-height: 32px; letter-spacing: -0.02em; }
+h3 { font-size: 20px; line-height: 28px; letter-spacing: -0.01em; }
+@media (min-width: 768px) {
+  h1 { font-size: clamp(56px, 7.2vw, 72px); line-height: 1; letter-spacing: -0.04em; }
+  h2 { font-size: clamp(32px, 3.5vw, 36px); line-height: 1.1; letter-spacing: -0.025em; }
+}
+/* Two-line headings: statement in ink, consequence in ink-2, same size. */
+.line2 { display: block; color: var(--color-ink-2); }
+h1 em, h2 em { font-style: normal; font-weight: inherit; color: inherit; }
+
+/* ---------- Layout primitives ---------- */
+.container { width: 100%; max-width: calc(var(--content-max) + 2 * var(--margin)); margin-inline: auto; padding-inline: var(--margin); }
+
+/* 12-col desktop / 4-col mobile grid. Below 880px a 5-col column would be under 320px, so everything stacks. */
+.grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); column-gap: var(--gutter); row-gap: var(--section-gap); }
+.grid > * { grid-column: 1 / -1; min-width: 0; }
+@media (min-width: 768px) { .grid { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+@media (min-width: 880px) {
+  .grid > .span-5 { grid-column: span 5; } /* 486 at 1200 */
+  .grid > .span-6 { grid-column: span 6; } /* 588 */
+  .grid > .span-7 { grid-column: span 7; } /* 690 */
+}
+
+.section { padding-top: var(--section-top); padding-bottom: var(--section-bottom); position: relative; }
+.section-stack { display: flex; flex-direction: column; gap: var(--section-gap); }
+/* Full-bleed surface band: put the background on the section, keep the container inside. */
+.band { background: var(--color-surface); }
+
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 .skip {
-  position: absolute; left: var(--gutter); top: -4rem;
-  background: var(--ink); color: var(--bg); text-decoration: none;
-  padding: 0.5rem 0.9rem; font-family: var(--font-mono); font-weight: 500; z-index: 50; border-radius: 2px;
+  position: absolute; left: var(--space-16); top: -80px; z-index: 100;
+  background: var(--color-accent); color: var(--color-on-accent); padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-8); font-family: var(--font-mono); font-size: 14px; font-weight: 500;
 }
-.skip:focus { top: 0.75rem; }
+.skip:focus { top: var(--space-8); }
 
-.overline { font-family: var(--font-mono); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-2); }
-
-/* inline code: plain mono, no chip */
-:not(pre) > code { font-size: 0.9em; color: var(--ink); overflow-wrap: anywhere; }
-
-/* commands: mono with a 2px ink left rule, no background, no border */
-pre.block {
-  margin: 0; padding: 0.15rem 0 0.15rem 1rem; border-left: 2px solid var(--ink);
-  font-size: 0.875rem; line-height: 1.7; color: var(--ink); tab-size: 2;
-  white-space: pre-wrap; overflow-wrap: anywhere;
-}
-pre.block code { font-size: inherit; color: inherit; }
-
-/* the only two button styles; used in the hero */
+/* Legacy aliases kept until the landing page is rebuilt (Phase B). */
+.wrap, .colWide { width: 100%; max-width: calc(var(--content-max) + 2 * var(--margin)); margin-inline: auto; padding-inline: var(--margin); }
+.col { width: 100%; max-width: calc(840px + 2 * var(--margin)); margin-inline: auto; padding-inline: var(--margin); }
+.overline { font-family: var(--font-mono); font-size: 14px; line-height: 20px; text-transform: uppercase; color: var(--color-ink-2); }
 .btnPrimary, .btnLink {
-  display: inline-flex; align-items: center; height: 44px; padding: 0 1.25rem; box-sizing: border-box;
-  font-family: var(--font-mono); font-size: 0.9rem; font-weight: 500; border-radius: 2px; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 var(--space-24);
+  font-family: var(--font-mono); font-size: 14px; line-height: 16px; font-weight: 500; border-radius: var(--radius-8);
 }
-.btnPrimary { background: var(--ink); color: var(--bg); }
-.btnPrimary { transition: background 0.15s, transform 0.05s; }
-.btnPrimary:hover { background: color-mix(in srgb, var(--ink) 88%, var(--bg)); }
-.btnPrimary:active { transform: translateY(1px); }
-.btnLink { color: var(--ink); background: linear-gradient(var(--ink), var(--ink)) no-repeat 1.25rem calc(50% + 0.8em) / 0 1px; transition: background-size 0.15s ease-out; }
-.btnLink:hover { background-size: calc(100% - 2.5rem) 1px; }
-.btnLink:active { transform: translateY(1px); }
+.btnPrimary { background: var(--color-accent); color: var(--color-on-accent); }
+.btnPrimary:hover, .btnLink:hover { text-decoration: underline; text-underline-offset: 0.2em; }
+.btnLink { color: var(--color-accent); padding: 0 var(--space-8); }
+pre.block {
+  margin: 0; padding: var(--space-16) var(--space-24); background: var(--color-surface); border: 1px solid var(--color-rule); border-radius: var(--radius-8);
+  font-size: 14px; line-height: 22px; color: var(--color-ink); tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+pre.block code { font-size: inherit; color: inherit; background: none; padding: 0; }
+
+main, footer { position: relative; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .btnPrimary { transition: none; }
 }
-
-/* page layers */
-main, footer { position: relative; z-index: 1; }
 
 /* Print: docs on white paper, no chrome, URLs after links. */
 @media print {
-  :root { --bg: #fff; --ink: #000; --ink-2: #222; --ink-3: #666; --rule: #ccc; }
+  :root, :root[data-theme] { --color-bg: #fff; --color-surface: #fff; --color-ink: #000; --color-ink-2: #222; --color-ink-3: #666; --color-rule: #ccc; --color-accent: #000; }
   html, body { background: #fff !important; color: #000; }
-  body::after, canvas, header, footer, nav, aside, .skip { display: none !important; }
+  canvas, header, footer, nav, aside, .skip { display: none !important; }
   main { z-index: auto; }
-  article a[href]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #444; word-break: break-all; }
+  article a[href]::after { content: " (" attr(href) ")"; font-size: 14px; color: #444; word-break: break-all; }
   article a[href^="#"]::after { content: ""; }
   pre, code { color: #000 !important; }
 }
+main:focus { outline: none; }

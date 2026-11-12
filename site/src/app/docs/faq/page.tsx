@@ -1,24 +1,57 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
+import type { ReactNode } from "react";
+import Link from "next/link";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "FAQ — kedgeway docs",
-  description: "Short answers to common questions about kedgeway.",
-  alternates: { canonical: "/docs/faq" },
-  openGraph: { title: "FAQ — kedgeway docs", description: "Short answers to common questions about kedgeway.", url: "/docs/faq", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("FAQ — kedgeway docs", "Short answers to common questions about kedgeway.", "/docs/faq");
 
-const QA: [string, string][] = [
-  ["Does kedgeway send my code anywhere?", "No. It sends one fixed script to Stellar Raven, with nothing from your repo in it. The comparison happens on your machine."],
-  ["Why do I have to log in?", "Live ecosystem data comes from the Stellar Raven MCP server, which requires OAuth. You log in once; the token is stored at ~/.config/kedgeway/auth.json."],
-  ["Does it change my repo?", "diagnose never does. kedgeway migrate is a dry run unless you pass --write, and it refuses to write over uncommitted git changes."],
-  ["Can I log in on a server without a browser?", "Yes. kedgeway login --no-browser prints the URL; sign in anywhere and paste the redirect URL or code back, or forward the callback port with ssh -L. See Authentication."],
-  ["Can I run it offline?", "Yes. --offline reuses the cached Raven snapshot from your last live run, and --fixture uses a snapshot file. See Data sources and Fixtures."],
-  ["Why do I get SDK_UNKNOWN?", "Either the version in your manifest cannot be read as a single major (for example an upper bound or a compound range), or the current major was unavailable. See What it scans and DATA_DEGRADED."],
-  ["Does it read my lockfile?", "No. It reads the versions declared in Cargo.toml and package.json."],
-  ["Which --fail-on should I use in CI?", "critical fails on deprecated SDKs and legacy packages. warning also fails on one-major-behind and unknowns. See CI."],
-  ["Is it on npm?", "Not yet. npm install -g kedgeway is coming soon. Install from source for now."],
+const QA: { q: string; a: ReactNode }[] = [
+  { q: "Does kedgeway send my code anywhere?", a: "No. It sends one fixed script to Stellar Raven, with nothing from your repo in it. The comparison happens on your machine." },
+  { q: "Why do I have to log in?", a: "Live ecosystem data comes from the Stellar Raven MCP server, which requires OAuth. You log in once; the token is stored at ~/.config/kedgeway/auth.json." },
+  { q: "Does it change my repo?", a: "diagnose never does. kedgeway migrate is a dry run unless you pass --write, and it refuses to write over uncommitted git changes." },
+  {
+    q: "Can I log in on a server without a browser?",
+    a: (
+      <>
+        Yes. <code>kedgeway login --no-browser</code> prints the URL; sign in anywhere and paste the redirect URL or code back, or forward the callback port with <code>ssh -L</code>. See <Link href="/docs/authentication#headless">Authentication</Link>.
+      </>
+    ),
+  },
+  {
+    q: "Can I run it offline?",
+    a: (
+      <>
+        Yes. <code>--offline</code> reuses the cached Raven snapshot from your last live run, and <code>--fixture</code> uses a snapshot file. See <Link href="/docs/data-sources">Data sources</Link> and <Link href="/docs/fixtures">Fixtures</Link>.
+      </>
+    ),
+  },
+  {
+    q: "Why do I get SDK_UNKNOWN?",
+    a: (
+      <>
+        Either the version in your manifest cannot be read as a single major (for example an upper bound or a compound range), or the current major was unavailable. See <Link href="/docs/what-it-scans">What it scans</Link> and <Link href="/docs/findings#data_degraded">DATA_DEGRADED</Link>.
+      </>
+    ),
+  },
+  {
+    q: "Does it read my lockfile?",
+    a: (
+      <>
+        Yes, when one is present. <code>Cargo.lock</code>, <code>package-lock.json</code>, <code>pnpm-lock.yaml</code> and <code>yarn.lock</code> supply the resolved version of each direct dependency, and that version is what the comparison uses. If the lockfile is missing or ambiguous, kedgeway falls back to the manifest and says so. See <Link href="/docs/what-it-scans">What it scans</Link>.
+      </>
+    ),
+  },
+  {
+    q: "Which --fail-on should I use in CI?",
+    a: (
+      <>
+        <code>critical</code> fails on deprecated SDKs and legacy packages. <code>warning</code> also fails on one-major-behind and unknowns. See <Link href="/docs/ci">CI</Link>.
+      </>
+    ),
+  },
+  { q: "Is it on npm?", a: "Not yet. npm install -g kedgeway does not work. Install from source for now; a published package is coming later." },
 ];
 
 export default function Faq() {
@@ -26,7 +59,7 @@ export default function Faq() {
     <>
       <h1>FAQ</h1>
       <dl className={styles.defs}>
-        {QA.map(([q, a]) => (
+        {QA.map(({ q, a }) => (
           <div key={q}>
             <dt>{q}</dt>
             <dd>{a}</dd>

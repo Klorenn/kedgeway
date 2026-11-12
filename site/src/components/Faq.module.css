@@ -1,12 +1,1 @@
-.faq { border-top: 1px solid var(--rule); }
-.item { border-bottom: 1px solid var(--rule); }
-.q { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; color: var(--ink); font-family: var(--font-sans); font-size: 1.0625rem; text-align: left; }
-.q:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.mark { font-family: var(--font-mono); color: var(--ink-2); flex: none; }
-.item[data-open="true"] .mark { color: var(--ink); }
-/* height animates through grid rows: 0fr to 1fr */
-.panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms ease-out; }
-.item[data-open="true"] .panel { grid-template-rows: 1fr; }
-.inner { overflow: hidden; }
-.inner p { padding: 0 2rem 1.25rem 0; max-width: 36rem; margin: 0; }
-@media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
+.faq { border-top: 1px solid var(--color-rule); }

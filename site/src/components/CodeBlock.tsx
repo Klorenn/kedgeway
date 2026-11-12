@@ -6,16 +6,19 @@ interface CodeBlockProps {
   code: string;
   /** Output blocks are not copyable. */
   copy?: boolean;
-  /** Accepted for older call sites; the block no longer shows a label bar. */
+  /** Header label: "Terminal" for commands, "Clone" for the clone block. Defaults to "Terminal", or "Output" when not copyable. */
   label?: string;
 }
 
-/** Code block with a top-right copy button. The block is server-rendered; only the button is client code. */
-export default function CodeBlock({ code, copy = true }: CodeBlockProps) {
+/** Surface panel with a header (label + Copy) over the code. Server-rendered; only the button is client code. */
+export default function CodeBlock({ code, copy = true, label }: CodeBlockProps) {
   return (
     <div className={styles.block}>
-      {copy ? <CopyButton text={code} /> : null}
-      <pre className={styles.pre}>
+      <div className={styles.header}>
+        <span className="t-mono-label">{label ?? (copy ? "Terminal" : "Output")}</span>
+        {copy ? <CopyButton text={code} /> : null}
+      </div>
+      <pre className={`${styles.pre} t-command`}>
         <code>{code}</code>
       </pre>
     </div>

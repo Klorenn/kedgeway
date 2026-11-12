@@ -1,0 +1,7 @@
+.fig { margin: 0; display: flex; flex-direction: column; gap: var(--space-16); color: var(--color-ink); min-width: 0; }
+.bare { color: var(--color-ink); min-width: 0; }
+.desktop, .mobile { display: block; width: 100%; height: auto; }
+.mobile { display: none; }
+.caption { display: flex; flex-direction: column; border-top: 1px solid var(--color-rule); padding-top: var(--space-8); color: var(--color-ink-2); }
+@media (max-width: 767px) { .desktop { display: none; } .mobile { display: block; } }
+@media (min-width: 768px) { .caption { flex-direction: row; justify-content: space-between; gap: var(--space-16); } }

@@ -1,0 +1,2 @@
+/* The box is reserved by aspect-ratio (the shared 180x101 viewBox), so frames never shift the layout. */
+.gallop { display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: 180 / 101; color: var(--color-ink); overflow: visible; }

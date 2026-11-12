@@ -1,0 +1,23 @@
++-- kedgeway diagnose ./my-contract ---------------------------------------+
+|                                                                          |
+| ecosystem  soroban-sdk current major 28                                  |
+| observed   2026-11-11T22:00:57Z                                          |
+| source     Stellar Raven · Scout                                         |
+|                                                                          |
++--------------------------------------------------------------------------+
+|                                                                          |
+| [CRITICAL]  SDK_DEPRECATED      contracts/hello/Cargo.toml               |
+|     soroban-sdk 21.0.0 is on a major listed as deprecated (current: 28). |
+|     Upgrade.                                                             |
+|                                                                          |
+| [CRITICAL]  JS_LEGACY_PACKAGE   package.json                             |
+|     soroban-client 1.0.0 is a legacy package; replace it with            |
+|     @stellar/stellar-sdk.                                                |
+|                                                                          |
++--------------------------------------------------------------------------+
+|                                                                          |
+| critical 2  ############################..............................   |
+| warning  0  ..........................................................   |
+| info     0  ..........................................................   |
+|                                                                          |
++--------------------------------------------------------------------------+

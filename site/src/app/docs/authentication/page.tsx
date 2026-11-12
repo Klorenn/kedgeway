@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Authentication — kedgeway docs",
-  description: "How kedgeway signs in to Stellar Raven, what it stores, and what it sends.",
-  alternates: { canonical: "/docs/authentication" },
-  openGraph: { title: "Authentication — kedgeway docs", description: "How kedgeway signs in to Stellar Raven, what it stores, and what it sends.", url: "/docs/authentication", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Authentication — kedgeway docs", "How kedgeway signs in to Stellar Raven, what it stores, and what it sends.", "/docs/authentication");
 
 export default function Authentication() {
   return (
@@ -32,17 +28,17 @@ export default function Authentication() {
 
       <h2>When it asks you to log in</h2>
       <p>
-        <code>kedgeway login</code> always starts a fresh authorization: it clears the stored token, client registration and verifier first. <code>kedgeway diagnose</code> first tries your stored token silently, with no server and no browser. Only if Raven answers 401 does it start the interactive flow.
+        <code>kedgeway login</code> starts a fresh authorization: it clears the stored token, client registration and verifier first. <code>login --export</code> does not clear them. It prints what is already stored, and only starts a login when nothing is stored. <code>kedgeway diagnose</code> first tries your stored token silently, with no server and no browser. Only if Raven answers 401 does it start the interactive flow.
       </p>
 
       <h2>Where the token lives</h2>
       <Callout kind="warning">
         <p>Anyone who can read <code>~/.config/kedgeway/auth.json</code> can use your Raven session. kedgeway writes it with mode 0600; keep it out of backups and repos, and run <code>kedgeway logout</code> on shared machines.</p>
       </Callout>
-      <CodeBlock label="bash" code={"~/.config/kedgeway/auth.json"} />
+      <CodeBlock code={"~/.config/kedgeway/auth.json"} />
       <p>The folder is created with mode 0700 and the file is written with mode 0600, through a temporary file and a rename. It holds the OAuth tokens, the client registration, and the last callback port.</p>
       <p>To delete it:</p>
-      <CodeBlock label="bash" code={"kedgeway logout"} />
+      <CodeBlock code={"kedgeway logout"} />
 
       <h2>What is sent to Raven</h2>
       <p>
@@ -53,7 +49,7 @@ export default function Authentication() {
       <p>
         Raven&apos;s OAuth server offers authorization code with PKCE and refresh tokens only, with no device-code grant, so there is no <code>--device</code> flow. On a machine without a browser, use:
       </p>
-      <CodeBlock label="bash" code={"kedgeway login --no-browser"} />
+      <CodeBlock code={"kedgeway login --no-browser"} />
       <p>
         kedgeway prints the authorization URL and does not try to open a browser. Open it in any browser and sign in. The browser is then redirected to <code>http://127.0.0.1:&lt;port&gt;/callback</code>, which only exists on the machine running kedgeway. Two ways to finish:
       </p>
@@ -61,14 +57,14 @@ export default function Authentication() {
         <li><strong>Paste it back.</strong> Copy the full redirect URL (or just its <code>code</code>) into the terminal and press Enter. Bad input gets a one-line error and the prompt repeats.</li>
         <li><strong>Forward the port.</strong> From your own machine, before you sign in, forward the callback port so the redirect lands on kedgeway directly. The port is in the <code>redirect_uri</code> of the printed URL.</li>
       </ul>
-      <CodeBlock label="bash" code={"ssh -L <port>:127.0.0.1:<port> user@remote-host"} />
+      <CodeBlock code={"ssh -L <port>:127.0.0.1:<port> user@remote-host"} />
       <p>
         A pasted URL is checked against the login attempt&apos;s OAuth state, and the check fails closed: with no state to compare, a pasted URL is refused. A bare code carries no state, so it cannot be checked. When stdin is not a terminal, pasting is disabled and only the callback can finish the login.
       </p>
       <p>
         For CI, do this once on a trusted machine and add <code>--export</code> to print the secret afterwards:
       </p>
-      <CodeBlock label="bash" code={"kedgeway login --no-browser --export"} />
+      <CodeBlock code={"kedgeway login --no-browser --export"} />
 
       <h2>In CI</h2>
       <p>Run <code>kedgeway login --export</code> to print your stored credentials as a base64 secret, and put it in a <code>KEDGEWAY_AUTH</code> secret. At runtime the variable replaces <code>auth.json</code>: it is never written to disk and refreshes in memory only, so a rotated refresh token can make it go stale. See <Link href="/docs/ci">CI</Link>.</p>

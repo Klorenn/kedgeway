@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Architecture — kedgeway docs",
-  description: "How kedgeway is organized: pure core, ports, adapters and the CLI.",
-  alternates: { canonical: "/docs/architecture" },
-  openGraph: { title: "Architecture — kedgeway docs", description: "How kedgeway is organized: pure core, ports, adapters and the CLI.", url: "/docs/architecture", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Architecture — kedgeway docs", "How kedgeway is organized: pure core, ports, adapters and the CLI.", "/docs/architecture");
 
 export default function Architecture() {
   return (

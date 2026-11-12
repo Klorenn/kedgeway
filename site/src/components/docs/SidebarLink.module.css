@@ -1,0 +1,6 @@
+/* Figma Sidebar link (33:6735): Geist Mono 14/24, 8px/16px padding, 1px rule on the left, 2px ink when active. */
+.link { position: relative; display: block; padding: var(--space-8) var(--space-16); color: var(--color-ink-2); font-family: var(--font-mono); font-size: 14px; line-height: 24px; border-radius: 0; }
+.link::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--color-rule); }
+.link:hover { color: var(--color-ink); }
+.link[aria-current="page"] { color: var(--color-ink); }
+.link[aria-current="page"]::before { width: 2px; background: var(--color-ink); }

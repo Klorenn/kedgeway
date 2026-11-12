@@ -1,11 +1,12 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { backdropSrc } from "@/lib/backdrop";
 import { COMMON, startDither } from "@/lib/dither-gl";
+import styles from "./DitherClouds.module.css";
 
 // u_p.x = half width of the content column (uv units), u_p.y = how far the column is darkened,
-// u_p.z = calm factor (docs pages are quieter), u_p.w = canvas width in CSS px (for px/s drift).
+// u_p.z = calm factor (1 on the landing page), u_p.w = canvas width in CSS px (for px/s drift).
 const FRAG = `${COMMON}
 // fbm whose first two octaves are billowed, so the big forms get puffy ridges.
 float fbmB(vec3 p) {
@@ -54,34 +55,53 @@ void main() {
 }
 `;
 
-/** Full-viewport animated dithered cumulus behind everything. Quiet by design. */
+/**
+ * Hero sky: dithered cumulus filling the hero stage (its positioned parent), including the plate. 0.5x resolution,
+ * pixelated, ~10px/s drift, 24 fps. The centre column clears 0.34 -> 0.46 with scroll progress. Static (t = 40 s) under
+ * reduced motion; a PNG of frame 1 when WebGL is unavailable. Starts after first paint.
+ */
 export default function DitherClouds() {
   const ref = useRef<HTMLCanvasElement>(null);
-  const pathname = usePathname();
-  const calm = useRef(1);
-  calm.current = pathname.startsWith("/docs") ? 0.4 : 1;
+  const [fallback, setFallback] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    const handle = startDither(canvas, {
-      frag: FRAG,
-      fps: 24,
-      scale: 0.5,
-      staticTime: 40,
-      params: () => {
-        const vw = Math.max(320, window.innerWidth);
-        const half = Math.min(0.5, 560 / vw); // hero text column (wider than the narrow text)
-        // strongest at the top of the page (hero), darker once the content scrolls over it
-        const s = Math.min(1, window.scrollY / Math.max(1, window.innerHeight * 0.8));
-        const inside = 0.34 + 0.12 * s; // how far the column is pushed into sky
-        return [half, inside, calm.current, Math.max(1, canvas.clientWidth)];
-      },
-    });
-    (window as unknown as { __cloudsLuma?: () => number | null; __cloudsRegion?: (a: number, b: number, c: number, d: number) => number | null }).__cloudsLuma = handle.readAverageLuminance;
-    (window as unknown as { __cloudsRegion?: typeof handle.readRegionLuminance }).__cloudsRegion = handle.readRegionLuminance;
-    return () => handle.destroy();
+    let handle: ReturnType<typeof startDither> | undefined;
+    let cancelled = false;
+    const boot = (): void => {
+      if (cancelled) return;
+      handle = startDither(canvas, {
+        frag: FRAG,
+        fps: 24,
+        scale: 0.5,
+        staticTime: 40,
+        params: () => {
+          const vw = Math.max(320, window.innerWidth);
+          const half = Math.min(0.5, 560 / vw); // hero copy column
+          const stageH = Math.max(1, canvas.clientHeight);
+          const s = Math.min(1, Math.max(0, window.scrollY / stageH)); // hero scroll progress
+          return [half, 0.34 + 0.12 * s, 1, Math.max(1, canvas.clientWidth)];
+        },
+      });
+      if (!handle.ok) setFallback(backdropSrc("clouds"));
+    };
+    // Eager, but after first paint.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(boot));
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      handle?.destroy();
+    };
   }, []);
 
-  return <canvas ref={ref} aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none", imageRendering: "pixelated" }} />;
+  return (
+    <div className={styles.sky} aria-hidden="true">
+      <canvas ref={ref} className={styles.canvas} />
+      {fallback ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className={styles.img} src={fallback} alt="" width={1440} height={1200} decoding="async" />
+      ) : null}
+    </div>
+  );
 }

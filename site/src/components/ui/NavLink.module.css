@@ -1,0 +1,2 @@
+.link { display: inline-flex; align-items: center; min-height: 24px; color: var(--color-ink-2); font-size: 15px; line-height: 24px; }
+.link:hover, .link[aria-current="page"] { color: var(--color-ink); }

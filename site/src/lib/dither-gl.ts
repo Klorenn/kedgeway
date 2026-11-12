@@ -16,11 +16,16 @@ uniform vec2 u_res;
 uniform float u_time;
 uniform vec4 u_p; // per-effect parameters
 
-const vec3 BG   = vec3(11.0, 11.0, 12.0) / 255.0;   // --bg
-const vec3 RULE = vec3(31.0, 31.0, 34.0) / 255.0;   // --rule
-const vec3 INK3 = vec3(74.0, 74.0, 79.0) / 255.0;   // --ink-3
-const vec3 INK2 = vec3(154.0, 151.0, 143.0) / 255.0; // --ink-2
-const vec3 INK  = vec3(242.0, 239.0, 233.0) / 255.0; // --ink
+uniform vec3 u_bg;
+uniform vec3 u_rule;
+uniform vec3 u_ink3;
+uniform vec3 u_ink2;
+uniform vec3 u_ink;
+#define BG u_bg
+#define RULE u_rule
+#define INK3 u_ink3
+#define INK2 u_ink2
+#define INK u_ink
 
 float hash3(vec3 p) {
   p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
@@ -82,6 +87,24 @@ export interface DitherHandle {
   readRegionLuminance(x0: number, y0: number, x1: number, y1: number): number | null;
 }
 
+/** Reads the five palette tokens (bg, rule, ink-3, ink-2, ink) from CSS custom properties as 0..1 RGB triples. */
+export function readPalette(): number[] {
+  const cs = getComputedStyle(document.documentElement);
+  const hex = (name: string, fb: number[]): number[] => {
+    const m = /^#([0-9a-f]{6})$/i.exec(cs.getPropertyValue(name).trim());
+    if (!m) return fb;
+    const n = parseInt(m[1] as string, 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  };
+  return [
+    ...hex("--color-bg", [0.04, 0.04, 0.05]),
+    ...hex("--color-rule", [0.12, 0.12, 0.13]),
+    ...hex("--color-ink-3", [0.29, 0.29, 0.31]),
+    ...hex("--color-ink-2", [0.6, 0.59, 0.56]),
+    ...hex("--color-ink", [0.95, 0.94, 0.91]),
+  ];
+}
+
 function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLShader | null {
   const sh = gl.createShader(type);
   if (!sh) return null;
@@ -131,6 +154,8 @@ export function startDither(canvas: HTMLCanvasElement, opts: DitherOptions): Dit
   const uRes = gl.getUniformLocation(prog, "u_res");
   const uTime = gl.getUniformLocation(prog, "u_time");
   const uP = gl.getUniformLocation(prog, "u_p");
+  const uPal = ["u_bg", "u_rule", "u_ink3", "u_ink2", "u_ink"].map((n) => gl.getUniformLocation(prog, n));
+  let palette = readPalette();
 
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const frameMs = 1000 / opts.fps;
@@ -145,6 +170,7 @@ export function startDither(canvas: HTMLCanvasElement, opts: DitherOptions): Dit
     gl.uniform2f(uRes, canvas.width, canvas.height);
     gl.uniform1f(uTime, t);
     gl.uniform4f(uP, a, b, c, d);
+    uPal.forEach((loc, i) => gl.uniform3f(loc, palette[i * 3] as number, palette[i * 3 + 1] as number, palette[i * 3 + 2] as number));
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
   const resize = (): void => {
@@ -175,6 +201,16 @@ export function startDither(canvas: HTMLCanvasElement, opts: DitherOptions): Dit
     }
   };
 
+  // Re-read tokens when the theme changes (OS scheme or data-theme) and redraw, so static frames follow too.
+  const mq = window.matchMedia("(prefers-color-scheme: light)");
+  const onTheme = (): void => {
+    palette = readPalette();
+    resize();
+  };
+  mq.addEventListener("change", onTheme);
+  const mo = new MutationObserver(onTheme);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
   resize();
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
@@ -196,6 +232,8 @@ export function startDither(canvas: HTMLCanvasElement, opts: DitherOptions): Dit
       cancelAnimationFrame(raf);
       ro.disconnect();
       io?.disconnect();
+      mq.removeEventListener("change", onTheme);
+      mo.disconnect();
       document.removeEventListener("visibilitychange", sync);
     },
     readRegionLuminance: (x0, y0, x1, y1) => {

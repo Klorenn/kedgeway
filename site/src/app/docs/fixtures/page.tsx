@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Fixtures — kedgeway docs",
-  description: "The ecosystem snapshot JSON format used by --fixture, with a complete example.",
-  alternates: { canonical: "/docs/fixtures" },
-  openGraph: { title: "Fixtures — kedgeway docs", description: "The ecosystem snapshot JSON format used by --fixture, with a complete example.", url: "/docs/fixtures", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Fixtures — kedgeway docs", "The ecosystem snapshot JSON format used by --fixture, with a complete example.", "/docs/fixtures");
 
 const EXAMPLE = `{
   "observedAt": "2026-11-11T22:00:57Z",
@@ -34,7 +30,7 @@ export default function Fixtures() {
       <h1>Fixtures</h1>
       <p className={styles.lede}>A fixture is a saved ecosystem snapshot. Pass it with <code>--fixture</code> to run without Raven: for tests, offline machines and CI.</p>
 
-      <CodeBlock label="bash" code={"kedgeway diagnose ./my-contract --fixture snapshot.json"} />
+      <CodeBlock code={"kedgeway diagnose ./my-contract --fixture snapshot.json"} />
 
       <h2>Shape</h2>
       <div className={styles.tableWrap}>
@@ -55,7 +51,7 @@ export default function Fixtures() {
       </div>
 
       <h2>Complete example</h2>
-      <CodeBlock label="bash" code={EXAMPLE} />
+      <CodeBlock code={EXAMPLE} />
       <p>A file that does not match this shape makes the run exit with 1 and a message. Fixtures are not refreshed automatically: the ecosystem moves, your fixture does not.</p>
       <PrevNext href="/docs/fixtures" />
     </>

@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "CI — kedgeway docs",
-  description: "Fail a build on SDK drift with --fail-on, and run offline in CI with a fixture.",
-  alternates: { canonical: "/docs/ci" },
-  openGraph: { title: "CI — kedgeway docs", description: "Fail a build on SDK drift with --fail-on, and run offline in CI with a fixture.", url: "/docs/ci", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("CI — kedgeway docs", "Fail a build on SDK drift with --fail-on, and run offline in CI with a fixture.", "/docs/ci");
 
 export default function Ci() {
   return (
@@ -36,42 +32,22 @@ export default function Ci() {
       <p>Prefer no secret at all? Run offline against a saved snapshot with <code>--fixture</code> and refresh it by hand. See <Link href="/docs/fixtures">Fixtures</Link>. The action needs one of the two: <code>auth</code> or <code>fixture</code>.</p>
 
       <h2>GitHub Actions example</h2>
-      <p>This is an untested sketch. It builds kedgeway from source (it is not on npm yet), then checks the repo against a committed fixture. Adjust the checkout of kedgeway to wherever you host it.</p>
+      <p>kedgeway is not on npm. This job clones <code>Klorenn/kedgeway</code>, builds it, and checks the repo against a committed fixture. For the maintained action, see <Link href="/docs/github-action">GitHub Action</Link>.</p>
       <CodeBlock label="yaml" code={`name: kedgeway
-on: [pull_request]
-
+on: [push, pull_request]
 jobs:
-  drift:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/checkout@v4
-        with:
-          repository: kedgeway/kedgeway
-          path: .kedgeway
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Build kedgeway
-        working-directory: .kedgeway
-        run: |
-          npm ci
-          npm run build
-          npm link
-
-      - name: Diagnose
-        run: |
-          kedgeway diagnose . --fixture ci/ecosystem.json --fail-on warning --json > kedgeway-report.json
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: kedgeway-report
-          path: kedgeway-report.json`} />
-      <p>The step fails with exit code 2 when a warning or critical finding exists, and with exit code 1 on a tool error. The <code>if: always()</code> keeps the JSON report even when the step fails.</p>
+      - run: |
+          git clone https://github.com/Klorenn/kedgeway /tmp/kedgeway
+          (cd /tmp/kedgeway && npm ci && npm run build && npm link)
+      - run: kedgeway diagnose . --fail-on warning --fixture snapshot.json`} />
+      <p>The diagnose step exits 2 when a warning or critical finding exists, and 1 on a tool error. Commit <code>snapshot.json</code> next to the workflow, or drop <code>--fixture</code> and set <code>KEDGEWAY_AUTH</code> in the step environment for live data.</p>
       <PrevNext href="/docs/ci" />
     </>
   );

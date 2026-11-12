@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import PixelIcon from "./icons/pixel";
 import styles from "./CodeBlock.module.css";
 
-/** "Copy" button for a code block. Announces "Copied" politely for 1.5s. */
+/** "Copy" button. Announces "Copied" through a polite live region for ~1.2s. */
 export default function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number>(0);
@@ -32,11 +31,12 @@ export default function CopyButton({ text }: { text: string }) {
   };
 
   return (
-    <button type="button" className={styles.copy} onClick={copy}>
-      <span aria-live="polite" className={styles.copyLabel}>
-        {copied ? <PixelIcon name="check" size={16} /> : null}
-        <span className={copied ? styles.sr : undefined}>{copied ? "Copied" : "Copy"}</span>
-      </span>
-    </button>
+    <>
+      <button type="button" className={styles.copy} onClick={copy}>
+        <span aria-hidden="true">{copied ? "Copied" : "Copy"}</span>
+        <span className="sr-only">Copy to clipboard</span>
+      </button>
+      <span className="sr-only" role="status" aria-live="polite">{copied ? "Copied" : ""}</span>
+    </>
   );
 }

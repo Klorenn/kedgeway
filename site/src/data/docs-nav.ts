@@ -32,7 +32,7 @@ export const DOCS_GROUPS: DocsGroup[] = [
       { href: "/docs/sdk", title: "TypeScript SDK", summary: "Call diagnose and migrate from your own code." },
       { href: "/docs/mcp", title: "MCP server", summary: "Let AI assistants diagnose a repo." },
       { href: "/docs/github-action", title: "GitHub Action", summary: "Gate pull requests on drift." },
-      { href: "/docs/migrate", title: "Migration guide", summary: "A guide from the snapshot, then version bumps." },
+      { href: "/docs/migrate", title: "Migration mode", summary: "A guide from the snapshot, then version bumps." },
     ],
   },
   {

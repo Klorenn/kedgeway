@@ -1,22 +1,30 @@
-.footer { position: relative; border-top: 1px solid var(--rule); }
-.inner { padding-top: 5rem; padding-bottom: 2rem; display: grid; gap: 3rem; }
-.row1 { display: grid; gap: 2.5rem; }
-.brandCol { display: grid; gap: 1.25rem; align-content: start; max-width: 22rem; }
-.lockup { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; font-family: var(--font-mono); font-weight: 500; font-size: 1.05rem; letter-spacing: -0.01em; }
-.blurb { color: var(--ink-2); font-size: 0.9375rem; line-height: 1.55; margin: 0; }
-.social { display: flex; gap: 0.5rem; }
-/* Icon buttons: 40px square, hairline border: the second allowed box type. */
-.iconBtn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 1px solid var(--rule); border-radius: 2px; color: var(--ink-2); text-decoration: none; background: none; transition: color 0.15s, border-color 0.15s; }
-.iconBtn:hover { color: var(--ink); border-color: var(--ink); }
-.iconBtn svg { width: 18px; height: 18px; fill: currentColor; display: block; }
-.col h3 { margin: 0 0 0.9rem; font-family: var(--font-sans); font-weight: 500; font-size: 0.9375rem; color: var(--ink); letter-spacing: 0; }
-.col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; }
-.col a, .legal a { color: var(--ink-2); text-decoration: none; font-size: 0.9375rem; transition: color 0.15s; }
-.col a:hover, .legal a:hover { color: var(--ink); }
-.plain { color: var(--ink-2); font-size: 0.9375rem; }
-.cols { display: grid; gap: 2rem 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1rem; padding-top: 1.25rem; border-top: 1px solid var(--rule); font-size: 0.8125rem; color: var(--ink-2); }
-.legal p { margin: 0; }
-@media (min-width: 60rem) { .row1 { grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr; gap: 2rem; } .cols { display: contents; } }
-@media (prefers-reduced-motion: reduce) { .iconBtn, .col a, .legal a { transition: none; } }
+.footer { position: relative; background: var(--color-bg); }
+.desktop, .mobile { padding-top: var(--space-64); }
+.desktop { display: none; flex-direction: column; gap: var(--space-64); padding-top: var(--space-96); padding-bottom: 0; }
+.mobile { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-24); padding-bottom: 0; }
+.mobile > p { max-width: 342px; }
+.top { display: flex; justify-content: space-between; gap: var(--space-48); }
+.brandCol { display: flex; flex-direction: column; gap: var(--space-24); width: 384px; flex: none; }
+.brandCol p { color: var(--color-ink-2); }
+.social { display: flex; gap: var(--space-8); margin-left: calc(var(--space-8) * -1); }
+.mobile .social { margin-left: 0; }
+.cols { display: grid; grid-template-columns: repeat(4, auto); gap: var(--space-48); }
+.colTitle { margin: 0 0 var(--space-16); color: var(--color-ink); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-8); }
+.row { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-8) var(--space-24); max-width: 342px; }
+.signature { display: flex; align-items: center; gap: var(--space-32); color: var(--color-ink); }
+.signature > svg { color: var(--color-ink); }
+.wmBox { container-type: inline-size; flex: 1; min-width: 0; width: 100%; }
+.wm, .wmMobile { display: block; font-family: var(--font-mono); font-weight: 500; line-height: 1; letter-spacing: -0.04em; color: var(--color-ink); white-space: nowrap; }
+/* Geist Mono advances 0.6em per glyph; with -0.04em tracking "kedgeway" is about 4.48em wide. */
+.wm { font-size: min(216px, calc(100cqw / 4.5)); }
+.wmMobile { font-size: min(72px, calc(100cqw / 4.5)); text-align: center; }
+.legal { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-8) var(--space-16); padding-block: var(--space-24); border-top: 1px solid var(--color-rule); }
+.legal p { margin: 0; color: var(--color-ink-2); }
+.mobile .legal { flex-direction: column; align-items: center; justify-content: center; border-top: 0; padding-block: 0 var(--space-32); gap: var(--space-8); }
+.desktop .legal { margin-bottom: 0; }
+@media (min-width: 1024px) {
+  .desktop { display: flex; }
+  .mobile { display: none; }
+}
 @media print { .footer { display: none; } }

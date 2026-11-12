@@ -1,0 +1,12 @@
+.stat { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: var(--space-8); margin: 0; padding-top: var(--space-24); border-top: 1px solid var(--color-rule); min-width: 0; }
+.statValue { margin: 0; color: var(--color-ink); }
+.statLabel { margin: 0; color: var(--color-ink-2); }
+.step, .way { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-16); padding: var(--space-24); border: 1px solid var(--color-rule); border-radius: var(--radius-8); min-width: 0; }
+.stepNo { margin: 0; color: var(--color-ink-2); }
+.stepTitle { margin: 0; color: var(--color-ink); }
+.detail { margin: 0; color: var(--color-ink-2); }
+.way { color: inherit; }
+.way:hover { background: var(--color-surface); border-color: var(--color-ink-2); }
+.wayTitle { color: var(--color-ink); }
+.wayCta { margin-top: auto; color: var(--color-accent); }
+.way:hover .wayCta { text-decoration: underline; text-underline-offset: 0.25em; }

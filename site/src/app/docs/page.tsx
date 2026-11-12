@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import PrevNext from "@/components/docs/PrevNext";
 import { DOCS_FLAT } from "@/data/docs-nav";
 import styles from "./docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Overview — kedgeway docs",
-  description: "What kedgeway is and is not, how it thinks, and where to read next.",
-  alternates: { canonical: "/docs" },
-  openGraph: { title: "Overview — kedgeway docs", description: "What kedgeway is and is not, how it thinks, and where to read next.", url: "/docs", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Overview — kedgeway docs", "What kedgeway is and is not, how it thinks, and where to read next.", "/docs");
 
 export default function Overview() {
   return (

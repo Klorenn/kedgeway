@@ -1,107 +1,98 @@
-/* hero (plate): centered text, then the horse with its hooves on a full-width baseline */
-.hero { position: relative; overflow: hidden; padding: 9rem 0 2rem; }
-.textBlock { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.5rem; width: 100%; max-width: 60rem; margin-inline: auto; padding-inline: var(--gutter); }
-.title { font-size: clamp(2.25rem, 5vw, 4.5rem); line-height: 1; letter-spacing: -0.04em; }
-@media (min-width: 56rem) { .title { white-space: nowrap; } }
-.sub { font-size: 1.125rem; line-height: 1.5; max-width: 34rem; text-wrap: pretty; }
-.cta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.75rem 1.25rem; margin-top: 0.5rem; }
-/* The svg has ~5.3% of its width below the hooves: the baseline sits there, the caption beneath it. */
-.horseBlock { --hw: min(100vw - 32px, 44rem); position: relative; z-index: 1; width: var(--hw); margin: 3rem auto 0; }
-.baseline { position: absolute; left: 50%; width: 100vw; transform: translateX(-50%); bottom: calc(var(--hw) * 0.0528 - 2px); height: 1px; background: #4a4a4f; }
-.baseline::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: repeating-linear-gradient(to right, #4a4a4f 0 1px, transparent 1px 20%); }
-.baseline::after { content: ""; position: absolute; right: 0; top: 0; width: 1px; height: 6px; background: #4a4a4f; }
-.plate { position: absolute; right: 0; bottom: 0.1rem; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-2); text-align: right; }
+/* Landing. Figma: Landing / Desktop 1440 (30:1573) and Mobile 390 (31:2837). */
 
-/* sections: a hairline above; anchor sections get 10rem, light ones 6rem */
-.section { position: relative; }
-.section::before, .cta2::before, .cta2::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%); width: min(calc(64rem - 32px), calc(100% - 32px)); height: 1px; background: var(--rule); top: 0; }
-.cta2::after { top: auto; bottom: 0; }
-.anchor { padding-block: clamp(6rem, 12vw, 10rem); }
-.light { padding-block: clamp(3.5rem, 7vw, 6rem); }
-.head { display: grid; gap: 1rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
-.head p:not(.overline), .text p:not(.overline) { max-width: 40rem; }
-.text { display: grid; gap: 1rem; }
-
-/* 01 ecosystem: 10rem | 1fr */
-.ecoHead { display: grid; gap: 1.5rem; }
-.big { font-family: var(--font-mono); font-weight: 400; font-size: clamp(3rem, 8vw, 5rem); line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
-.ecoBody { display: grid; gap: 1rem; min-width: 0; }
-.ecoTitle { font-size: 1.5rem; font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; max-width: 30rem; }
-.ecoText { max-width: 40rem; }
-@media (min-width: 48rem) { .ecoHead { grid-template-columns: 10rem minmax(0, 1fr); gap: 2rem; } }
-
-/* works with: one hairline row at the end of "how it works" */
-.works { list-style: none; margin: clamp(2.5rem, 5vw, 3.5rem) 0 0; padding: 1.5rem 0; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1.25rem 2rem; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--ink); }
-.works li { display: flex; align-items: center; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.8125rem; }
-
-/* 02 report: plain mono lines, hairline on the left */
-.term { margin: 0; padding-left: 1.5rem; border-left: 1px solid var(--rule); font-size: 0.875rem; line-height: 1.8; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 46rem; }
-.strong { color: var(--ink); font-weight: 600; }
-
-/* what it catches: only a top hairline per item */
-.catches { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.5rem 1.5rem; }
-.catchItem { border-top: 1px solid var(--rule); padding-top: 1.25rem; display: grid; gap: 0.6rem; align-content: start; color: var(--ink); }
-.catchItem p { color: var(--ink-2); font-size: 0.95rem; max-width: 22rem; }
-.catchCode { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink); word-break: keep-all; }
-.moreLink { margin-top: 2rem; font-family: var(--font-mono); font-size: 0.8125rem; }
-@media (min-width: 48rem) { .catches { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 3rem; } .catchCode { font-size: 0.75rem; } }
-
-/* 03 install */
-.installBlock { max-width: 40rem; }
-.stepNote { margin-top: 0.25rem; font-size: 0.95rem; max-width: 40rem; }
-
-/* faq */
-.faq { max-width: 40rem; border-top: 1px solid var(--rule); }
-.faqItem { border-bottom: 1px solid var(--rule); }
-.faqItem summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; color: var(--ink); font-size: 1.0625rem; }
-.faqItem summary::-webkit-details-marker { display: none; }
-.faqItem summary::after { content: "+"; font-family: var(--font-mono); color: var(--ink-2); flex: none; }
-.faqItem[open] summary::after { content: "\2212"; color: var(--ink); }
-.faqItem p { padding: 0 2rem 1.25rem 0; max-width: 36rem; }
-
-/* roadmap: simple rows, no tags */
-.road { list-style: none; margin: 0; padding: 0; }
-.road li { display: grid; gap: 0.25rem; padding: 1.1rem 0; border-top: 1px solid var(--rule); }
-.road li:last-child { border-bottom: 1px solid var(--rule); }
-.road h3 { font-size: 1rem; }
-.road p { color: var(--ink-2); }
-@media (min-width: 48rem) { .road li { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; align-items: baseline; } }
-
-/* final call to action */
-.cta2 { position: relative; padding-block: clamp(5rem, 10vw, 8rem); text-align: center; }
-.cta2 :global(.col) { max-width: 56rem; display: grid; justify-items: center; gap: 1.25rem; }
-.ctaHorse { display: block; margin-bottom: 0.5rem; }
-.ctaTitle { font-size: clamp(2.5rem, 5vw, 4rem); line-height: 1.05; letter-spacing: -0.035em; }
-.ctaCode { width: 100%; max-width: 40rem; text-align: left; margin-top: 1rem; }
-
-/* hero proof line */
-.proof { font-size: 0.9375rem; color: var(--ink-2); max-width: 36rem; }
-.proof b { color: var(--ink); font-weight: 500; }
-
-/* stats quartet: vertical hairlines on desktop, horizontal on mobile */
-.stats { display: grid; grid-template-columns: 1fr; margin: clamp(3rem, 6vw, 4.5rem) 0 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-.stats > div { display: flex; flex-direction: column-reverse; gap: 0.35rem; padding: 1.5rem 0; }
-.stats > div + div { border-top: 1px solid var(--rule); }
-.stats dd { margin: 0; font-size: 2.25rem; font-weight: 500; line-height: 1; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
-.stats dt { font-size: 0.875rem; color: var(--ink-2); }
-@media (min-width: 48rem) {
-  .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .stats > div { padding: 1.75rem 0 1.75rem 1.5rem; }
-  .stats > div:first-child { padding-left: 0; }
-  .stats > div + div { border-top: 0; border-left: 1px solid var(--rule); }
+/* ---- Hero stage: full bleed, clipped; transparent so the sky shows through ---- */
+.stage { position: relative; overflow: hidden; isolation: isolate; }
+.stage > .hero, .stage > .rise { position: relative; z-index: 1; }
+.hero { padding-top: calc(79px + 56px); padding-bottom: var(--space-40); }
+.copy { position: relative; isolation: isolate; display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-24); max-width: 960px; margin-inline: auto; }
+/* Scrim: page background at .8 opacity, 48px blur, 16px radius (64px on desktop), wider than the copy. */
+.copy::before { content: ""; position: absolute; z-index: -1; inset: -16px -8px; border-radius: 16px; background: var(--color-bg); opacity: var(--scrim); filter: blur(48px); }
+.copy > p { margin: 0; }
+.title { margin: 0; max-width: 100%; }
+.sub { max-width: 560px; color: var(--color-ink-2); }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-24); }
+.proof { color: var(--color-ink-2); }
+.proof b { font-weight: 400; color: var(--color-ink); }
+@media (min-width: 768px) {
+  .hero { padding-top: calc(83px + 120px); padding-bottom: var(--space-120); }
+  .copy::before { inset: -40px -64px; border-radius: 64px; }
 }
 
-/* centered 40rem sections: install, FAQ, roadmap */
-.centered .head { justify-items: center; text-align: center; }
-.centered .head p:not(.overline) { margin-inline: auto; }
-.centered .installBlock, .centered .faq { max-width: none; }
-.centered .stepNote { text-align: center; margin-inline: auto; }
-
-/* hero load sequence: h1, sub, buttons, proof, horse; 60ms stagger, 400ms ease-out */
+/* hero entrance: blocks rise 8px + fade in, 400ms ease-out, 60ms stagger (overline, h1, sub, actions, proof, plate).
+   CSS-only and keyed to first paint (opacity/transform only, so no layout shift); HeroReady adds data-ready after
+   hydration. Off under reduced motion. */
+.rise { animation: rise 400ms ease-out both; animation-delay: calc(var(--i, 0) * 60ms); }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-.r0, .r1, .r2, .r3, .r4 { animation: rise 400ms ease-out both; }
-.r1 { animation-delay: 60ms; }
-.r2 { animation-delay: 120ms; }
-.r3 { animation-delay: 180ms; }
-.r4 { animation-delay: 240ms; }
-@media (prefers-reduced-motion: reduce) { .r0, .r1, .r2, .r3, .r4 { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+
+/* ---- Sections: opaque so the fixed sky does not show through below the hero ---- */
+.solid { background: var(--color-bg); }
+.block { display: flex; flex-direction: column; gap: var(--space-16); min-width: 0; }
+.block p { margin: 0; }
+.block h2 { margin: 0; }
+/* Figma sets these as plain text, so inline code carries no chip or mono face here. */
+.block code { background: none; padding: 0; font: inherit; color: inherit; }
+.faq h2, .ways h2, .reportLeft > h2 { margin: 0; }
+
+/* Split rows on the 12-col grid. Below 880px everything stacks (the base .grid rules). */
+@media (min-width: 880px) {
+  .eco > :first-child { grid-column: 1 / span 5; }
+  .eco > :last-child { grid-column: 7 / span 6; }
+  .how { align-items: end; }
+  .how > :first-child { grid-column: 1 / span 7; }
+  .how > :last-child { grid-column: 8 / span 5; }
+  .report > :first-child { grid-column: 1 / span 5; }
+  .report > :last-child { grid-column: 6 / span 7; }
+  .findings { align-items: end; }
+  .findings > :first-child { grid-column: 1 / span 5; }
+  .findings > :last-child { grid-column: 7 / span 6; }
+  .install > :first-child, .faq > :first-child { grid-column: 1 / span 5; }
+  .install > :last-child, .faq > :last-child { grid-column: 6 / span 7; }
+  .ways { align-items: end; }
+  .ways > :first-child { grid-column: 1 / span 7; }
+  .ways > :last-child { grid-column: 8 / span 5; }
+}
+
+/* 01 */
+.distribution { display: flex; flex-direction: column; gap: var(--space-24); min-width: 0; }
+.chartTitle { margin: 0; color: var(--color-ink); }
+.source { margin: 0; color: var(--color-ink-2); }
+@media (min-width: 880px) { .distribution { padding-top: var(--space-48); } }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-32) var(--space-16); margin: 0; }
+@media (min-width: 768px) { .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-24); } }
+
+/* 02 */
+.steps { display: grid; grid-template-columns: 1fr; gap: var(--space-24); }
+@media (min-width: 1024px) { .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.works { display: flex; flex-direction: column; gap: var(--space-8); border-top: 1px solid var(--color-rule); padding-top: var(--space-24); }
+.works > p { margin: 0; color: var(--color-ink-2); }
+.worksList { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-8) var(--space-16); color: var(--color-ink); }
+@media (min-width: 768px) {
+  .works { flex-direction: row; align-items: flex-start; gap: var(--space-40); }
+  .worksList { gap: var(--space-8) var(--space-40); }
+}
+
+/* 03, 05, 06: heading + figure on the left */
+.reportLeft { display: flex; flex-direction: column; gap: var(--space-16); min-width: 0; }
+.figPad { padding-top: var(--space-16); }
+.figPadLg { padding-top: var(--space-16); }
+@media (min-width: 768px) { .figPad { padding-top: var(--space-32); } .figPadLg { padding-top: var(--space-48); } }
+.codeCol { min-width: 0; }
+.codeCol > div { margin-bottom: 0; }
+
+/* 07 */
+.wayCards { display: grid; grid-template-columns: 1fr; gap: var(--space-24); }
+@media (min-width: 768px) { .wayCards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .wayCards { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* Closing CTA */
+.cta { border-top: 1px solid var(--color-rule); padding-block: var(--space-96); }
+.ctaInner { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-32); }
+.ctaTitle { margin: 0; }
+.gallop { display: flex; flex-direction: column; align-items: center; gap: var(--space-16); width: 100%; }
+.gallopBlock { max-width: 100%; display: flex; justify-content: center; }
+.gallopBlock pre { width: max-content; text-align: left; }
+.gallopCaption { display: flex; gap: var(--space-16); margin: 0; color: var(--color-ink-2); }
+.clone { width: 100%; max-width: 588px; text-align: left; }
+.clone > div { margin-bottom: 0; }
+@media (min-width: 768px) { .cta { padding-block: var(--space-160); } .ctaInner { gap: var(--space-40); } }

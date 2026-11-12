@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Migration guide — kedgeway docs",
-  description: "A migration guide from the live snapshot, then narrow SDK version bumps.",
-  alternates: { canonical: "/docs/migrate" },
-  openGraph: { title: "Migration guide — kedgeway docs", description: "A migration guide from the live snapshot, then narrow SDK version bumps.", url: "/docs/migrate", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Migration guide — kedgeway docs", "A migration guide from the live snapshot, then narrow SDK version bumps.", "/docs/migrate");
 
 export default function Page() {
   return (
@@ -29,8 +25,10 @@ export default function Page() {
 
       <h2>Run it</h2>
       <CodeBlock code={`kedgeway migrate [path]            # dry run (default): prints a guide and a diff, edits nothing
+kedgeway migrate [path] --dry-run  # the same; cannot be combined with --write
 kedgeway migrate [path] --write    # applies the edits
-kedgeway migrate . --fixture snapshot.json`} />
+kedgeway migrate . --fixture snapshot.json
+kedgeway migrate . --offline       # cached snapshot only (also --no-cache, --max-age)`} />
 
       <h2>What it changes</h2>
       <ul>
@@ -44,7 +42,7 @@ kedgeway migrate . --fixture snapshot.json`} />
       <ul>
         <li><code>@stellar/stellar-base</code> is a manual step, because the snapshot has no current base version.</li>
         <li>It never runs <code>cargo</code> or <code>npm</code>. It prints the follow-up commands instead: <code>cargo update -p soroban-sdk</code> and <code>npm install</code>.</li>
-        <li><code>--write</code> is refused if a file it would touch has uncommitted changes in git. The check is skipped when git is not installed or the path is not in a repo.</li>
+        <li><code>--write</code> is refused if a file it would touch has uncommitted changes in git. The check passes silently only when git is not installed or the path is not in a repository. Any other git failure also refuses the write.</li>
         <li>Anything it cannot do safely is listed as a manual step with its reason. Only plain versions are edited: <code>12.x</code>, <code>12 || 13</code> and comma ranges become manual steps, and dependencies in <code>peerDependencies</code>, <code>optionalDependencies</code>, <code>overrides</code> or <code>resolutions</code> are left alone. kedgeway never guesses.</li>
         <li>Edits are byte-exact: for <code>package.json</code> only the affected spans change, and writes are atomic. Symlinked manifests are never edited.</li>
       </ul>

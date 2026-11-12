@@ -1,21 +1,17 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "What it scans — kedgeway docs",
-  description: "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges.",
-  alternates: { canonical: "/docs/what-it-scans" },
-  openGraph: { title: "What it scans — kedgeway docs", description: "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges.", url: "/docs/what-it-scans", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("What it scans — kedgeway docs", "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges.", "/docs/what-it-scans");
 
 export default function WhatItScans() {
   return (
     <>
       <h1>What it scans</h1>
-      <p className={styles.lede}>kedgeway reads manifests and lockfiles, not source code.</p>
+      <p className={styles.lede}>A diagnosis reads manifests and lockfiles. It does not score source code. <code>migrate</code> also lists up to 20 import lines of legacy packages, using the same depth and skipped directories.</p>
 
       <h2>Cargo.toml</h2>
       <p>It looks for the <code>soroban-sdk</code> crate in these forms:</p>

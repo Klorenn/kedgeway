@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "Data sources — kedgeway docs",
-  description: "Where kedgeway gets ground truth, how conflicts are settled, and what DATA_DEGRADED means.",
-  alternates: { canonical: "/docs/data-sources" },
-  openGraph: { title: "Data sources — kedgeway docs", description: "Where kedgeway gets ground truth, how conflicts are settled, and what DATA_DEGRADED means.", url: "/docs/data-sources", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("Data sources — kedgeway docs", "Where kedgeway gets ground truth, how conflicts are settled, and what DATA_DEGRADED means.", "/docs/data-sources");
 
 export default function DataSources() {
   return (
@@ -24,7 +20,7 @@ export default function DataSources() {
           <tbody>
             <tr><th scope="row"><code>stellarDocs.get_doc_page</code> on <code>/docs/networks/software-versions</code></th><td>The official Software Versions page: the current soroban-sdk, the current JavaScript SDK and the protocol version.</td></tr>
             <tr><th scope="row"><code>scout.analyzeEcosystem</code> (toolchain)</th><td>The Scout ecosystem toolchain index: a sample of repos on deprecated soroban-sdk versions.</td></tr>
-            <tr><th scope="row"><code>stellarDocs.search_docs</code></th><td>Upgrade and migration notes. The top five hits (title, URL, a short snippet) are collected into the snapshot. The current report does not print them.</td></tr>
+            <tr><th scope="row"><code>stellarDocs.search_docs</code></th><td>Upgrade and migration notes. The top five hits (title, URL, a short snippet) are collected into the snapshot. <code>diagnose</code> does not print them. <code>migrate</code> cites a hit only when its title or url is a migration document.</td></tr>
           </tbody>
         </table>
       </div>

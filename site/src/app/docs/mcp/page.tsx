@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
+import { docsMeta } from "@/lib/seo";
 import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import Callout from "@/components/docs/Callout";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = {
-  title: "MCP server — kedgeway docs",
-  description: "Run kedgeway as an MCP server so AI assistants can diagnose and migrate a repo.",
-  alternates: { canonical: "/docs/mcp" },
-  openGraph: { title: "MCP server — kedgeway docs", description: "Run kedgeway as an MCP server so AI assistants can diagnose and migrate a repo.", url: "/docs/mcp", images: [{ url: "/docs/opengraph-image", width: 1200, height: 630 }] },
-};
+export const metadata: Metadata = docsMeta("MCP server — kedgeway docs", "Run kedgeway as an MCP server so AI assistants can diagnose and migrate a repo.", "/docs/mcp");
 
 export default function Page() {
   return (
