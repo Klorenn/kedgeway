@@ -236,11 +236,11 @@ describe("renderPrBody", () => {
     expect(first).toContain("`28.0.0`");
   });
   it("has the findings table, edits, manual checklist, guide, provenance and footer", () => {
-    expect(body).toContain("| Code | Severity | Location |");
-    expect(body).toContain("| `SDK_DEPRECATED` | `critical` | `Cargo.toml:7` |");
+    expect(body).toContain("| Code | Severity | Location | Status |");
+    expect(body).toContain("| `SDK_DEPRECATED` | `critical` | `Cargo.toml:7` | `fixed by this PR` |");
     expect(body).toMatch(/## Edits/);
     expect(body).toContain("`Cargo.toml`");
-    expect(body).toMatch(/## Manual steps\n\n- \[ \] /);
+    expect(body).toMatch(/## Manual follow-ups\n\n- \[ \] /);
     expect(body).toMatch(/## Migration guide\n\n```/);
     expect(body).toContain("`fixture: official page`");
     expect(body).toContain("`2026-11-11T00:00:00.000Z`");
@@ -257,7 +257,7 @@ describe("renderPrBody", () => {
     expect(b).toContain("boom");
   });
   it("lists no checklist when there are no manual steps", () => {
-    expect(renderPrBody(input({ plan: plan([rustStep]) }))).not.toMatch(/## Manual steps/);
+    expect(renderPrBody(input({ plan: plan([rustStep]) }))).not.toMatch(/## Manual follow-ups/);
   });
   it("is deterministic", () => {
     expect(renderPrBody(input())).toBe(body);
@@ -298,7 +298,69 @@ describe("renderPrBody", () => {
     it("keeps every table row on one line with the right cell count", () => {
       const rows = outsideFences(hostile).filter((l) => l.startsWith("|"));
       expect(rows.length).toBeGreaterThan(2);
-      for (const r of rows) expect(r.replace(/\\\|/g, "").split("|").length, r).toBe(5);
+      for (const r of rows) expect(r.replace(/\\\|/g, "").split("|").length, r).toBe(6);
     });
+  });
+});
+
+describe("renderPrBody: fixed versus manual", () => {
+  const rustPlan = plan([rustStep]);
+  const mixed: Finding[] = [
+    finding({ severity: "info", code: "SDK_CURRENT", file: "other/Cargo.toml", line: 2 }),
+    finding({ severity: "warning", code: "RUST_TOOLCHAIN_OLD", file: "rust-toolchain.toml", line: 2 }),
+    finding({ severity: "warning", code: "RUST_TARGET_LEGACY", file: ".github/workflows/ci.yml", line: 14 }),
+    finding({ severity: "warning", code: "RUST_TARGET_LEGACY", file: "Makefile", line: 3 }),
+    finding({ severity: "critical", code: "CLI_DEPRECATED", file: ".github/workflows/ci.yml", line: 20 }),
+    finding(),
+  ];
+  const b = renderPrBody(input({ plan: rustPlan, findings: mixed }));
+  const rows = b.split("\n").filter((l) => l.startsWith("| `"));
+
+  it("sorts fixed, then manual, then info, by severity inside each group", () => {
+    expect(rows.map((r) => r.split("|")[1]?.trim())).toEqual(["`SDK_DEPRECATED`", "`CLI_DEPRECATED`", "`RUST_TOOLCHAIN_OLD`", "`RUST_TARGET_LEGACY`", "`RUST_TARGET_LEGACY`", "`SDK_CURRENT`"]);
+  });
+  it("marks each finding fixed, manual or informational", () => {
+    expect(rows[0]).toContain("| `fixed by this PR` |");
+    for (const r of rows.slice(1, 5)) expect(r).toMatch(/\| `manual` \|$/);
+    expect(rows[5]).toMatch(/\| — \|$/);
+  });
+  it("does not call a finding fixed when the edit is for another file or dependency", () => {
+    const other = renderPrBody(input({ plan: rustPlan, findings: [finding({ file: "elsewhere/Cargo.toml" })] }));
+    expect(other).toMatch(/\| `manual` \|\n/);
+  });
+  it("treats an informational RUST_TARGET_LEGACY (browser Wasm) as info", () => {
+    const w = renderPrBody(input({ plan: rustPlan, findings: [finding({ severity: "info", code: "RUST_TARGET_LEGACY", file: "web/ci.yml", line: 1 })] }));
+    expect(w).toMatch(/\| — \|\n/);
+    expect(w).not.toMatch(/## Manual follow-ups/);
+  });
+  it("has a concrete checkbox per manual finding", () => {
+    expect(b).toContain("- [ ] Bump `stellar-cli` to `28.1.0` in `.github/workflows/ci.yml:20` (`cargo install --locked stellar-cli --version 28.1.0`)");
+    expect(b).toContain("- [ ] Replace `wasm32-unknown-unknown` with `wasm32v1-none` in `.github/workflows/ci.yml:14` and run `rustup target add wasm32v1-none`");
+    expect(b).toContain("- [ ] Replace `wasm32-unknown-unknown` with `wasm32v1-none` in `Makefile:3` and run `rustup target add wasm32v1-none`");
+    expect(b).toContain("- [ ] Raise the Rust channel in `rust-toolchain.toml` to `1.84.0` or newer");
+    expect(b.split("\n").filter((l) => l.startsWith("- [ ] ")).length).toBe(4);
+  });
+  it("counts them in the summary line", () => {
+    const first = b.split("\n").find((l) => l.trim() !== "") as string;
+    expect(first).toContain("fixes 1 finding");
+    expect(first).toContain("4 need a manual follow-up");
+    expect(renderPrBody(input({ plan: rustPlan, findings: [finding()] })).split("\n")[0]).not.toContain("manual follow-up");
+  });
+  it("keeps plan manual steps and does not duplicate their finding", () => {
+    const m = renderPrBody(input({ plan: plan([rustStep, manualStep]), findings: [finding(), finding({ code: "SDK_BEHIND", severity: "warning" })] }));
+    expect(m).toContain("not a plain version");
+    expect(m.split("\n").filter((l) => l.startsWith("- [ ] ")).length).toBe(1);
+    expect(m.split("\n")[0]).toContain("1 needs a manual follow-up");
+  });
+  it("says 'the current version' instead of inventing a number", () => {
+    const n = renderPrBody(input({ plan: rustPlan, findings: [finding({ severity: "critical", code: "CLI_DEPRECATED", file: "ci.yml", line: 4 })], snapshot: { ...snapshot, stellarCli: { currentVersion: null, source: "x" } } }));
+    expect(n).toContain("- [ ] Bump `stellar-cli` to the current version in `ci.yml:4`");
+    expect(n).not.toContain("--version");
+    expect(n).not.toContain("28.1.0");
+  });
+  it("sanitises a hostile CLI version", () => {
+    const h = renderPrBody(input({ plan: rustPlan, findings: [finding({ severity: "critical", code: "CLI_BEHIND", file: "ci.yml", line: 4 })], snapshot: { ...snapshot, stellarCli: { currentVersion: "1.0.0`\n# x; rm -rf /", source: "x" } } }));
+    for (const line of outsideFences(h)) expect(line).not.toMatch(/^# x/);
+    expect(h).not.toContain("rm -rf");
   });
 });

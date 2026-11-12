@@ -1,7 +1,8 @@
-import type { Finding } from "./diagnose.js";
+import { SEVERITY_RANK, type Finding } from "./diagnose.js";
 import { formatGuide, type MigrationGuide } from "./guide.js";
 import type { LockfileKind } from "./lockfile.js";
 import type { MigrationPlan, MigrationStep } from "./migration.js";
+import { RUST_MIN_VERSION } from "./toolchain.js";
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
 
 const TITLE_MAX = 72;
@@ -210,6 +211,50 @@ function safeVersion(v: string): string {
   return v.replace(/[^0-9A-Za-z.+-]/g, "").slice(0, 40);
 }
 
+
+type FindingStatus = "fixed" | "manual" | "info";
+
+const FIXABLE_CODES = new Set(["SDK_DEPRECATED", "SDK_BEHIND", "JS_SDK_DEPRECATED", "JS_SDK_BEHIND"]);
+const INFO_CODES = new Set(["SDK_CURRENT", "JS_SDK_CURRENT", "CLI_CURRENT", "NO_SDK_FOUND"]);
+const STATUS_ORDER: Record<FindingStatus, number> = { fixed: 0, manual: 1, info: 2 };
+
+/** `fixed` when an edit of the plan changes the manifest line the finding is about; `info` for notes; else `manual`. */
+function statusOf(f: Finding, editSteps: readonly MigrationStep[]): FindingStatus {
+  if (f.severity === "info" || INFO_CODES.has(f.code)) return "info";
+  if (!FIXABLE_CODES.has(f.code)) return "manual";
+  const d = f.dependency;
+  const file = d?.file ?? f.file;
+  const fixed = editSteps.some((s) => s.file === file && s.findingCode === f.code && (d === undefined || s.dependency === d.name || s.dependency === d.declaredKey));
+  return fixed ? "fixed" : "manual";
+}
+
+function location(f: Finding): string {
+  return f.line === undefined ? f.file : `${f.file}:${f.line}`;
+}
+
+/** The checkbox for a manual finding the plan has no step for; every value is a code span. */
+function followUpFor(f: Finding, cliVersion: string): string {
+  const where = code(location(f));
+  switch (f.code) {
+    case "CLI_DEPRECATED":
+    case "CLI_BEHIND":
+    case "CLI_UNKNOWN":
+      return cliVersion === ""
+        ? `Bump ${code("stellar-cli")} to the current version in ${where}`
+        : `Bump ${code("stellar-cli")} to ${code(cliVersion)} in ${where} (${code(`cargo install --locked stellar-cli --version ${cliVersion}`)})`;
+    case "RUST_TARGET_LEGACY":
+      return `Replace ${code("wasm32-unknown-unknown")} with ${code("wasm32v1-none")} in ${where} and run ${code("rustup target add wasm32v1-none")}`;
+    case "RUST_TOOLCHAIN_OLD":
+      return `Raise the Rust channel in ${code(f.file)} to ${code(RUST_MIN_VERSION)} or newer`;
+    case "JS_LEGACY_PACKAGE":
+      return `Replace ${f.dependency === undefined ? "the legacy package" : code(f.dependency.name)} with ${code("@stellar/stellar-sdk")} in ${code(f.dependency?.file ?? f.file)}`;
+    case "DATA_DEGRADED":
+      return `Re-run kedgeway once the ecosystem data is reachable: ${code(f.message, MAX_REASON)}`;
+    default:
+      return `${code(f.code)} in ${where}: ${code(f.message, MAX_REASON)}`;
+  }
+}
+
 /**
  * Markdown for the pull request body. Every string that can come from the scanned repo or from Raven (file names,
  * messages, evidence, snapshot text) sits inside a code span or a code fence, so it can never start a heading,
@@ -221,16 +266,33 @@ export function renderPrBody(input: PrBodyInput): string {
   const editSteps = edits(plan);
   const manuals = plan.steps.filter((s) => s.kind === "manual");
 
+  const classified = input.findings
+    .map((f, i) => ({ f, i, status: statusOf(f, editSteps) }))
+    .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || SEVERITY_RANK[b.f.severity] - SEVERITY_RANK[a.f.severity] || a.i - b.i);
+  const fixedCount = classified.filter((c) => c.status === "fixed").length;
+
+  // Plan manual steps keep their text; a manual finding gets its own checkbox only when no plan step covers it.
+  const planManual = manuals.map((m) => `${code(m.file)}${m.dependency ? ` (${code(m.dependency)})` : ""}: ${code(m.reason, MAX_REASON)}`);
+  const covered = (f: Finding): boolean => manuals.some((m) => m.findingCode === f.code && m.file === (f.dependency?.file ?? f.file));
+  const cliVersion = safeVersion(snapshot.stellarCli.currentVersion ?? "");
+  const derived = classified.filter((c) => c.status === "manual" && !covered(c.f)).map((c) => followUpFor(c.f, cliVersion));
+  const followUps = [...planManual, ...derived];
+
   const shown = editSteps.slice(0, 3).map(stepSummary);
   const more = editSteps.length > 3 ? `; and ${editSteps.length - 3} more` : "";
-  out.push(editSteps.length === 0 ? "kedgeway found nothing it can edit automatically." : `kedgeway ${shown.join("; ")}${more}.`);
+  const base = editSteps.length === 0 ? "kedgeway found nothing it can edit automatically." : `kedgeway ${shown.join("; ")}${more}.`;
+  const counts = followUps.length === 0 ? "" : ` It fixes ${fixedCount} finding${fixedCount === 1 ? "" : "s"}; ${followUps.length} need${followUps.length === 1 ? "s" : ""} a manual follow-up.`;
+  out.push(`${base}${counts}`);
   if (input.display !== undefined) out.push("", `Repository: ${code(input.display)}`);
 
-  const findings = input.findings.slice(0, MAX_FINDINGS);
+  const findings = classified.slice(0, MAX_FINDINGS);
   if (findings.length > 0) {
-    out.push("", "## Findings", "", "| Code | Severity | Location |", "| --- | --- | --- |");
-    for (const f of findings) out.push(`| ${cell(f.code)} | ${cell(f.severity)} | ${cell(f.line === undefined ? f.file : `${f.file}:${f.line}`)} |`);
-    if (input.findings.length > findings.length) out.push("", `And ${input.findings.length - findings.length} more finding(s); run \`kedgeway diagnose\` for the full list.`);
+    out.push("", "## Findings", "", "| Code | Severity | Location | Status |", "| --- | --- | --- | --- |");
+    for (const { f, status } of findings) {
+      const label = status === "fixed" ? "`fixed by this PR`" : status === "manual" ? "`manual`" : "—";
+      out.push(`| ${cell(f.code)} | ${cell(f.severity)} | ${cell(location(f))} | ${label} |`);
+    }
+    if (classified.length > findings.length) out.push("", `And ${classified.length - findings.length} more finding(s); run \`kedgeway diagnose\` for the full list.`);
   }
 
   if (editSteps.length > 0) {
@@ -239,9 +301,9 @@ export function renderPrBody(input: PrBodyInput): string {
     out.push("", "Only the version strings change; no source file is rewritten.");
   }
 
-  if (manuals.length > 0) {
-    out.push("", "## Manual steps", "");
-    for (const m of manuals) out.push(`- [ ] ${code(m.file)}${m.dependency ? ` (${code(m.dependency)})` : ""}: ${code(m.reason, MAX_REASON)}`);
+  if (followUps.length > 0) {
+    out.push("", "## Manual follow-ups", "");
+    for (const l of followUps) out.push(`- [ ] ${l}`);
   }
 
   if (input.lockfilesTouched.length > 0) {

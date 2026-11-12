@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Changed
+
+- feat(pr): the findings table in the PR body has a `Status` column (`fixed by this PR`, `manual` or `—`) and is sorted fixed, manual, info; the manual-steps checklist becomes `## Manual follow-ups` with one checkbox per manual finding and a concrete command or edit (stellar-cli bump, `wasm32v1-none` switch, Rust channel, legacy package), and the summary line counts them. The stellar-cli version comes from the snapshot; when it is unavailable the text says "the current version". `pr --dry-run` prints the same body.
+
 ## [0.3.1] - 2026-11-12
 
 ### Added
