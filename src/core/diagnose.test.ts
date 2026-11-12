@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { diagnose, meetsThreshold } from "./diagnose.js";
-import type { DetectedDep, RepoFacts } from "./repo-facts.js";
+import { parseVersion, type DetectedDep, type RepoFacts } from "./repo-facts.js";
+import type { CliPin, RustTargetDecl, RustToolchainPin, ToolchainFacts } from "./toolchain.js";
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
 
 const snap = (
@@ -10,6 +11,7 @@ const snap = (
   observedAt: "2026-01-01T00:00:00.000Z",
   sorobanSdk: { currentMajor: 23, deprecatedVersions: ["20.0.0"], source: "raven:scout", ...over },
   jsSdk: { currentVersion: "14.2.0", source: "raven:docs" },
+  stellarCli: { currentVersion: "28.1.0", source: "fake" },
   protocolCurrent: 25,
   degraded: [],
   notes: [],
@@ -212,5 +214,115 @@ describe("diagnose: manifest lines", () => {
   it("carries the dependency line on its finding", () => {
     const d = diagnose(facts([{ ...mk("soroban-sdk", "21.0.0", "Cargo.toml"), line: 12 }], [{ ...mk("soroban-client", "1.0.0", "package.json"), line: 5 }]), snap());
     expect(d.findings.map((f) => f.line)).toEqual([12, 5]);
+  });
+});
+
+describe("diagnose: toolchain checks", () => {
+  const pin = (raw: string, over: Partial<CliPin> = {}): CliPin => {
+    const parsed = parseVersion(raw.replace(/^v/, ""));
+    return { raw, version: parsed.version, major: parsed.major, file: ".github/workflows/ci.yml", line: 23, source: "workflow", via: "cargo install --version", ...over };
+  };
+  const tc = (over: Partial<ToolchainFacts> = {}): ToolchainFacts => ({ cliPins: [], rustTargets: [], rustToolchains: [], ...over });
+  const withTc = (t: ToolchainFacts, rustDeps: DetectedDep[] = [rust("28.0.0")]): RepoFacts => ({ ...facts(rustDeps), toolchain: t });
+  const cliSnap = (currentVersion: string | null = "28.1.0"): EcosystemSnapshot =>
+    snap({}, { stellarCli: { currentVersion, source: "docs: software-versions" } });
+  const codes = (d: ReturnType<typeof diagnose>): string[] => d.findings.map((f) => f.code);
+  const unknownTarget = (line = 7, file = ".github/workflows/ci.yml"): RustTargetDecl => ({ target: "wasm32-unknown-unknown", file, line, via: "rustup target add" });
+
+  it("says nothing about the CLI when no pin exists", () => {
+    const d = diagnose(withTc(tc()), cliSnap());
+    expect(codes(d).filter((c) => c.startsWith("CLI_"))).toEqual([]);
+    expect(diagnose(facts([rust("28.0.0")]), cliSnap()).findings.map((f) => f.code)).toEqual(["SDK_CURRENT"]);
+  });
+
+  it("CLI_DEPRECATED (critical) when the pinned major is 2+ behind, with file, line and provenance", () => {
+    const d = diagnose(withTc(tc({ cliPins: [pin("21.5.0")] })), cliSnap());
+    const f = d.findings.find((x) => x.code === "CLI_DEPRECATED");
+    expect(f).toMatchObject({ severity: "critical", file: ".github/workflows/ci.yml", line: 23 });
+    expect(f?.message).toContain("21.5.0");
+    expect(f?.evidence).toContain("pinned in .github/workflows/ci.yml:23");
+    expect(f?.evidence).toContain("docs: software-versions");
+    expect(f?.evidence).toContain("2026-01-01T00:00:00.000Z");
+  });
+
+  it("CLI_BEHIND (warning) exactly one major behind; CLI_CURRENT (info) on the current major or newer", () => {
+    expect(diagnose(withTc(tc({ cliPins: [pin("27.9.0")] })), cliSnap()).findings.find((f) => f.code.startsWith("CLI_"))).toMatchObject({ code: "CLI_BEHIND", severity: "warning" });
+    expect(diagnose(withTc(tc({ cliPins: [pin("28.0.1")] })), cliSnap()).findings.find((f) => f.code.startsWith("CLI_"))).toMatchObject({ code: "CLI_CURRENT", severity: "info" });
+    const newer = diagnose(withTc(tc({ cliPins: [pin("29.0.0")] })), cliSnap()).findings.find((f) => f.code === "CLI_CURRENT");
+    expect(newer?.message).toContain("or newer");
+  });
+
+  it("CLI_UNKNOWN (warning) when the pin is unparseable or the current CLI version is unavailable", () => {
+    const unparseable = diagnose(withTc(tc({ cliPins: [pin("main")] })), cliSnap()).findings.find((f) => f.code.startsWith("CLI_"));
+    expect(unparseable).toMatchObject({ code: "CLI_UNKNOWN", severity: "warning" });
+    expect(unparseable?.evidence).toContain("unparseable");
+    const noCurrent = diagnose(withTc(tc({ cliPins: [pin("21.5.0")] })), cliSnap(null)).findings.find((f) => f.code.startsWith("CLI_"));
+    expect(noCurrent).toMatchObject({ code: "CLI_UNKNOWN", severity: "warning" });
+    expect(noCurrent?.evidence).toContain("unavailable");
+  });
+
+  it("emits one CLI finding per pin", () => {
+    const d = diagnose(withTc(tc({ cliPins: [pin("21.5.0"), pin("28.1.0", { file: "Makefile", line: 3, source: "makefile" })] })), cliSnap());
+    expect(d.findings.filter((f) => f.code.startsWith("CLI_")).map((f) => [f.code, f.file, f.line])).toEqual([
+      ["CLI_DEPRECATED", ".github/workflows/ci.yml", 23],
+      ["CLI_CURRENT", "Makefile", 3],
+    ]);
+  });
+
+  it("a repo with only a CLI pin still gets NO_SDK_FOUND plus its CLI finding", () => {
+    const d = diagnose({ ...facts([]), toolchain: tc({ cliPins: [pin("27.0.0")] }) }, cliSnap());
+    expect(codes(d)).toEqual(["NO_SDK_FOUND", "CLI_BEHIND"]);
+  });
+
+  it("RUST_TARGET_LEGACY (warning) per wasm32-unknown-unknown site when soroban-sdk exists and wasm32v1-none is absent", () => {
+    const d = diagnose(withTc(tc({ rustTargets: [unknownTarget(7), unknownTarget(3, "Makefile")] })), cliSnap());
+    const found = d.findings.filter((f) => f.code === "RUST_TARGET_LEGACY");
+    expect(found.map((f) => [f.severity, f.file, f.line])).toEqual([
+      ["warning", ".github/workflows/ci.yml", 7],
+      ["warning", "Makefile", 3],
+    ]);
+    expect(found[0]?.message).toContain("rustup target add wasm32v1-none");
+    expect(found[0]?.message).toMatch(/Stellar CLI 23\+/);
+    expect(found[0]?.evidence).toContain("declared in .github/workflows/ci.yml:7");
+    expect(found[0]?.evidence).toContain("setup");
+  });
+
+  it("RUST_TARGET_LEGACY drops to info when the declaring line also uses wasm-pack, wasm-bindgen or trunk", () => {
+    const web: RustTargetDecl = { ...unknownTarget(4, "build.sh"), webTooling: true };
+    const d = diagnose(withTc(tc({ rustTargets: [web, unknownTarget(9)] })), cliSnap());
+    const found = d.findings.filter((f) => f.code === "RUST_TARGET_LEGACY");
+    expect(found.map((f) => [f.file, f.severity])).toEqual([
+      ["build.sh", "info"],
+      [".github/workflows/ci.yml", "warning"],
+    ]);
+    expect(found[0]?.evidence).toMatch(/wasm-pack|browser/);
+  });
+
+  it("RUST_TARGET_LEGACY is silent without a soroban-sdk dependency or when wasm32v1-none is declared somewhere", () => {
+    expect(codes(diagnose({ ...facts([]), toolchain: tc({ rustTargets: [unknownTarget()] }) }, cliSnap()))).toEqual(["NO_SDK_FOUND"]);
+    const both = tc({ rustTargets: [unknownTarget(), { target: "wasm32v1-none", file: "rust-toolchain.toml", line: 3, via: "rust-toolchain targets" }] });
+    expect(codes(diagnose(withTc(both), cliSnap()))).not.toContain("RUST_TARGET_LEGACY");
+  });
+
+  it("RUST_TOOLCHAIN_OLD (warning) for a pinned channel below 1.84.0 with a soroban-sdk dependency", () => {
+    const old: RustToolchainPin = { channel: "1.79.0", version: "1.79.0", file: "rust-toolchain.toml", line: 2 };
+    const f = diagnose(withTc(tc({ rustToolchains: [old] })), cliSnap()).findings.find((x) => x.code === "RUST_TOOLCHAIN_OLD");
+    expect(f).toMatchObject({ severity: "warning", file: "rust-toolchain.toml", line: 2 });
+    expect(f?.evidence).toContain("1.84.0");
+    expect(f?.evidence).toContain("https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup");
+    expect(f?.evidence).toContain("rust-toolchain.toml:2");
+  });
+
+  it("RUST_TOOLCHAIN_OLD is silent for 1.84.0+, unpinned channels, or no soroban-sdk", () => {
+    const at = (version: string | null): RustToolchainPin => ({ channel: version ?? "stable", version, file: "rust-toolchain.toml", line: 2 });
+    for (const v of ["1.84.0", "1.90.1"]) expect(codes(diagnose(withTc(tc({ rustToolchains: [at(v)] })), cliSnap()))).not.toContain("RUST_TOOLCHAIN_OLD");
+    expect(codes(diagnose(withTc(tc({ rustToolchains: [at(null)] })), cliSnap()))).not.toContain("RUST_TOOLCHAIN_OLD");
+    expect(codes(diagnose({ ...facts([]), toolchain: tc({ rustToolchains: [at("1.70.0")] }) }, cliSnap()))).toEqual(["NO_SDK_FOUND"]);
+  });
+
+  it("toolchain findings do not change the summary arithmetic or --fail-on semantics", () => {
+    const d = diagnose(withTc(tc({ cliPins: [pin("21.5.0")] }), []), cliSnap());
+    expect(d.summary).toEqual({ critical: 1, warning: 0, info: 1 });
+    expect(meetsThreshold(d, "critical")).toBe(true);
   });
 });

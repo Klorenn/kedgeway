@@ -6,7 +6,16 @@ import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 import { z } from "zod";
 import { SnapshotSchema } from "./fake-ecosystem.js";
 
-const CacheSchema = SnapshotSchema.extend({ observedAt: z.string().datetime() });
+/** `stellarCli.source` of a cached snapshot that predates the field. */
+export const CLI_FIELD_MISSING = "cache (field missing)";
+
+const CacheSchema = SnapshotSchema.extend({
+  observedAt: z.string().datetime(),
+  // Snapshots cached before the Stellar CLI check existed have no such field; they must still load.
+  stellarCli: z
+    .object({ currentVersion: z.string().nullable(), source: z.string() })
+    .default({ currentVersion: null, source: CLI_FIELD_MISSING }),
+});
 
 export function defaultCacheDir(env: NodeJS.ProcessEnv = process.env): string {
   const xdg = env["XDG_CACHE_HOME"];
@@ -72,15 +81,17 @@ export class CachingEcosystem implements EcosystemPort {
     const cached = this.opts.noCache === true ? null : await this.cache.read();
     const ageMs = cached === null ? Number.NaN : now - Date.parse(cached.observedAt);
     const ageOk = cached !== null && ageMs >= 0 && ageMs <= maxAge; // a future observedAt is not trusted
-    const fresh = ageOk && cached.degraded.length === 0; // a degraded snapshot is never "fresh"
+    const legacy = cached !== null && cached.stellarCli.source === CLI_FIELD_MISSING; // pre-upgrade cache: refetch to fill stellarCli
+    const fresh = ageOk && cached.degraded.length === 0 && !legacy; // a degraded snapshot is never "fresh"
+    const note = legacy ? ["cached snapshot predates the Stellar CLI check (stellarCli missing); run once with Raven access to refresh it"] : [];
 
     if (this.opts.offline === true) {
       if (cached === null) {
         throw new Error('No cached snapshot to use with --offline. Run once without it (and with Raven access) to create one.');
       }
-      if (ageOk) return cached; // its own degraded notes (if any) are already in the list
+      if (ageOk) return legacy ? { ...cached, degraded: [...cached.degraded, ...note] } : cached; // its own degraded notes (if any) are already in the list
       const age = Number.isFinite(ageMs) && ageMs >= 0 ? `snapshot is ${Math.floor(ageMs / HOUR_MS)} hours old` : "snapshot age is unknown";
-      return { ...cached, degraded: [...cached.degraded, age] };
+      return { ...cached, degraded: [...cached.degraded, ...note, age] };
     }
     if (cached !== null && fresh) return cached;
 
@@ -91,7 +102,7 @@ export class CachingEcosystem implements EcosystemPort {
       return live;
     } catch (e) {
       if (cached === null) throw e;
-      return { ...cached, degraded: [...cached.degraded, `using cached snapshot from ${cached.observedAt}`] };
+      return { ...cached, degraded: [...cached.degraded, ...note, `using cached snapshot from ${cached.observedAt}`] };
     }
   }
 }

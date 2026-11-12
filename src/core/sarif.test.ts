@@ -30,7 +30,9 @@ describe("buildSarif", () => {
   it("declares one rule per finding code with the required fields", () => {
     const rules = run?.tool.driver.rules ?? [];
     expect(rules.map((r) => r.id)).toEqual(FINDINGS_REFERENCE.map((f) => f.code));
-    expect(rules).toHaveLength(12);
+    expect(rules).toHaveLength(18);
+    const ids = rules.map((r) => r.id);
+    for (const id of ["CLI_DEPRECATED", "CLI_BEHIND", "CLI_CURRENT", "CLI_UNKNOWN", "RUST_TARGET_LEGACY", "RUST_TOOLCHAIN_OLD"]) expect(ids).toContain(id);
     for (const r of rules) {
       expect(r.shortDescription.text.length).toBeGreaterThan(0);
       expect(r.shortDescription.text).not.toBe(r.id);
@@ -68,6 +70,16 @@ describe("buildSarif", () => {
       artifactLocation: { uri: "contracts/a/Cargo.toml", uriBaseId: "%SRCROOT%" },
       region: { startLine: 1 },
     });
+  });
+
+  it("points at the finding's line when it has one", () => {
+    const l = buildSarif(diag([finding({ code: "CLI_DEPRECATED", file: ".github/workflows/ci.yml", line: 23 })]), { version: "1" });
+    expect(l.runs[0]?.results[0]?.locations?.[0]?.physicalLocation.region).toEqual({ startLine: 23 });
+  });
+
+  it("never emits a startLine below 1", () => {
+    const l = buildSarif(diag([finding({ line: 0 }), finding({ line: -3 })]), { version: "1" });
+    expect(l.runs[0]?.results.map((r) => r.locations?.[0]?.physicalLocation.region.startLine)).toEqual([1, 1]);
   });
 
   it("prefixes uris when the scan root is below the repo root", () => {

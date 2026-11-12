@@ -5,6 +5,7 @@ const payload = {
   observedAt: "2026-11-11T10:00:00.000Z",
   rustSdkCurrent: "28.0.0",
   jsSdkCurrent: "17.2.1",
+  stellarCliCurrent: "28.1.0",
   protocolCurrent: 29,
   deprecatedVersions: ["29.0.0", "27.0.2", "26.0.1"],
   scoutGeneratedAt: "2026-11-10T00:00:00Z",
@@ -53,6 +54,16 @@ describe("parseRavenResult", () => {
     expect(snap.protocolCurrent).toBe(29);
     expect(snap.degraded).toEqual([]);
     expect(snap.notes).toEqual(payload.notes);
+    expect(snap.stellarCli.currentVersion).toBe("28.1.0");
+    expect(snap.stellarCli.source).toContain("/docs/networks/software-versions");
+  });
+
+  it("strips a leading v from the CLI version and tolerates payloads without the field", () => {
+    expect(parseRavenResult(JSON.stringify({ ...payload, stellarCliCurrent: "v28.1.0" })).stellarCli.currentVersion).toBe("28.1.0");
+    const { stellarCliCurrent: _c, ...old } = payload;
+    const legacy = parseRavenResult(JSON.stringify(old));
+    expect(legacy.stellarCli.currentVersion).toBeNull();
+    expect(legacy.degraded.join(" ")).toMatch(/stellarCliCurrent/);
   });
 
   it("returns null currentMajor and passes degraded through when the rust row is missing", () => {
@@ -96,6 +107,7 @@ describe("EXECUTE_SCRIPT behaviour in a fake sandbox", () => {
     "Protocol 29 is live",
     "| Smart Contract Rust SDK | `v28.0.0` |",
     "| Stellar JS Stellar SDK | `17.2.1` |",
+    "| Stellar CLI | `28.1.0` |",
   ].join("\n");
 
   it("extracts versions from the official page table and reports no degradation", async () => {
@@ -109,11 +121,24 @@ describe("EXECUTE_SCRIPT behaviour in a fake sandbox", () => {
     expect(out).toMatchObject({
       rustSdkCurrent: "28.0.0",
       jsSdkCurrent: "17.2.1",
+      stellarCliCurrent: "28.1.0",
       protocolCurrent: 29,
       deprecatedVersions: ["27.0.2"],
       scoutGeneratedAt: "g",
       degraded: [],
     });
+  });
+
+  it("notes a degraded entry and returns null when the Stellar CLI row is missing", async () => {
+    const out = await run({
+      stellarDocs: {
+        get_doc_page: () => ok({ content: page.replace("| Stellar CLI | `28.1.0` |", "") }),
+        search_docs: () => ok({ hits: [] }),
+      },
+      scout: { analyzeEcosystem: () => ok({ toolchain: { deprecatedRepos: [] } }) },
+    });
+    expect(out["stellarCliCurrent"]).toBeNull();
+    expect(out["degraded"]).toEqual(["software-versions: stellar cli row not found"]);
   });
 
   it("records degraded entries when services fail", async () => {

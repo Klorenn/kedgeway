@@ -20,6 +20,7 @@ const snap = (hoursAgo: number, degraded: string[] = []): EcosystemSnapshot => (
   observedAt: new Date(NOW - hoursAgo * 3_600_000).toISOString(),
   sorobanSdk: { currentMajor: 28, currentVersion: "28.0.0", deprecatedVersions: [], source: "s" },
   jsSdk: { currentVersion: "17.0.0", source: "j" },
+  stellarCli: { currentVersion: "28.1.0", source: "fake" },
   protocolCurrent: 29,
   degraded,
   notes: [],
@@ -34,6 +35,7 @@ function deps(over: Partial<DoctorDeps> = {}): DoctorDeps {
     cache: new SnapshotCache(join(dir, "cache")),
     now: () => NOW,
     ping: () => Promise.resolve(),
+    exec: () => Promise.reject(Object.assign(new Error("spawn stellar ENOENT"), { code: "ENOENT" })),
     ...over,
   };
 }
@@ -105,5 +107,72 @@ describe("runDoctor", () => {
     const offline = await runDoctor(failing, { offline: true });
     expect(byName(offline, "raven")).toMatchObject({ status: "skip", detail: expect.stringContaining("--offline") });
     expect(calls).toBe(1);
+  });
+});
+
+describe("runDoctor: stellar-cli", () => {
+  const out = (stdout: string): DoctorDeps["exec"] => () => Promise.resolve({ stdout });
+  const cacheWith = async (current: string | null): Promise<SnapshotCache> => {
+    const cache = new SnapshotCache(join(dir, "cache"));
+    await cache.write({ ...snap(1), stellarCli: { currentVersion: current, source: "s" } });
+    return cache;
+  };
+
+  it("warns, without failing, when stellar is not installed", async () => {
+    const c = byName(await runDoctor(deps(), {}), "stellar-cli");
+    expect(c).toMatchObject({ status: "warn", detail: "not installed (optional): https://developers.stellar.org/docs/tools/cli/install-cli" });
+  });
+
+  it("runs `stellar --version` through execFile-style args with a 5 s timeout, never a shell string", async () => {
+    const calls: { file: string; args: string[]; timeout: number }[] = [];
+    const exec: DoctorDeps["exec"] = (file, args, opts) => {
+      calls.push({ file, args, timeout: opts.timeout });
+      return Promise.resolve({ stdout: "stellar 28.1.0 (abc)\nstellar-xdr 28.0.0\n" });
+    };
+    await runDoctor(deps({ exec, cache: await cacheWith("28.1.0") }), {});
+    expect(calls).toEqual([{ file: "stellar", args: ["--version"], timeout: 5000 }]);
+    calls.length = 0;
+    await runDoctor(deps({ exec, cliTimeoutMs: 1234 }), {});
+    expect(calls[0]?.timeout).toBe(1234);
+  });
+
+  it("ok on the current major or newer, warn one behind, fail two or more behind", async () => {
+    const cache = await cacheWith("28.1.0");
+    expect(byName(await runDoctor(deps({ exec: out("stellar 28.0.2\n"), cache }), {}), "stellar-cli")?.status).toBe("ok");
+    expect(byName(await runDoctor(deps({ exec: out("stellar 29.0.0\n"), cache }), {}), "stellar-cli")?.status).toBe("ok");
+    expect(byName(await runDoctor(deps({ exec: out("stellar 27.3.0\n"), cache }), {}), "stellar-cli")?.status).toBe("warn");
+    const two = byName(await runDoctor(deps({ exec: out("stellar 26.9.9\n"), cache }), {}), "stellar-cli");
+    expect(two?.status).toBe("fail");
+  });
+
+  it("is ok with 'current unknown offline' under --offline, even when a snapshot exists", async () => {
+    const cache = await cacheWith("28.1.0");
+    expect(byName(await runDoctor(deps({ exec: out("stellar 21.0.0\n"), cache }), { offline: true }), "stellar-cli")).toEqual({
+      name: "stellar-cli",
+      status: "ok",
+      detail: "installed 21.0.0 (current unknown offline)",
+    });
+  });
+
+  it("is ok with no snapshot, or a snapshot without a CLI version", async () => {
+    expect(byName(await runDoctor(deps({ exec: out("stellar 21.0.0\n") }), {}), "stellar-cli")).toMatchObject({ status: "ok", detail: expect.stringContaining("current unknown") });
+    const cache = await cacheWith(null);
+    expect(byName(await runDoctor(deps({ exec: out("stellar 21.0.0\n"), cache }), {}), "stellar-cli")?.status).toBe("ok");
+  });
+
+  it("does not hang when exec never settles: its own timer wins", async () => {
+    const never: DoctorDeps["exec"] = () => new Promise(() => undefined);
+    const t0 = Date.now();
+    const c = byName(await runDoctor(deps({ exec: never, cliTimeoutMs: 20 }), {}), "stellar-cli");
+    expect(c).toMatchObject({ status: "warn", detail: expect.stringMatching(/timed out/) });
+    expect(Date.now() - t0).toBeLessThan(2000);
+  });
+
+  it("warns on unparseable output and on a failing or hanging command", async () => {
+    expect(byName(await runDoctor(deps({ exec: out("hello\n") }), {}), "stellar-cli")).toMatchObject({ status: "warn", detail: expect.stringContaining("unexpected output") });
+    const boom: DoctorDeps["exec"] = () => Promise.reject(Object.assign(new Error("Command failed"), { code: 1 }));
+    expect(byName(await runDoctor(deps({ exec: boom }), {}), "stellar-cli")).toMatchObject({ status: "warn", detail: expect.stringContaining("Command failed") });
+    const killed: DoctorDeps["exec"] = () => Promise.reject(Object.assign(new Error("timed out"), { killed: true, code: null, signal: "SIGTERM" }));
+    expect(byName(await runDoctor(deps({ exec: killed }), {}), "stellar-cli")).toMatchObject({ status: "warn", detail: expect.stringMatching(/timed out after 5 s/) });
   });
 });

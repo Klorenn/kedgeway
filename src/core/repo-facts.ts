@@ -1,6 +1,7 @@
 import { parse as parseToml } from "smol-toml";
 import type { LockfileKind } from "./lockfile.js";
 import { packageJsonDepLines } from "./manifest-edit.js";
+import type { ToolchainFacts } from "./toolchain.js";
 
 export interface DetectedDep {
   name: string;
@@ -33,6 +34,8 @@ export interface RepoFacts {
   jsDeps: DetectedDep[];
   /** Manifests or directories that could not be read/parsed; their contents are unknown. */
   manifestErrors: ManifestError[];
+  /** Stellar CLI pins, Rust targets and Rust toolchain pins; present only when the scan found any. */
+  toolchain?: ToolchainFacts;
   /** Non-finding advice for the text report (for example a lockfile above the scan root). */
   hints?: string[];
 }

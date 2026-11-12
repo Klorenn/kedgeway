@@ -1,6 +1,6 @@
-import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 import { CachingEcosystem, SnapshotCache, defaultCacheDir } from "./snapshot-cache.js";
@@ -19,6 +19,7 @@ const snap = (observedAt: string, extra: Partial<EcosystemSnapshot> = {}): Ecosy
   observedAt,
   sorobanSdk: { currentMajor: 28, currentVersion: "28.0.0", deprecatedVersions: [], source: "fake" },
   jsSdk: { currentVersion: "17.0.0", source: "fake" },
+  stellarCli: { currentVersion: "28.1.0", source: "fake" },
   protocolCurrent: 29,
   degraded: [],
   notes: [],
@@ -53,6 +54,43 @@ describe("SnapshotCache", () => {
     const file = join(dir, "nested", "snapshot.json");
     expect((await stat(file)).mode & 0o777).toBe(0o600);
     expect(JSON.parse(await readFile(file, "utf8")).observedAt).toBe(hoursAgo(1));
+  });
+
+  it("loads an old cached snapshot without stellarCli instead of dropping it", async () => {
+    const cache = new SnapshotCache(join(dir, "old"));
+    await cache.write(snap(hoursAgo(1)));
+    const { stellarCli: _c, ...old } = snap(hoursAgo(1));
+    await writeFile(cache.path, JSON.stringify(old));
+    const read = await cache.read();
+    expect(read).not.toBeNull();
+    expect(read?.stellarCli).toEqual({ currentVersion: null, source: "cache (field missing)" });
+    expect(read?.sorobanSdk.currentVersion).toBe("28.0.0");
+  });
+
+  it("treats a pre-upgrade cache (no stellarCli) as not fresh, so it is refetched", async () => {
+    const cache = new SnapshotCache(join(dir, "legacy"));
+    const { stellarCli: _c, ...old } = snap(hoursAgo(1));
+    await mkdir(dirname(cache.path), { recursive: true });
+    await writeFile(cache.path, JSON.stringify(old));
+    const live = snap(hoursAgo(0));
+    const p = port(live);
+    const out = await new CachingEcosystem(p, cache, { now: () => T0 }).fetchSnapshot();
+    expect(p.calls).toBe(1);
+    expect(out.stellarCli.currentVersion).toBe("28.1.0");
+    expect((await cache.read())?.stellarCli.source).toBe("fake");
+  });
+
+  it("notes the missing field as degraded when a pre-upgrade cache is used offline or after a failed fetch", async () => {
+    const cache = new SnapshotCache(join(dir, "legacy2"));
+    const { stellarCli: _c, ...old } = snap(hoursAgo(1));
+    await mkdir(dirname(cache.path), { recursive: true });
+    await writeFile(cache.path, JSON.stringify(old));
+    const off = await new CachingEcosystem(port(new Error("x")), cache, { offline: true, now: () => T0 }).fetchSnapshot();
+    expect(off.stellarCli.currentVersion).toBeNull();
+    expect(off.degraded.join(" ")).toMatch(/stellarCli|Stellar CLI/);
+    const fb = await new CachingEcosystem(port(new Error("down")), cache, { now: () => T0 }).fetchSnapshot();
+    expect(fb.degraded.join(" ")).toMatch(/stellarCli|Stellar CLI/);
+    expect(fb.degraded.join(" ")).toMatch(/using cached snapshot/);
   });
 
   it("treats a corrupt or invalid file as no cache", async () => {

@@ -193,7 +193,7 @@ export default function Home() {
           <AsciiRule label="04 — Findings" as="p" />
           <div className={`grid ${styles.findings}`}>
             <div className={styles.block}>
-              <h2 id="findings-h" className="t-heading">What it catches. <span className="line2">Twelve codes, three severities.</span></h2>
+              <h2 id="findings-h" className="t-heading">What it catches. <span className="line2">Eighteen codes, three severities.</span></h2>
               <p className="t-body">Each finding names the file, cites its source and the time it was observed, and says what to do.</p>
             </div>
             <LazyDesignFigure name="fig5" fig="fig. 5" caption="hatch density = severity" description="Three severities from critical to info, drawn with decreasing hatch density." />
@@ -206,7 +206,7 @@ export default function Home() {
             emphasis={/(\b[A-Z]{2,}(?:_[A-Z]+)+\b|\b(?:critical|warning|info)\b(?= +\|))/.source}
           >
             <table>
-              <caption>Six of the twelve finding codes</caption>
+              <caption>Six of the eighteen finding codes</caption>
               <thead><tr><th>code</th><th>severity</th><th>what it means</th></tr></thead>
               <tbody>
                 {FINDINGS.map(([code, sev, text]) => (
@@ -216,7 +216,7 @@ export default function Home() {
             </table>
           </AsciiBlock>
           <div>
-            <Button variant="link" href="/docs/findings">All 12 finding codes →</Button>
+            <Button variant="link" href="/docs/findings">All 18 finding codes →</Button>
           </div>
         </div>
       </section>

@@ -50,3 +50,19 @@ describe("formatAnnotations", () => {
     expect(out).toEqual(["::error title=SDK_DEPRECATED::soroban-sdk 21.0.0 is deprecated"]);
   });
 });
+
+describe("formatAnnotations: toolchain findings", () => {
+  it("points CLI and Rust findings at the workflow or toolchain file and line", () => {
+    const out = formatAnnotations(
+      diag([
+        f({ code: "CLI_DEPRECATED", file: ".github/workflows/ci.yml", line: 23, message: "stellar-cli 21.5.0 is 7 majors behind" }),
+        f({ severity: "warning", code: "RUST_TOOLCHAIN_OLD", file: "rust-toolchain.toml", line: 2, message: "old" }),
+      ]),
+      { pathPrefix: "contracts" },
+    );
+    expect(out).toEqual([
+      "::error file=contracts/.github/workflows/ci.yml,line=23,title=CLI_DEPRECATED::stellar-cli 21.5.0 is 7 majors behind",
+      "::warning file=contracts/rust-toolchain.toml,line=2,title=RUST_TOOLCHAIN_OLD::old",
+    ]);
+  });
+});

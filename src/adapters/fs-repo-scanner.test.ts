@@ -122,4 +122,68 @@ describe("scanRepo", () => {
     const facts = await scanRepo(dir);
     expect(facts.rustDeps[0]).toMatchObject({ raw: "^21", resolved: "21.7.6", resolvedFrom: "Cargo.lock" });
   });
+  describe("toolchain facts", () => {
+    it("omits `toolchain` when nothing relevant is found", async () => {
+      await put("Cargo.toml", `[dependencies]\nsoroban-sdk = "21.0.0"\n`);
+      expect((await scanRepo(dir)).toolchain).toBeUndefined();
+    });
+
+    it("finds stellar-cli pins in workflows, Dockerfiles, Makefiles, scripts, .tool-versions and package.json", async () => {
+      await put(".github/workflows/ci.yml", `jobs:\n  b:\n    steps:\n      - run: cargo install --locked stellar-cli --version 21.5.0\n`);
+      await put(".github/workflows/rel.yaml", `steps:\n  - run: cargo binstall stellar-cli@22.0.0\n`);
+      await put("Dockerfile.dev", `FROM rust:1.84\nRUN cargo install stellar-cli@23.0.1\n`);
+      await put("Makefile", `setup:\n\tcargo install stellar-cli --version 20.0.0\n`);
+      await put("deploy.sh", `cargo install stellar-cli@19.0.0\n`);
+      await put("scripts/ci/x.sh", `cargo install stellar-cli@18.0.0\n`);
+      await put(".tool-versions", `stellar-cli 17.0.0\n`);
+      await put("package.json", `{\n  "devDependencies": {\n    "@stellar/stellar-cli": "^16.0.0"\n  }\n}\n`);
+      const pins = (await scanRepo(dir)).toolchain?.cliPins ?? [];
+      const got = pins.map((p) => `${p.file}:${p.line}=${p.version}/${p.source}`).sort();
+      expect(got).toEqual(
+        [
+          ".github/workflows/ci.yml:4=21.5.0/workflow",
+          ".github/workflows/rel.yaml:2=22.0.0/workflow",
+          "Dockerfile.dev:2=23.0.1/dockerfile",
+          "Makefile:2=20.0.0/makefile",
+          "deploy.sh:1=19.0.0/script",
+          "scripts/ci/x.sh:1=18.0.0/script",
+          ".tool-versions:1=17.0.0/tool-versions",
+          "package.json:3=16.0.0/package.json",
+        ].sort(),
+      );
+    });
+
+    it("does not read shell scripts outside the root and scripts/, or anything under ignored directories", async () => {
+      await put("tools/x.sh", `cargo install stellar-cli@21.0.0\n`);
+      await put("node_modules/pkg/Makefile", `\tcargo install stellar-cli@21.0.0\n`);
+      await put("target/build.sh", `cargo install stellar-cli@21.0.0\n`);
+      expect((await scanRepo(dir)).toolchain).toBeUndefined();
+    });
+
+    it("finds rust targets and the rust toolchain pin in rust-toolchain.toml, .cargo/config.toml and scripts", async () => {
+      await put("rust-toolchain.toml", `[toolchain]\nchannel = "1.79.0"\ntargets = ["wasm32-unknown-unknown"]\n`);
+      await put(".cargo/config.toml", `[build]\ntarget = "wasm32v1-none"\n`);
+      await put("Makefile", `build:\n\tcargo build --target wasm32-unknown-unknown\n`);
+      const tc = (await scanRepo(dir)).toolchain;
+      expect(tc?.rustToolchains).toEqual([{ channel: "1.79.0", version: "1.79.0", file: "rust-toolchain.toml", line: 2 }]);
+      expect(tc?.rustTargets.map((t) => `${t.file}:${t.line}=${t.target}`).sort()).toEqual(
+        [".cargo/config.toml:2=wasm32v1-none", "Makefile:2=wasm32-unknown-unknown", "rust-toolchain.toml:3=wasm32-unknown-unknown"].sort(),
+      );
+    });
+
+    it("reads a legacy rust-toolchain file and ignores broken toolchain TOML without a manifest error", async () => {
+      await put("rust-toolchain", `1.80.1\n`);
+      await put("sub/rust-toolchain.toml", `[toolchain\n`);
+      const facts = await scanRepo(dir);
+      expect(facts.toolchain?.rustToolchains).toEqual([{ channel: "1.80.1", version: "1.80.1", file: "rust-toolchain", line: 1 }]);
+      expect(facts.manifestErrors).toEqual([]);
+    });
+
+    it("does not let a package.json parse error hide the error report", async () => {
+      await put("package.json", "{nope");
+      const facts = await scanRepo(dir);
+      expect(facts.manifestErrors.map((e) => e.file)).toEqual(["package.json"]);
+      expect(facts.toolchain).toBeUndefined();
+    });
+  });
 });

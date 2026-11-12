@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+
+- feat(toolchain): checks beyond the SDKs. `EcosystemSnapshot` gains `stellarCli: { currentVersion, source }`, parsed from the "Stellar CLI" row of the official software-versions table (a missing row raises `DATA_DEGRADED`); old cached snapshots without the field load with `stellarCli.currentVersion: null` and source `cache (field missing)`. `RepoFacts` gains an optional `toolchain` (stellar-cli pins, `wasm32-unknown-unknown`/`wasm32v1-none` declarations and the pinned Rust channel, each with file and line) read from workflows, `Dockerfile*`, `Makefile`, `*.sh` (root and `scripts/`), `.tool-versions`, `package.json`, `rust-toolchain(.toml)` and `.cargo/config.toml`.
+- feat(findings): six new codes. `CLI_DEPRECATED` (critical, pinned CLI 2+ majors behind), `CLI_BEHIND` (warning, one behind), `CLI_CURRENT` (info), `CLI_UNKNOWN` (warning), one finding per pin and nothing when no pin exists; `RUST_TARGET_LEGACY` (warning, `wasm32-unknown-unknown` without `wasm32v1-none` in a `soroban-sdk` repo); `RUST_TOOLCHAIN_OLD` (warning, pinned Rust below 1.84.0 in a `soroban-sdk` repo). They flow through the text report, `--json`, annotations, SARIF (now 18 rules) and the MCP `findings_reference` and `diagnose` tools. `NO_SDK_FOUND` and `--fail-on` are unchanged.
+- feat(sarif): results point at the finding's line (`region.startLine`) when it has one instead of always line 1.
+- feat(doctor): a `stellar-cli` check runs `stellar --version` (no shell, 5 s timeout): not installed is a `warn` (optional); with a snapshot, the current major or newer is `ok`, one major behind `warn`, two or more `fail`; with `--offline` or no snapshot it is `ok` ("current unknown"). `DoctorDeps` gains an injectable `exec`.
+- fix(toolchain): the scanner no longer uses backtracking regex scans (token matching on command segments instead; logical lines over 8 KB are skipped), so hostile files cannot stall it. A `--version` from another command on the same line is not a pin; only a `cargo install|binstall` segment that names `stellar-cli` counts. New pin forms: `--tag`, legacy `soroban-cli`, `npm i -g @stellar/stellar-cli@X`, release-download URLs. A rust channel with a host triple is parsed. `RUST_TARGET_LEGACY` is `info` when the line also uses wasm-pack, wasm-bindgen or trunk. A `[build] target` line wins over a `[target."..."]` header. SARIF `startLine` is at least 1.
+- fix(doctor): the `stellar --version` call is killed with SIGKILL and raced against doctor's own 5 s timer.
+- fix(cache): a snapshot cached before `stellarCli` existed is refetched instead of counted fresh; when used anyway it carries a `DATA_DEGRADED` note, as does a Raven payload without `stellarCliCurrent`.
+- feat(sdk): exports the `CliPin`, `CliPinSource`, `RustTargetDecl`, `RustTargetName`, `RustToolchainPin` and `ToolchainFacts` types.
+
 ## [0.1.1] - 2026-11-12
 
 ### Changed

@@ -1,6 +1,7 @@
 import type { EcosystemSnapshot } from "../ports/ecosystem.js";
 import type { LockfileKind } from "./lockfile.js";
 import type { DetectedDep, RepoFacts } from "./repo-facts.js";
+import { compareRustVersion, RUST_MIN_VERSION, SETUP_DOC_OBSERVED, SETUP_DOC_URL, type CliPin } from "./toolchain.js";
 
 export type Severity = "critical" | "warning" | "info";
 
@@ -185,6 +186,99 @@ function diagnoseJsDep(dep: DetectedDep, s: EcosystemSnapshot): Finding {
   };
 }
 
+function cliProvenance(s: EcosystemSnapshot): string {
+  return `source: ${s.stellarCli.source}, observed ${s.observedAt}`;
+}
+
+function diagnoseCliPin(pin: CliPin, s: EcosystemSnapshot): Finding {
+  const where = `${pin.file}:${pin.line}`;
+  const pinned = `pinned in ${where} (${pin.via})`;
+  const label = `stellar-cli ${pin.raw}`;
+  const base = { file: pin.file, line: pin.line };
+  const current = s.stellarCli.currentVersion;
+  const currentMajor = current === null ? null : majorOf(current);
+
+  if (pin.major === null) {
+    return {
+      ...base,
+      severity: "warning",
+      code: "CLI_UNKNOWN",
+      message: `${label} (${where}): version could not be determined, so it cannot be compared with the current Stellar CLI.`,
+      evidence: `${pinned}; version unparseable; no comparison made (${cliProvenance(s)}).`,
+    };
+  }
+  if (currentMajor === null) {
+    return {
+      ...base,
+      severity: "warning",
+      code: "CLI_UNKNOWN",
+      message: `${label} (${where}): the current Stellar CLI version is unknown, so staleness cannot be judged.`,
+      evidence: `${pinned}; current Stellar CLI version evidence unavailable; no deprecation claim made (${cliProvenance(s)}).`,
+    };
+  }
+  if (pin.major < currentMajor - 1) {
+    return {
+      ...base,
+      severity: "critical",
+      code: "CLI_DEPRECATED",
+      message: `${label} (${where}) is ${currentMajor - pin.major} majors behind (current: ${current}). Treat as deprecated.`,
+      evidence: `${pinned}; major ${pin.major} < current major ${currentMajor} - 1 (${cliProvenance(s)}).`,
+    };
+  }
+  if (pin.major === currentMajor - 1) {
+    return {
+      ...base,
+      severity: "warning",
+      code: "CLI_BEHIND",
+      message: `${label} (${where}) is one major behind (current: ${current}).`,
+      evidence: `${pinned}; major ${pin.major} = current major ${currentMajor} - 1 (${cliProvenance(s)}).`,
+    };
+  }
+  return {
+    ...base,
+    severity: "info",
+    code: "CLI_CURRENT",
+    message: `${label} (${where}) is on the current major (${currentMajor})${pin.major > currentMajor ? " or newer" : ""}.`,
+    evidence: `${pinned}; major ${pin.major} >= current major ${currentMajor} (${cliProvenance(s)}).`,
+  };
+}
+
+function toolchainFindings(facts: RepoFacts, s: EcosystemSnapshot): Finding[] {
+  const tc = facts.toolchain;
+  if (tc === undefined) return [];
+  const findings: Finding[] = tc.cliPins.map((pin) => diagnoseCliPin(pin, s));
+  const sdk = facts.rustDeps.find((d) => d.name === "soroban-sdk");
+  if (sdk === undefined) return findings;
+  const sdkAt = `soroban-sdk detected in ${sdk.declaredIn ?? sdk.file}${sdk.line === undefined ? "" : `:${sdk.line}`}`;
+  const docs = `source: ${SETUP_DOC_URL}, observed ${SETUP_DOC_OBSERVED}`;
+
+  if (!tc.rustTargets.some((t) => t.target === "wasm32v1-none")) {
+    for (const t of tc.rustTargets) {
+      if (t.target !== "wasm32-unknown-unknown") continue;
+      findings.push({
+        severity: t.webTooling === true ? "info" : "warning",
+        code: "RUST_TARGET_LEGACY",
+        message: `wasm32-unknown-unknown is declared in ${t.file}:${t.line}, but Stellar CLI 23+ builds contracts for wasm32v1-none. Run \`rustup target add wasm32v1-none\`.`,
+        file: t.file,
+        line: t.line,
+        evidence: `wasm32-unknown-unknown declared in ${t.file}:${t.line} (${t.via}); wasm32v1-none is not declared anywhere in the scanned repo${t.webTooling === true ? "; the line also uses wasm-pack, wasm-bindgen or trunk (browser Wasm), so this is informational" : ""}; ${sdkAt} (${docs}).`,
+      });
+    }
+  }
+  for (const r of tc.rustToolchains) {
+    if (r.version === null || compareRustVersion(r.version, RUST_MIN_VERSION) >= 0) continue;
+    findings.push({
+      severity: "warning",
+      code: "RUST_TOOLCHAIN_OLD",
+      message: `Rust ${r.version} is pinned in ${r.file}:${r.line}, below the ${RUST_MIN_VERSION} that Stellar smart contracts require.`,
+      file: r.file,
+      line: r.line,
+      evidence: `channel "${r.channel}" pinned in ${r.file}:${r.line}; the setup guide requires Rust toolchain v${RUST_MIN_VERSION} or higher because the wasm32v1-none target is only available in recent versions; ${sdkAt} (${docs}).`,
+    });
+  }
+  return findings;
+}
+
 export function meetsThreshold(d: Diagnosis, severity: Severity): boolean {
   return d.findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[severity]);
 }
@@ -237,6 +331,8 @@ export function diagnose(facts: RepoFacts, snapshot: EcosystemSnapshot): Diagnos
       evidence: `Scanned Cargo.toml and package.json files under ${facts.root}.`,
     });
   }
+
+  findings.push(...toolchainFindings(facts, snapshot));
 
   const summary = { critical: 0, warning: 0, info: 0 };
   for (const f of findings) summary[f.severity] += 1;

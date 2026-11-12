@@ -55,7 +55,7 @@ kedgeway init [path]                          # write .github/workflows/kedgeway
 kedgeway login                                # force the OAuth flow
 kedgeway login --export                       # print credentials as a base64 secret for CI
 kedgeway login --no-browser                   # headless login: print the URL, paste the redirect back
-kedgeway doctor                               # self-check: Node, auth, cache, Raven reachability
+kedgeway doctor                               # self-check: Node, auth, cache, stellar-cli, Raven reachability
 kedgeway logout                               # delete stored credentials
 kedgeway diagnose [path]                      # human-readable report
 kedgeway diagnose . --json                    # Diagnosis as JSON
@@ -111,11 +111,27 @@ kedgeway detects `soroban-sdk` in every `Cargo.toml` (string and table forms, re
 | `JS_SDK_CURRENT` | info | JS SDK is on the current major |
 | `JS_SDK_UNKNOWN` | warning | JS SDK version could not be resolved |
 | `JS_LEGACY_PACKAGE` | critical | Legacy package such as `soroban-client` or `stellar-sdk` |
+| `CLI_DEPRECATED` | critical | A pinned `stellar-cli` is two or more majors behind the current Stellar CLI |
+| `CLI_BEHIND` | warning | A pinned `stellar-cli` is exactly one major behind |
+| `CLI_CURRENT` | info | A pinned `stellar-cli` is on the current major (or newer) |
+| `CLI_UNKNOWN` | warning | A `stellar-cli` pin exists but its version is unparseable, or the current CLI version is unavailable |
+| `RUST_TARGET_LEGACY` | warning (info with wasm-pack, wasm-bindgen or trunk) | `wasm32-unknown-unknown` is declared in a repo with `soroban-sdk` and no `wasm32v1-none`; Stellar CLI 23+ builds for `wasm32v1-none` |
+| `RUST_TOOLCHAIN_OLD` | warning | A pinned Rust channel is below 1.84.0 in a repo with `soroban-sdk` |
 | `NO_SDK_FOUND` | info | No Stellar SDK dependency found |
 | `MANIFEST_UNPARSEABLE` | warning | A manifest or directory could not be read or parsed, so it was not checked |
 | `DATA_DEGRADED` | warning | Part of the ecosystem data could not be fetched or parsed |
 
 Version ranges that do not pin a major (`<21`, `a || b`) are reported as `*_UNKNOWN`, unless a lockfile pins the dependency (see below).
+
+### Toolchain checks
+
+Beyond the SDKs, kedgeway reads the toolchain a repo pins. Every finding carries the file and line it came from (`pinned in .github/workflows/ci.yml:23`), so annotations and SARIF point at it.
+
+- **Stellar CLI pins** (one finding per pin; nothing at all when the repo pins none): `cargo install ... stellar-cli --version X` (or `--tag X` for a git install), `cargo install stellar-cli@X`, `cargo binstall stellar-cli@X`, `stellar-cli@X`, `npm i -g @stellar/stellar-cli@X`, legacy `soroban-cli` installs (reported as a pin, with the evidence saying "legacy soroban-cli") and release-download URLs (`.../releases/download/vX/`, `stellar-cli-X-<triple>.tar.gz`) in `.github/workflows/*.yml|yaml`, `Dockerfile*`, `Makefile`, `*.sh` in the root and `scripts/`; the `version:` input of a `stellar/stellar-cli` action step (the action ref itself is not a CLI version); `stellar-cli X` in `.tool-versions`; and `@stellar/stellar-cli` in `package.json`. The pin is compared with the "Stellar CLI" row of the official [software versions](https://developers.stellar.org/docs/networks/software-versions) table by major: 2+ behind is `CLI_DEPRECATED`, one behind `CLI_BEHIND`, otherwise `CLI_CURRENT`; an unparseable pin (`main`, a CI expression) or an unavailable current version is `CLI_UNKNOWN`. A missing row raises `DATA_DEGRADED`. A cache written before this check existed is refetched; when it must be used anyway (`--offline`, or Raven down) a `DATA_DEGRADED` note says the CLI version is missing.
+- **Rust target**: `wasm32-unknown-unknown` is read from `rust-toolchain.toml` (`targets`), `.cargo/config.toml` (`[build] target`) and `rustup target add`, `--target`, `targets:` or `CARGO_BUILD_TARGET` lines in workflows, Dockerfiles, Makefiles and scripts. `RUST_TARGET_LEGACY` fires once per declaration site when a `soroban-sdk` dependency exists and `wasm32v1-none` is declared nowhere: Stellar CLI 23+ builds contracts for `wasm32v1-none`, so run `rustup target add wasm32v1-none`. When the declaring line also uses `wasm-pack`, `wasm-bindgen` or `trunk` (browser Wasm in a monorepo) it is reported as `info` instead of `warning`.
+- **Rust toolchain pin**: a numeric `channel` in `rust-toolchain.toml` (or a legacy `rust-toolchain` file; a host triple such as `1.81.0-x86_64-unknown-linux-gnu` is ignored) below 1.84.0 is `RUST_TOOLCHAIN_OLD` when a `soroban-sdk` dependency exists. The [setup guide](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup) requires Rust v1.84.0 or higher because the `wasm32v1-none` target is only available in recent versions. `stable` and `nightly` channels are not pins and are never reported.
+
+Only the command that installs the CLI counts: a `--version` belonging to another command on the same line (`&&`, `;`, `|`) is never read as a pin. Commented-out lines are ignored, backslash continuations are joined, lines longer than 8 KB are skipped, and the scan keeps the same depth and ignore rules as the manifest scan. `NO_SDK_FOUND` is unaffected: a repo with only a CLI pin gets `NO_SDK_FOUND` plus its `CLI_*` finding. `--fail-on` works as before, and `migrate` edits none of these files.
 
 ## Lockfile resolution
 
@@ -158,7 +174,7 @@ Invalid input gets a one-line error and the prompt repeats. A pasted URL is chec
 
 ## `kedgeway doctor`
 
-`kedgeway doctor` is a self-check that changes nothing: Node version (>= 22.12), auth state (`KEDGEWAY_AUTH` valid in the environment, `auth.json` with tokens, or none), the snapshot cache (path and age), and Raven reachability (one cheap non-interactive `search` call with a 10 s timeout, skipped with `--offline`; it uses a read-only copy of the credentials, so a token refresh cannot modify `auth.json`). It prints one line per check (`ok`, `warn`, `fail` or `skip`) and exits `1` if any check failed, `0` otherwise (warnings do not fail it).
+`kedgeway doctor` is a self-check that changes nothing: Node version (>= 22.12), auth state (`KEDGEWAY_AUTH` valid in the environment, `auth.json` with tokens, or none), the snapshot cache (path and age), and the Stellar CLI (`stellar --version`, run without a shell with a 5 s timeout, killed with SIGKILL and also bounded by doctor's own timer: not installed is a `warn` since it is optional; with a cached snapshot, the current major or newer is `ok`, one major behind `warn`, two or more `fail`; with `--offline` or no snapshot it is `ok` and only reports the installed version), and Raven reachability (one cheap non-interactive `search` call with a 10 s timeout, skipped with `--offline`; it uses a read-only copy of the credentials, so a token refresh cannot modify `auth.json`). It prints one line per check (`ok`, `warn`, `fail` or `skip`) and exits `1` if any check failed, `0` otherwise (warnings do not fail it).
 
 ## Snapshot cache and offline mode
 
@@ -215,7 +231,7 @@ ESM only (Node >= 22.12). The package `exports` map has no `default` or `require
 | Tool | Input | Returns |
 | ---- | ----- | ------- |
 | `diagnose` | `{ path, fixture?, failOn?, format? }` | a text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with `format: "sarif"` |
-| `findings_reference` | none | the 12 finding codes with severity, meaning and what `migrate` does for them |
+| `findings_reference` | none | the 18 finding codes with severity, meaning and what `migrate` does for them |
 | `migrate` | `{ path, fixture?, write? }` | summary including the guide, plan JSON and unified diff; dry run unless `write: true` |
 | `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
 
@@ -294,7 +310,7 @@ steps:
       sarif_file: ${{ steps.kedgeway.outputs.sarif }}
 ```
 
-The SARIF 2.1.0 log has one run for tool `kedgeway`, a rule per finding code (12) with `shortDescription`, `fullDescription` and a default level (`critical` is `error`, `warning` is `warning`, `info` is `note`), and one result per finding with `ruleId`, `level`, `message.text` and the repo-relative manifest path (`uriBaseId: "%SRCROOT%"`). Findings that are not about a file (`DATA_DEGRADED`, `NO_SDK_FOUND`) have no location. URIs are percent-encoded and relative to the directory you run from (resolved with realpath); `%SRCROOT%` is declared in `originalUriBaseIds` with a description only. If the scan path lies outside the working directory, URIs are absolute `file://` ones without a `uriBaseId`. Locally: `kedgeway diagnose . --sarif kedgeway.sarif`, `--format sarif`, or the MCP `diagnose` tool with `format: "sarif"`.
+The SARIF 2.1.0 log has one run for tool `kedgeway`, a rule per finding code (18) with `shortDescription`, `fullDescription` and a default level (`critical` is `error`, `warning` is `warning`, `info` is `note`), and one result per finding with `ruleId`, `level`, `message.text`, and the repo-relative path and line (`uriBaseId: "%SRCROOT%"`). Findings that are not about a file (`DATA_DEGRADED`, `NO_SDK_FOUND`) have no location. URIs are percent-encoded and relative to the directory you run from (resolved with realpath); `%SRCROOT%` is declared in `originalUriBaseIds` with a description only. If the scan path lies outside the working directory, URIs are absolute `file://` ones without a `uriBaseId`. Locally: `kedgeway diagnose . --sarif kedgeway.sarif`, `--format sarif`, or the MCP `diagnose` tool with `format: "sarif"`.
 
 ## CI
 

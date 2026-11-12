@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { runCli } from "./cli/commands.js";
+import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
+import { promisify } from "node:util";
 import { runDoctor } from "./adapters/doctor.js";
 import { SnapshotCache } from "./adapters/snapshot-cache.js";
 import { AuthStore, defaultAuthPath, exportAuth, readOnlyAuthStore } from "./adapters/raven-auth.js";
@@ -10,6 +12,8 @@ import { readLine } from "./adapters/stdin-prompt.js";
 import { runStdioServer } from "./mcp/server.js";
 import { createRavenEcosystem } from "./sdk.js";
 import { RavenEcosystem, loginToRaven, pingRaven } from "./adapters/raven-ecosystem.js";
+
+const run = promisify(execFile);
 
 const code = await runCli(process.argv, {
   stdout: (s) => void process.stdout.write(s),
@@ -33,6 +37,7 @@ const code = await runCli(process.argv, {
         authPath: defaultAuthPath(),
         cache: new SnapshotCache(),
         now: Date.now,
+        exec: (file, args, opts) => run(file, args, { timeout: opts.timeout, killSignal: "SIGKILL", windowsHide: true }), // execFile: never a shell
         ping: async () => pingRaven(await readOnlyAuthStore()), // read-only: a token refresh must not touch auth.json
       },
       opts,

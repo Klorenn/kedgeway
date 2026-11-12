@@ -59,6 +59,12 @@ const TITLE: Record<string, string> = {
   NO_SDK_FOUND: "No Stellar SDK dependency found",
   MANIFEST_UNPARSEABLE: "Manifest could not be parsed",
   DATA_DEGRADED: "Ecosystem data is degraded",
+  CLI_DEPRECATED: "Pinned Stellar CLI is on a deprecated major",
+  CLI_BEHIND: "Pinned Stellar CLI is one major behind",
+  CLI_CURRENT: "Pinned Stellar CLI is current",
+  CLI_UNKNOWN: "Pinned Stellar CLI version could not be judged",
+  RUST_TARGET_LEGACY: "Contracts target wasm32-unknown-unknown instead of wasm32v1-none",
+  RUST_TOOLCHAIN_OLD: "Pinned Rust toolchain is below the Stellar minimum",
 };
 
 const encodePath = (p: string): string => p.split("/").map(encodeURIComponent).join("/");
@@ -99,7 +105,7 @@ export function buildSarif(diagnosis: Diagnosis, opts: SarifOptions): SarifLog {
         opts.absoluteRootUri !== undefined
           ? { uri: `${opts.absoluteRootUri}${encodePath(f.file)}` }
           : { uri: encodePath(prefix === "" ? f.file : `${prefix}/${f.file}`), uriBaseId: "%SRCROOT%" as const };
-      result.locations = [{ physicalLocation: { artifactLocation, region: { startLine: 1 } } }];
+      result.locations = [{ physicalLocation: { artifactLocation, region: { startLine: Math.max(1, f.line ?? 1) } } }];
     }
     return result;
   });

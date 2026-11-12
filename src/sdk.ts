@@ -123,3 +123,4 @@ export function toAnnotations(detailed: Pick<DetailedDiagnosis, "facts" | "diagn
 }
 
 export { diagnoseRepo, scanRepo, planMigration, applyMigration };
+export type { CliPin, CliPinSource, RustTargetDecl, RustTargetName, RustToolchainPin, ToolchainFacts } from "./core/toolchain.js";

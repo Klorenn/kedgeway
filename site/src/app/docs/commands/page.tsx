@@ -75,6 +75,7 @@ kedgeway diagnose . --json > report.json`} />
         <li>Node version (22.12 or newer).</li>
         <li>Auth: a valid <code>KEDGEWAY_AUTH</code> in the environment, an <code>auth.json</code> with tokens, or none.</li>
         <li>Snapshot cache: path and age.</li>
+        <li>Stellar CLI: runs <code>stellar --version</code> without a shell (5 second timeout). Not installed is <code>warn</code>, since it is optional (<a href="https://developers.stellar.org/docs/tools/cli/install-cli">install guide</a>). With a cached snapshot, the current major or newer is <code>ok</code>, one major behind is <code>warn</code>, and two or more is <code>fail</code>. With <code>--offline</code> or no snapshot it is <code>ok</code> and only reports the installed version.</li>
         <li>Raven reachability: one cheap <code>search</code> call with a 10 second timeout. <code>--offline</code> skips it. It uses a read-only copy of your credentials, so a token refresh cannot modify <code>auth.json</code>.</li>
       </ul>
       <p>Exit 0 when nothing failed (warnings do not fail it), 1 when any check failed.</p>

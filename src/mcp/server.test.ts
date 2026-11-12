@@ -12,6 +12,7 @@ const snapshot: EcosystemSnapshot = {
   observedAt: "2026-11-11T00:00:00.000Z",
   sorobanSdk: { currentMajor: 28, currentVersion: "28.0.0", deprecatedVersions: ["21.0.0"], source: "fixture" },
   jsSdk: { currentVersion: "17.2.1", source: "fixture" },
+  stellarCli: { currentVersion: "28.1.0", source: "fake" },
   protocolCurrent: 29,
   degraded: [],
   notes: [],
@@ -104,10 +105,11 @@ describe("kedgeway MCP server", () => {
     expect(badSeverity.isError).toBe(true);
   });
 
-  it("findings_reference returns the 12 codes", async () => {
+  it("findings_reference returns the 18 codes (including the toolchain ones)", async () => {
     const res = await client.callTool({ name: "findings_reference", arguments: {} });
     const list = JSON.parse(texts(res)[0] ?? "") as { code: string; severity: string; meaning: string }[];
-    expect(list).toHaveLength(12);
+    expect(list).toHaveLength(18);
+    expect(list.map((f) => f.code)).toEqual(expect.arrayContaining(["CLI_DEPRECATED", "RUST_TARGET_LEGACY", "RUST_TOOLCHAIN_OLD"]));
     expect(list.find((f) => f.code === "SDK_DEPRECATED")?.severity).toBe("critical");
   });
 
@@ -117,6 +119,25 @@ describe("kedgeway MCP server", () => {
       ...snapshot,
       sorobanSdk: { ...snapshot.sorobanSdk },
     });
+  });
+
+  it("ecosystem_snapshot includes stellarCli", async () => {
+    const res = await client.callTool({ name: "ecosystem_snapshot", arguments: { fixture } });
+    expect((JSON.parse(texts(res)[0] ?? "") as EcosystemSnapshot).stellarCli).toEqual({ currentVersion: "28.1.0", source: "fake" });
+  });
+
+  it("diagnose exposes the toolchain findings and SARIF rules", async () => {
+    await mkdir(join(dir, "repo/.github/workflows"), { recursive: true });
+    await writeFile(join(dir, "repo/.github/workflows/ci.yml"), "steps:\n  - run: cargo install --locked stellar-cli --version 21.5.0\n  - run: rustup target add wasm32-unknown-unknown\n");
+    await writeFile(join(dir, "repo/rust-toolchain.toml"), '[toolchain]\nchannel = "1.79.0"\n');
+    const res = await client.callTool({ name: "diagnose", arguments: { path: join(dir, "repo"), fixture } });
+    const parsed = JSON.parse(texts(res)[1] ?? "") as { findings: { code: string; line?: number }[] };
+    const codes = parsed.findings.map((f) => f.code);
+    expect(codes).toEqual(expect.arrayContaining(["CLI_DEPRECATED", "RUST_TARGET_LEGACY", "RUST_TOOLCHAIN_OLD"]));
+    expect(parsed.findings.find((f) => f.code === "CLI_DEPRECATED")?.line).toBe(2);
+    const sarif = await client.callTool({ name: "diagnose", arguments: { path: join(dir, "repo"), fixture, format: "sarif" } });
+    const log = JSON.parse(texts(sarif)[1] ?? "") as { runs: { results: { ruleId: string }[] }[] };
+    expect(log.runs[0]?.results.map((r) => r.ruleId)).toEqual(expect.arrayContaining(["CLI_DEPRECATED", "RUST_TARGET_LEGACY"]));
   });
 
   it("ecosystem_snapshot surfaces a bad fixture as a tool error", async () => {

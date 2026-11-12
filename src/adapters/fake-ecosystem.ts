@@ -11,6 +11,9 @@ export const SnapshotSchema = z.object({
     source: z.string(),
   }),
   jsSdk: z.object({ currentVersion: z.string().nullable(), source: z.string() }),
+  stellarCli: z
+    .object({ currentVersion: z.string().nullable(), source: z.string() })
+    .default({ currentVersion: null, source: "fixture (field missing)" }),
   protocolCurrent: z.number().nullable().default(null),
   degraded: z.array(z.string()).default([]),
   notes: z.array(z.object({ title: z.string(), url: z.string(), snippet: z.string() })),

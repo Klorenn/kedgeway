@@ -96,6 +96,14 @@ soroban-sdk = { workspace = true }`} />
         <li><strong>Tested on real files.</strong> The parsers run against seven real lockfiles from public repositories (Cargo.lock v4, package-lock v3, pnpm-lock v9, yarn classic and berry). Repositories and commits are listed in <code>fixtures/lockfiles/SOURCES.md</code> in the kedgeway repo.</li>
       </ul>
 
+      <h2>Toolchain checks</h2>
+      <p>Beyond the SDKs, kedgeway reads the toolchain the repo pins. Every finding points at a file and line.</p>
+      <ul>
+        <li><strong>Stellar CLI pins.</strong> They are read from workflows (<code>cargo install ... --version X</code>, <code>stellar-cli@X</code>, and the <code>version:</code> input of the <code>stellar/stellar-cli</code> action), <code>Dockerfile*</code>, <code>Makefile</code>, shell scripts in the root and <code>scripts/</code>, <code>.tool-versions</code>, and <code>@stellar/stellar-cli</code> in <code>package.json</code>. Each pin is compared by major with the Stellar CLI version on the official <a href="https://developers.stellar.org/docs/networks/software-versions">software versions</a> page. Nothing is reported if the repo pins none.</li>
+        <li><strong>Rust target.</strong> If a repo with <code>soroban-sdk</code> declares <code>wasm32-unknown-unknown</code> (<code>rust-toolchain.toml</code>, <code>.cargo/config.toml</code>, workflows, Makefiles, scripts) and never <code>wasm32v1-none</code>, RUST_TARGET_LEGACY tells you to run <code>rustup target add wasm32v1-none</code>.</li>
+        <li><strong>Rust toolchain.</strong> A pinned Rust channel below 1.84.0 raises RUST_TOOLCHAIN_OLD, because the <a href="https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup">setup guide</a> requires Rust v1.84.0 or higher. <code>stable</code> and <code>nightly</code> are not pins.</li>
+      </ul>
+
       <PrevNext href="/docs/what-it-scans" />
     </>
   );

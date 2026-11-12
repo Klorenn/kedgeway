@@ -10,6 +10,10 @@
     "currentVersion": "17.2.1",
     "source": "fixture: official software-versions page, captured 2026-11-11"
   },
+  "stellarCli": {
+    "currentVersion": "28.1.0",
+    "source": "https://developers.stellar.org/docs/networks/software-versions (Software table, Stellar CLI row)"
+  },
   "protocolCurrent": 29,
   "degraded": [],
   "notes": []

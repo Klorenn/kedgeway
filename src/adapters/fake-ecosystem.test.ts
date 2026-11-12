@@ -9,6 +9,7 @@ const snap: EcosystemSnapshot = {
   observedAt: "2026-01-01T00:00:00.000Z",
   sorobanSdk: { currentMajor: 23, deprecatedVersions: [], source: "fixture" },
   jsSdk: { currentVersion: null, source: "fixture" },
+  stellarCli: { currentVersion: "28.1.0", source: "fake" },
   protocolCurrent: null,
   degraded: [],
   notes: [],
@@ -29,6 +30,19 @@ describe("FakeEcosystem", () => {
       expect(out.protocolCurrent).toBeNull();
       expect(out.degraded).toEqual([]);
       expect(out.sorobanSdk.currentVersion).toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("defaults stellarCli when a fixture omits it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "sd-fx-"));
+    try {
+      const f = join(dir, "old.json");
+      const { stellarCli: _c, ...old } = snap;
+      await writeFile(f, JSON.stringify(old));
+      const out = await (await loadFixture(f)).fetchSnapshot();
+      expect(out.stellarCli).toEqual({ currentVersion: null, source: "fixture (field missing)" });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

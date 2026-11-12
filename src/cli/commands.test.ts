@@ -13,6 +13,7 @@ const snapshot: EcosystemSnapshot = {
   observedAt: "2026-01-01T00:00:00.000Z",
   sorobanSdk: { currentMajor: 23, currentVersion: "23.0.0", deprecatedVersions: [], source: "fake" },
   jsSdk: { currentVersion: null, source: "fake" },
+  stellarCli: { currentVersion: "28.1.0", source: "fake" },
   protocolCurrent: null,
   degraded: [],
   notes: [],

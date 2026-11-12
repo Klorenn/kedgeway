@@ -9,10 +9,13 @@ import {
   type ManifestError,
   type RepoFacts,
 } from "../core/repo-facts.js";
+import { emptyToolchain, isEmptyToolchain, mergeToolchain, scanToolchainText, toolchainFileKind, type ToolchainFacts } from "../core/toolchain.js";
 import { lockfileHints, resolveLockfiles } from "./lockfile-resolver.js";
 
 const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", ".next", "vendor", "build", "coverage"]);
 const MAX_DEPTH = 4;
+/** Toolchain files larger than this are not read (they are not hand-written pins). */
+const MAX_TOOLCHAIN_FILE_BYTES = 1_000_000;
 
 async function walk(
   root: string,
@@ -51,6 +54,7 @@ export async function scanRepo(path: string): Promise<RepoFacts> {
   const manifests: { file: string; manifest: CargoManifest }[] = [];
   const jsDeps: DetectedDep[] = [];
   const manifestErrors: ManifestError[] = [];
+  const toolchainParts: ToolchainFacts[] = [];
   const fail = (file: string, message: string): void => void manifestErrors.push({ file, message });
 
   await walk(
@@ -59,14 +63,22 @@ export async function scanRepo(path: string): Promise<RepoFacts> {
     0,
     async (rel, abs) => {
       const base = rel.split("/").pop();
+      const kind = toolchainFileKind(rel);
       if (base === "Cargo.toml") {
         const manifest = parseCargoManifest(await readFile(abs, "utf8"));
         if (manifest.error) fail(rel, manifest.error);
         else manifests.push({ file: rel, manifest });
       } else if (base === "package.json") {
-        const r = parsePackageJsonDeps(await readFile(abs, "utf8"), rel);
+        const text = await readFile(abs, "utf8");
+        const r = parsePackageJsonDeps(text, rel);
         if (r.error) fail(rel, r.error);
-        else jsDeps.push(...r.deps);
+        else {
+          jsDeps.push(...r.deps);
+          toolchainParts.push(scanToolchainText(rel, text));
+        }
+      } else if (kind !== null) {
+        if ((await stat(abs)).size > MAX_TOOLCHAIN_FILE_BYTES) return;
+        toolchainParts.push(scanToolchainText(rel, await readFile(abs, "utf8")));
       }
     },
     (rel, e) => fail(rel, e instanceof Error ? e.message : String(e)),
@@ -74,5 +86,6 @@ export async function scanRepo(path: string): Promise<RepoFacts> {
 
   const facts = await resolveLockfiles(root, { root, rustDeps: resolveRustDeps(manifests), jsDeps, manifestErrors });
   const hints = await lockfileHints(root, facts);
-  return hints.length > 0 ? { ...facts, hints } : facts;
+  const toolchain = mergeToolchain(emptyToolchain(), ...toolchainParts);
+  return { ...facts, ...(isEmptyToolchain(toolchain) ? {} : { toolchain }), ...(hints.length > 0 ? { hints } : {}) };
 }

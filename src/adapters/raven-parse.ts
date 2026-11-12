@@ -8,21 +8,23 @@ export const EXECUTE_SCRIPT = `async () => {
     stellarDocs.search_docs({ query: "soroban sdk upgrade migration breaking changes release notes", hitsPerPage: 5 })
   ]);
   const degraded = [];
-  let rustSdk = null, jsSdk = null, protocol = null;
+  let rustSdk = null, jsSdk = null, stellarCli = null, protocol = null;
   if (page.ok) {
     const c = page.data.content;
     const rust = c.match(/\\|\\s*Smart Contract Rust SDK\\s*\\|\\s*\`v?([0-9]+\\.[0-9]+\\.[0-9]+)\`/);
     const js = c.match(/\\|\\s*Stellar JS Stellar SDK\\s*\\|\\s*\`v?([0-9]+\\.[0-9]+\\.[0-9]+)\`/);
+    const cli = c.match(/\\|\\s*Stellar CLI\\s*\\|\\s*\`v?([0-9]+\\.[0-9]+\\.[0-9]+)\`/);
     const proto = c.match(/Protocol\\s+([0-9]+)/);
-    rustSdk = rust ? rust[1] : null; jsSdk = js ? js[1] : null; protocol = proto ? Number(proto[1]) : null;
+    rustSdk = rust ? rust[1] : null; jsSdk = js ? js[1] : null; stellarCli = cli ? cli[1] : null; protocol = proto ? Number(proto[1]) : null;
     if (!rustSdk) degraded.push("software-versions: rust sdk row not found");
+    if (!stellarCli) degraded.push("software-versions: stellar cli row not found");
   } else degraded.push("stellarDocs.get_doc_page: " + page.error.message);
   const t = tc.ok ? tc.data.toolchain : null;
   if (!tc.ok) degraded.push("scout.analyzeEcosystem: " + tc.error.message);
   const deprecated = [...new Set((t?.deprecatedRepos || []).map(r => r.sorobanSdkVersion).filter(Boolean))];
   const hits = r => (r.ok && Array.isArray(r.data.hits)) ? r.data.hits.map(h => ({ title: h.title || "", url: h.url || "", snippet: (h.snippet || "").slice(0, 300) })) : [];
   if (!notes.ok) degraded.push("stellarDocs.search_docs: " + notes.error.message);
-  return { observedAt: new Date().toISOString(), rustSdkCurrent: rustSdk, jsSdkCurrent: jsSdk, protocolCurrent: protocol, deprecatedVersions: deprecated, scoutGeneratedAt: tc.ok ? (tc.data.meta?.generatedAt ?? null) : null, notes: hits(notes), degraded };
+  return { observedAt: new Date().toISOString(), rustSdkCurrent: rustSdk, jsSdkCurrent: jsSdk, stellarCliCurrent: stellarCli, protocolCurrent: protocol, deprecatedVersions: deprecated, scoutGeneratedAt: tc.ok ? (tc.data.meta?.generatedAt ?? null) : null, notes: hits(notes), degraded };
 }`;
 
 const FOOTER_MARKER = /^--- SOURCE METADATA ---/m;
@@ -78,6 +80,8 @@ export const RavenPayloadSchema = z.object({
   observedAt: z.string(),
   rustSdkCurrent: z.string().nullable(),
   jsSdkCurrent: z.string().nullable(),
+  /** Absent from payloads produced by older scripts. */
+  stellarCliCurrent: z.string().nullable().optional(),
   protocolCurrent: z.number().nullable(),
   deprecatedVersions: z.array(z.string()),
   scoutGeneratedAt: z.string().nullable().optional(),
@@ -107,8 +111,13 @@ export function snapshotFromPayload(p: RavenPayload): EcosystemSnapshot {
       currentVersion: p.jsSdkCurrent,
       source: "raven: stellarDocs.get_doc_page /docs/networks/software-versions",
     },
+    stellarCli: {
+      currentVersion: p.stellarCliCurrent === undefined || p.stellarCliCurrent === null ? null : p.stellarCliCurrent.replace(/^v/i, ""),
+      source: "raven: stellarDocs.get_doc_page /docs/networks/software-versions",
+    },
     protocolCurrent: p.protocolCurrent,
-    degraded: p.degraded,
+    degraded:
+      p.stellarCliCurrent === undefined ? [...p.degraded, "raven payload has no stellarCliCurrent (older script); Stellar CLI checks are unavailable"] : p.degraded,
     notes: p.notes.map((n) => ({ title: n.title ?? "", url: n.url ?? "", snippet: n.snippet ?? "" })),
   };
 }

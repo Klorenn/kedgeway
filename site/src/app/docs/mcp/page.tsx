@@ -20,7 +20,7 @@ export default function Page() {
           <thead><tr><th scope="col">Tool</th><th scope="col">Input</th><th scope="col">Returns</th></tr></thead>
           <tbody>
             <tr><th scope="row"><code>diagnose</code></th><td><code>{"{ path, fixture?, failOn?, format? }"}</code></td><td>A text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with <code>format: &quot;sarif&quot;</code>.</td></tr>
-            <tr><th scope="row"><code>findings_reference</code></th><td>none</td><td>The 12 finding codes with severity, meaning, and what <code>migrate</code> does for them.</td></tr>
+            <tr><th scope="row"><code>findings_reference</code></th><td>none</td><td>The 18 finding codes with severity, meaning, and what <code>migrate</code> does for them.</td></tr>
             <tr><th scope="row"><code>migrate</code></th><td><code>{"{ path, fixture?, write? }"}</code></td><td>Summary, including the guide, plus the plan JSON and a unified diff. A dry run unless <code>write: true</code>.</td></tr>
             <tr><th scope="row"><code>ecosystem_snapshot</code></th><td><code>{"{ fixture? }"}</code></td><td>The ecosystem snapshot: live via Raven unless a fixture is given.</td></tr>
           </tbody>

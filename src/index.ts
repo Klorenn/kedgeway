@@ -14,6 +14,12 @@ export {
   type DiagnoseOptions,
   type DetailedDiagnosis,
   type RavenOptions,
+  type CliPin,
+  type CliPinSource,
+  type RustTargetDecl,
+  type RustTargetName,
+  type RustToolchainPin,
+  type ToolchainFacts,
 } from "./sdk.js";
 export { FakeEcosystem, loadFixture } from "./adapters/fake-ecosystem.js";
 export { formatAnnotations } from "./core/annotations.js";

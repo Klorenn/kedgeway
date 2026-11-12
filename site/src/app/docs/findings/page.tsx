@@ -11,12 +11,12 @@ export default function Findings() {
     <>
       <h1>Findings</h1>
       <p className={styles.lede}>
-        Each finding has a severity, a code, the file it applies to, a message and the evidence behind it. There are twelve codes.
+        Each finding has a severity, a code, the file it applies to, a message and the evidence behind it. There are eighteen codes.
       </p>
       <ul>
-        <li><strong>critical:</strong> SDK_DEPRECATED, JS_SDK_DEPRECATED, JS_LEGACY_PACKAGE</li>
-        <li><strong>warning:</strong> SDK_BEHIND, JS_SDK_BEHIND, SDK_UNKNOWN, JS_SDK_UNKNOWN, MANIFEST_UNPARSEABLE, DATA_DEGRADED</li>
-        <li><strong>info:</strong> SDK_CURRENT, JS_SDK_CURRENT, NO_SDK_FOUND</li>
+        <li><strong>critical:</strong> SDK_DEPRECATED, JS_SDK_DEPRECATED, JS_LEGACY_PACKAGE, CLI_DEPRECATED</li>
+        <li><strong>warning:</strong> SDK_BEHIND, JS_SDK_BEHIND, SDK_UNKNOWN, JS_SDK_UNKNOWN, MANIFEST_UNPARSEABLE, DATA_DEGRADED, CLI_BEHIND, CLI_UNKNOWN, RUST_TARGET_LEGACY, RUST_TOOLCHAIN_OLD</li>
+        <li><strong>info:</strong> SDK_CURRENT, JS_SDK_CURRENT, NO_SDK_FOUND, CLI_CURRENT</li>
       </ul>
       <p>When a lockfile resolves a dependency, the evidence says so, for example <code>resolved 21.7.6 from Cargo.lock; manifest ^21</code>, and the comparison uses the resolved version. When the lockfile is ambiguous the manifest version is used and the evidence notes it. See <Link href="/docs/what-it-scans">What it scans</Link>.</p>
       <p>The JavaScript checks compare against the current <code>@stellar/stellar-sdk</code> release. <code>@stellar/stellar-base</code> is compared with that same release.</p>
@@ -126,6 +126,60 @@ export default function Findings() {
           <dt>Meaning</dt><dd>{"No soroban-sdk or Stellar JavaScript SDK dependency was detected in the scanned path."}</dd>
           <dt>Evidence shown</dt><dd><code>{"Scanned Cargo.toml and package.json files under <root>"}</code>{"."}</dd>
           <dt>What to do</dt><dd>{"Check the path. Folders such as node_modules and target are skipped, and the scan stops four levels down."}</dd>
+        </dl>
+      </section>
+      <section className={styles.finding} aria-labelledby="cli_deprecated">
+        <h2 id="cli_deprecated">CLI_DEPRECATED</h2>
+        <p className={styles.sev}>critical</p>
+        <dl className={styles.defs}>
+          <dt>Meaning</dt><dd>{"A pinned stellar-cli is two or more majors behind the current Stellar CLI. One finding per pin; nothing is reported when the repo pins none."}</dd>
+          <dt>Evidence shown</dt><dd>{"The pin and the file and line it came from, for example pinned in .github/workflows/ci.yml:23. The comparison uses the Stellar CLI version on the official software versions page."}</dd>
+          <dt>What to do</dt><dd>{"Upgrade the pin to the current Stellar CLI major."}</dd>
+        </dl>
+      </section>
+      <section className={styles.finding} aria-labelledby="cli_behind">
+        <h2 id="cli_behind">CLI_BEHIND</h2>
+        <p className={styles.sev}>warning</p>
+        <dl className={styles.defs}>
+          <dt>Meaning</dt><dd>{"A pinned stellar-cli is exactly one major behind the current Stellar CLI."}</dd>
+          <dt>Evidence shown</dt><dd>{"The pin and the file and line it came from, for example pinned in .github/workflows/ci.yml:23."}</dd>
+          <dt>What to do</dt><dd>{"Plan an upgrade to the current major."}</dd>
+        </dl>
+      </section>
+      <section className={styles.finding} aria-labelledby="cli_current">
+        <h2 id="cli_current">CLI_CURRENT</h2>
+        <p className={styles.sev}>info</p>
+        <dl className={styles.defs}>
+          <dt>Meaning</dt><dd>{"A pinned stellar-cli is on the current major (or newer)."}</dd>
+          <dt>Evidence shown</dt><dd>{"The pin and the file and line it came from, for example pinned in .github/workflows/ci.yml:23."}</dd>
+          <dt>What to do</dt><dd>{"Nothing."}</dd>
+        </dl>
+      </section>
+      <section className={styles.finding} aria-labelledby="cli_unknown">
+        <h2 id="cli_unknown">CLI_UNKNOWN</h2>
+        <p className={styles.sev}>warning</p>
+        <dl className={styles.defs}>
+          <dt>Meaning</dt><dd>{"A stellar-cli pin exists but its version is unparseable (for example a branch name or a CI expression), or the current Stellar CLI version is unavailable, so no verdict is made."}</dd>
+          <dt>Evidence shown</dt><dd>{"The pin and the file and line it came from, for example pinned in .github/workflows/ci.yml:23."}</dd>
+          <dt>What to do</dt><dd>{"Pin a plain version, or look for DATA_DEGRADED and run again."}</dd>
+        </dl>
+      </section>
+      <section className={styles.finding} aria-labelledby="rust_target_legacy">
+        <h2 id="rust_target_legacy">RUST_TARGET_LEGACY</h2>
+        <p className={styles.sev}>warning</p>
+        <dl className={styles.defs}>
+          <dt>Meaning</dt><dd>{"wasm32-unknown-unknown is declared in a repo with soroban-sdk and no wasm32v1-none. Stellar CLI 23+ builds for wasm32v1-none. One finding per declaration site."}</dd>
+          <dt>Evidence shown</dt><dd>{"The declaring file and line, such as rust-toolchain.toml, .cargo/config.toml, a workflow, a Makefile or a script."}</dd>
+          <dt>What to do</dt><dd>{"Run rustup target add wasm32v1-none and declare it where the legacy target is declared."}</dd>
+        </dl>
+      </section>
+      <section className={styles.finding} aria-labelledby="rust_toolchain_old">
+        <h2 id="rust_toolchain_old">RUST_TOOLCHAIN_OLD</h2>
+        <p className={styles.sev}>warning</p>
+        <dl className={styles.defs}>
+          <dt>Meaning</dt><dd>{"A pinned Rust channel is below 1.84.0 in a repo with soroban-sdk. The setup guide requires Rust v1.84.0 or higher. stable and nightly are not pins."}</dd>
+          <dt>Evidence shown</dt><dd>{"The pinned channel and the file and line it came from."}</dd>
+          <dt>What to do</dt><dd>{"Raise the pinned channel to 1.84.0 or higher."}</dd>
         </dl>
       </section>
       <PrevNext href="/docs/findings" />
