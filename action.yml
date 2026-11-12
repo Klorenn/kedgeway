@@ -1,0 +1,69 @@
+name: kedgeway
+description: Diagnose how outdated a Stellar/Soroban repo's SDK versions are.
+author: Klorenn
+branding:
+  icon: anchor
+  color: blue
+
+inputs:
+  path:
+    description: Directory to scan.
+    required: false
+    default: "."
+  fail-on:
+    description: Fail the step if any finding is at or above this severity (critical, warning or info). Empty disables.
+    required: false
+    default: warning
+  fixture:
+    description: Path to an ecosystem snapshot JSON. Required for now (OAuth in CI is not supported yet).
+    required: false
+    default: ""
+  json:
+    description: Print the report as JSON instead of text ("true" or "false").
+    required: false
+    default: "false"
+
+outputs:
+  summary:
+    description: Finding counts, e.g. "critical=0 warning=1 info=2".
+    value: ${{ steps.run.outputs.summary }}
+  report-json:
+    description: Path to the JSON report written under RUNNER_TEMP.
+    value: ${{ steps.run.outputs.report-json }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Build kedgeway
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci && npm run build
+
+    - name: Run kedgeway diagnose
+      id: run
+      shell: bash
+      env:
+        KW_PATH: ${{ inputs.path }}
+        KW_FAIL_ON: ${{ inputs.fail-on }}
+        KW_FIXTURE: ${{ inputs.fixture }}
+        KW_JSON: ${{ inputs.json }}
+        KW_CLI: ${{ github.action_path }}/dist/cli.js
+      run: |
+        set -euo pipefail
+        if [ -z "$KW_FIXTURE" ]; then
+          echo "::error title=kedgeway::OAuth in CI isn't supported yet. Set the 'fixture' input to a committed ecosystem snapshot JSON (see the README, GitHub Action section)."
+          exit 1
+        fi
+        report="$RUNNER_TEMP/kedgeway-report.json"
+        node "$KW_CLI" diagnose "$KW_PATH" --json --fixture "$KW_FIXTURE" > "$report"
+        summary=$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const s=d.summary;console.log("critical="+s.critical+" warning="+s.warning+" info="+s.info)' "$report")
+        echo "summary=$summary" >> "$GITHUB_OUTPUT"
+        echo "report-json=$report" >> "$GITHUB_OUTPUT"
+        args=(diagnose "$KW_PATH" --fixture "$KW_FIXTURE")
+        if [ "$KW_JSON" = "true" ]; then args+=(--json); fi
+        if [ -n "$KW_FAIL_ON" ]; then args+=(--fail-on "$KW_FAIL_ON"); fi
+        node "$KW_CLI" "${args[@]}"

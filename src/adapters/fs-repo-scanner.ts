@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   parseCargoManifest,
@@ -45,6 +45,8 @@ async function walk(
 
 export async function scanRepo(path: string): Promise<RepoFacts> {
   const root = resolve(path);
+  const info = await stat(root); // rejects with ENOENT (including the path) if missing
+  if (!info.isDirectory()) throw new Error(`${root} is not a directory`);
   const manifests: { file: string; manifest: CargoManifest }[] = [];
   const jsDeps: DetectedDep[] = [];
   const manifestErrors: ManifestError[] = [];

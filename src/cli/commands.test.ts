@@ -26,13 +26,17 @@ afterEach(async () => {
 function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
   const out: string[] = [];
   const err: string[] = [];
-  const state = { loggedIn: 0, loggedOut: 0 };
+  const state = { loggedIn: 0, loggedOut: 0, mcpStarted: 0 };
   const io: CliIo = {
     stdout: (s) => out.push(s),
     stderr: (s) => err.push(s),
     createRavenPort: () => port,
     login: () => {
       state.loggedIn += 1;
+      return Promise.resolve();
+    },
+    startMcp: () => {
+      state.mcpStarted += 1;
       return Promise.resolve();
     },
     logout: () => {
@@ -133,5 +137,21 @@ describe("login / logout", () => {
     expect(await runCli(argv("logout"), io)).toBe(0);
     expect(state.loggedOut).toBe(1);
     expect(out.join("")).toMatch(/logged out/i);
+  });
+});
+
+describe("mcp", () => {
+  it("starts the stdio MCP server", async () => {
+    const { io, state, out } = makeIo();
+    expect(await runCli(argv("mcp"), io)).toBe(0);
+    expect(state.mcpStarted).toBe(1);
+    expect(out.join("")).toBe(""); // stdout is reserved for the MCP protocol
+  });
+
+  it("exits 1 when the server fails to start", async () => {
+    const { io, err } = makeIo();
+    io.startMcp = () => Promise.reject(new Error("nope"));
+    expect(await runCli(argv("mcp"), io)).toBe(1);
+    expect(err.join("")).toContain("nope");
   });
 });

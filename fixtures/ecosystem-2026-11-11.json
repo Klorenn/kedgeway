@@ -1,0 +1,15 @@
+{
+  "observedAt": "2026-11-11T00:00:00.000Z",
+  "sorobanSdk": {
+    "currentMajor": 28,
+    "deprecatedVersions": ["21.0.0", "20.0.0", "22.0.1"],
+    "source": "fixture: official software-versions page (current) + Scout deprecated sample, captured 2026-11-11"
+  },
+  "jsSdk": {
+    "currentVersion": "17.2.1",
+    "source": "fixture: official software-versions page, captured 2026-11-11"
+  },
+  "protocolCurrent": 29,
+  "degraded": [],
+  "notes": []
+}

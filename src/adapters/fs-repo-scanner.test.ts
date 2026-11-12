@@ -24,6 +24,12 @@ describe("scanRepo", () => {
     expect(facts).toEqual({ root: dir, rustDeps: [], jsDeps: [], manifestErrors: [] });
   });
 
+  it("throws when the path does not exist or is not a directory", async () => {
+    await expect(scanRepo(join(dir, "nope"))).rejects.toThrow(/nope/);
+    await put("file.txt", "x");
+    await expect(scanRepo(join(dir, "file.txt"))).rejects.toThrow(/not a directory/i);
+  });
+
   it("detects string, table and dev-dependency forms with relative paths", async () => {
     await put("a/Cargo.toml", `[dependencies]\nsoroban-sdk = "21.0.0"\n`);
     await put(

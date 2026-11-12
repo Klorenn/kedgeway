@@ -50,6 +50,7 @@ kedgeway diagnose [path]                      # human-readable report
 kedgeway diagnose . --json                    # Diagnosis as JSON
 kedgeway diagnose . --fail-on warning         # exit 2 on any finding >= warning
 kedgeway diagnose . --fixture snapshot.json   # offline, no Raven
+kedgeway mcp                                  # MCP server over stdio
 ```
 
 Raven is OAuth-protected. Each run tries stored credentials silently; only on a 401 does it open the browser (authorization code + PKCE). Credentials live in `~/.config/kedgeway/auth.json` (mode 0600).
@@ -90,6 +91,61 @@ kedgeway detects `soroban-sdk` in every `Cargo.toml` (string and table forms, re
 | `DATA_DEGRADED` | warning | Part of the ecosystem data could not be fetched or parsed |
 
 Version ranges that do not pin a major (`<21`, `a || b`) are reported as `*_UNKNOWN`.
+
+## Library (TypeScript SDK)
+
+```ts
+import { diagnose, FakeEcosystem, createRavenEcosystem } from "kedgeway";
+
+const diagnosis = await diagnose({ path: ".", ecosystem: createRavenEcosystem() });
+// or offline: await diagnose({ path: ".", fixture: "snapshot.json" });
+```
+
+Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`.
+
+## MCP server
+
+`kedgeway mcp` runs an MCP server over stdio, so an AI assistant can diagnose a repo directly. Tools:
+
+| Tool | Input | Returns |
+| ---- | ----- | ------- |
+| `diagnose` | `{ path, fixture?, failOn? }` | a text summary and the Diagnosis JSON |
+| `findings_reference` | none | the 12 finding codes with severity and meaning |
+| `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
+
+Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "kedgeway": { "command": "kedgeway", "args": ["mcp"] }
+  }
+}
+```
+
+On first live use Raven's authorization URL is printed to stderr (stdout is reserved for the protocol); run `kedgeway login` once beforehand to avoid that.
+
+## GitHub Action
+
+```yaml
+- uses: actions/checkout@v4
+- uses: Klorenn/kedgeway@main
+  with:
+    path: .
+    fail-on: warning
+    fixture: fixtures/ecosystem-2026-11-11.json
+```
+
+| Input | Default | Meaning |
+| ----- | ------- | ------- |
+| `path` | `.` | directory to scan |
+| `fail-on` | `warning` | fail on any finding at or above this severity; empty disables |
+| `fixture` | none | ecosystem snapshot JSON (required for now) |
+| `json` | `false` | print JSON instead of text |
+
+Outputs: `summary` (`critical=0 warning=1 info=2`) and `report-json` (path to the JSON report under `RUNNER_TEMP`).
+
+OAuth in CI isn't supported yet, so without `fixture` the action fails fast with a clear message. Commit a snapshot (see `fixtures/ecosystem-2026-11-11.json` for the shape) and refresh it from a machine where you are logged in.
 
 ## CI
 

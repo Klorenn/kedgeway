@@ -1,8 +1,7 @@
 import { Command, CommanderError } from "commander";
-import { diagnose, SEVERITY_RANK, type Diagnosis, type Severity } from "../core/diagnose.js";
+import { SEVERITY_RANK, type Diagnosis, type Severity } from "../core/diagnose.js";
 import type { RepoFacts } from "../core/repo-facts.js";
-import { scanRepo } from "../adapters/fs-repo-scanner.js";
-import { loadFixture } from "../adapters/fake-ecosystem.js";
+import { diagnoseDetailed } from "../sdk.js";
 import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 
 export interface CliIo {
@@ -11,6 +10,8 @@ export interface CliIo {
   createRavenPort: () => EcosystemPort;
   login: () => Promise<void>;
   logout: () => Promise<boolean>;
+  /** Runs the stdio MCP server until the client disconnects. */
+  startMcp: () => Promise<void>;
 }
 
 interface DiagnoseOptions {
@@ -48,10 +49,10 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
   }
   const threshold = opts.failOn as Severity | undefined;
   try {
-    const facts = await scanRepo(path);
-    const port = opts.fixture ? await loadFixture(opts.fixture) : io.createRavenPort();
-    const snapshot = await port.fetchSnapshot();
-    const diagnosis = diagnose(facts, snapshot);
+    const { facts, snapshot, diagnosis } = await diagnoseDetailed({
+      path,
+      ...(opts.fixture ? { fixture: opts.fixture } : { ecosystem: io.createRavenPort() }),
+    });
     io.stdout(opts.json ? `${JSON.stringify(diagnosis, null, 2)}\n` : formatReport(facts, snapshot, diagnosis));
     if (threshold && diagnosis.findings.some((f) => SEVERITY_RANK[f.severity] >= SEVERITY_RANK[threshold])) {
       return 2;
@@ -89,6 +90,18 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       try {
         await io.login();
         io.stdout("Logged in to Stellar Raven.\n");
+      } catch (e) {
+        io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
+        exitCode = 1;
+      }
+    });
+
+  program
+    .command("mcp")
+    .description("Run the kedgeway MCP server over stdio")
+    .action(async () => {
+      try {
+        await io.startMcp();
       } catch (e) {
         io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
         exitCode = 1;

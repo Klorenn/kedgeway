@@ -1,0 +1,29 @@
+name: self-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  action:
+    name: run the action on this repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: kedgeway
+        uses: ./
+        with:
+          path: .
+          fail-on: warning
+          fixture: fixtures/ecosystem-2026-11-11.json
+      - name: Check outputs
+        env:
+          SUMMARY: ${{ steps.kedgeway.outputs.summary }}
+          REPORT: ${{ steps.kedgeway.outputs.report-json }}
+        run: |
+          echo "summary: $SUMMARY"
+          test -s "$REPORT"
