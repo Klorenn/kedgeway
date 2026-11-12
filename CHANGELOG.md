@@ -6,12 +6,23 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Added
 
+- feat(migrate): `kedgeway migrate` leads with a guide: published version, protocol, observation time, numbered steps, and up to 20 import sites for `soroban-client` and unscoped `stellar-sdk`. Raven doc hits are cited only when the title or url is a migration document. SDK: `buildGuide`, `formatGuide`, `migrationDocs`, `findImportHits`. The edits are still version strings only.
 - feat(lockfile): `Cargo.lock`, `package-lock.json` (v1/v2/v3), `pnpm-lock.yaml` and `yarn.lock` (classic and berry) resolution of the DIRECT dependency (Cargo: the entry satisfying the manifest requirement, else `ambiguous in Cargo.lock`; pnpm: the importer's entry; yarn: the `name@range` descriptor). `DetectedDep` gains `resolved`, `resolvedFrom` and an optional `lockNote`; diagnosis compares `resolved ?? version` and evidence names the lockfile (`resolved 21.7.6 from Cargo.lock; manifest ^21`). `migrate` still edits manifests only; when the manifest already allows the current major but the lock is older it emits a "refresh the lockfile" manual step and always notes touched lockfiles. The text report hints at a lockfile above the scan root.
 - feat(cache): the ecosystem snapshot is cached at `$XDG_CACHE_HOME/kedgeway/snapshot.json` (mode 0600, exclusive temp file, directory 0700); degraded snapshots are never cached and cached degraded or future-dated snapshots count as stale. `diagnose` and `migrate` gain `--offline`, `--no-cache` and `--max-age <duration>` (default `24h`; `--offline --no-cache` is rejected; `--offline` is ignored with `--fixture`); a failed Raven fetch falls back to the cache, and stale or fallback snapshots raise `DATA_DEGRADED`.
 - feat(auth): `kedgeway login --export` prints the stored credentials as a base64 blob for CI. The `KEDGEWAY_AUTH` environment variable (base64 or base64url, whitespace tolerated) replaces `auth.json`, is never written to disk and refreshes in memory only. Caveat: if Raven rotates refresh tokens the secret can go stale and must be re-exported (see SECURITY.md). `login --export` never removes stored credentials.
 - feat(action): new `auth` input (secret, sets `KEDGEWAY_AUTH`); the action now requires `fixture` or `auth` and names both when neither is set.
 - feat(sarif): `kedgeway diagnose --sarif <file>` writes SARIF 2.1.0 with the 12 finding codes as rules; `diagnose --format <text|json|sarif>` chooses stdout (`--json` stays, and conflicts with `--format`). URIs are percent-encoded, realpath-relative, with absolute `file://` URIs outside the working directory. Action input `sarif` and output `sarif` (`$RUNNER_TEMP/kedgeway.sarif`); MCP `diagnose` accepts `format: "sarif"`. SDK: `buildSarif`, `toSarif`, `SnapshotCache`, `CachingEcosystem`.
 - docs: README sections for lockfile resolution, the snapshot cache, CI authentication and SARIF; SECURITY.md notes the scope and rotation of the exported token.
+
+- test(lockfile): real-lockfile corpus (`fixtures/lockfiles/`, sources and commits in `SOURCES.md`) for Cargo.lock v4, package-lock v3, pnpm-lock v9 and yarn classic and berry; `src/core/lockfile.corpus.test.ts` asserts the resolved direct dependency from each.
+- feat(lockfile): JS ranges are matched with the `semver` package (hyphen ranges, `||`, x-ranges, npm prerelease rules); Cargo keeps a custom matcher. New runtime dependency: `semver`.
+- feat(auth): `kedgeway login --no-browser` prints the authorization URL and accepts the redirect URL or code on stdin: invalid input is rejected with a one-line error and the prompt repeats; the OAuth state is checked for pasted URLs only (a bare code carries none) and the check fails closed; with no TTY on stdin pasting is disabled and only the callback can finish the login; document the `ssh -L` port-forward trick. Combines with `--export`.
+- feat(annotations): `diagnose --format annotations` and `--annotations <file>` emit GitHub `::error`/`::warning`/`::notice` commands with the manifest file and line (`DetectedDep.line`, `Finding.line`); action input `annotations`, on by default when `GITHUB_ACTIONS=true`. SDK: `toAnnotations`, `formatAnnotations`.
+- feat(doctor): `kedgeway doctor` checks Node, auth state, cache path and age, and Raven reachability (one `search` call with a 10 s timeout, skipped with `--offline`, run with a read-only auth store so a token refresh cannot touch `auth.json`); exits 1 when a check fails.
+
+### Fixed
+
+- `package.json` aliases such as `"stellar-sdk": "npm:@stellar/stellar-sdk@17.4.0"` are read as the real `@stellar/stellar-sdk` instead of being reported as the legacy `stellar-sdk` package (found in the stellar/freighter manifest while building the corpus); `migrate` edits the aliased member (`DetectedDep.declaredKey` / `declaredRaw`). Manifest lines now come from the span-aware JSON scanner, so `overrides.dependencies` cannot win; the action sanitises finding text before printing it so it cannot inject workflow commands.
 
 ### Changed
 
@@ -49,5 +60,7 @@ All notable changes to this project are documented here. The format is based on 
 - Open-source scaffolding: license, contributing guide, code of conduct, security policy, CI and release workflows, issue and PR templates.
 
 ### Known
+
+- No device-flow login: Stellar Raven's OAuth metadata (`/.well-known/oauth-authorization-server`, checked 2026-11-11) advertises only the `authorization_code` and `refresh_token` grants and no `device_authorization_endpoint`, so headless login uses `login --no-browser` instead. Revisit if Raven adds RFC 8628.
 
 - The GitHub Action builds kedgeway from source on every run until built `dist/` is committed on release tags; pin a tag (`@v0.1.0`) rather than `@main`.

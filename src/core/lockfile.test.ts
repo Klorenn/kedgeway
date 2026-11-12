@@ -54,6 +54,30 @@ describe("satisfies (npm: bare means exact)", () => {
   });
 });
 
+describe("satisfies (npm ranges via semver)", () => {
+  it.each([
+    ["1.5.0", "1.2.3 - 2.3.4", true],
+    ["2.4.0", "1.2.3 - 2.3.4", false],
+    ["2.3.9", "1.2.3 - 2.3", true],
+    ["13.1.0", "^12 || ^13", true],
+    ["14.0.0", "^12 || ^13", false],
+    ["12.4.1", "12.x", true],
+    ["12.4.1", "12.4.X", true],
+    ["13.0.0", "12.x", false],
+    ["1.2.3", "*", true],
+    ["1.2.3", "", true],
+    ["1.2.4", ">=1.2.3 <1.3.0", true],
+    ["1.3.0", ">=1.2.3 <1.3.0", false],
+    ["1.2.3-beta.2", "^1.2.3-beta.1", true],
+    ["1.2.4-beta.1", "^1.2.3", false], // prerelease of a higher tuple never satisfies a plain range
+    ["2.0.0-rc.1", "^2.0.0", false],
+    ["2.0.0-rc.1", ">=2.0.0-rc.0", true],
+    ["1.0.0", "not a range", false],
+  ])("%s vs %j", (v, range, expected) => {
+    expect(satisfies(v, range, "exact")).toBe(expected);
+  });
+});
+
 describe("Cargo.lock", () => {
   const lock = `version = 3
 

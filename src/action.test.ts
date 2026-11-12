@@ -26,7 +26,7 @@ describe("committed ecosystem fixture", () => {
 describe("action.yml", () => {
   it("declares the documented inputs and outputs and delegates to the run script", async () => {
     const y = await readFile(resolve(root, "action.yml"), "utf8");
-    for (const key of ["path:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:"]) {
+    for (const key of ["path:", "fail-on:", "fixture:", "json:", "auth:", "sarif:", "annotations:", "summary:", "report-json:", "KW_AUTH:", "KW_SARIF:", "KW_ANNOTATIONS:"]) {
       expect(y).toContain(key);
     }
     expect(y).toContain("using: composite");
@@ -54,6 +54,8 @@ const a = process.argv.slice(2);
 writeFileSync(${JSON.stringify(join(tmp, "call.json"))}, JSON.stringify({ args: a, auth: process.env.KEDGEWAY_AUTH ?? null }));
 const i = a.indexOf("--sarif");
 if (i !== -1) writeFileSync(a[i + 1], "{}");
+const j = a.indexOf("--annotations");
+if (j !== -1) writeFileSync(a[j + 1], "::error file=Cargo.toml,line=2,title=SDK_BEHIND::stub annotation\\n");
 console.log(${JSON.stringify(json)});
 process.exit(${code});
 `,
@@ -115,6 +117,39 @@ process.exit(${code});
     expect(r.code).toBe(2);
     expect((await call()).args).toEqual(expect.arrayContaining(["--sarif", join(tmp, "kedgeway.sarif")]));
     expect(r.outputs).toContain(`sarif=${join(tmp, "kedgeway.sarif")}`);
+  });
+
+  it("annotates by default inside GitHub Actions, printing annotations before the report", async () => {
+    const cli = await stubCli(report, 2);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "warning", KW_JSON: "false", KW_CLI: cli, GITHUB_ACTIONS: "true" });
+    expect((await call()).args).toEqual(expect.arrayContaining(["--annotations", join(tmp, "kedgeway-annotations.txt")]));
+    expect(r.out.indexOf("::error file=Cargo.toml")).toBeGreaterThanOrEqual(0);
+    expect(r.out.indexOf("::error file=Cargo.toml")).toBeLessThan(r.out.indexOf("Summary:"));
+  });
+
+  it("annotations: false overrides the Actions default, true works outside Actions", async () => {
+    const cli = await stubCli(report, 0);
+    await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "false", KW_ANNOTATIONS: "false", KW_CLI: cli, GITHUB_ACTIONS: "true" });
+    expect((await call()).args).not.toContain("--annotations");
+    await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "false", KW_ANNOTATIONS: "true", KW_CLI: cli });
+    expect((await call()).args).toContain("--annotations");
+  });
+
+  it("does not annotate outside Actions by default", async () => {
+    const cli = await stubCli(report, 0);
+    await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "false", KW_CLI: cli });
+    expect((await call()).args).not.toContain("--annotations");
+  });
+
+  it("cannot be tricked into emitting workflow commands from untrusted finding text", async () => {
+    const evil = JSON.stringify({
+      findings: [{ severity: "warning", code: "SDK_BEHIND", file: "::error::pwn-file", message: "line one\n::error file=x::injected\r::warning::also", evidence: "e" }],
+      summary: { critical: 0, warning: 1, info: 0 },
+    });
+    const cli = await stubCli(evil, 0);
+    const r = await run({ KW_PATH: ".", KW_FIXTURE: "fx.json", KW_FAIL_ON: "", KW_JSON: "false", KW_CLI: cli });
+    expect(r.out).toContain("injected");
+    for (const line of r.out.split(/\r?\n|\r/)) expect(line.startsWith("::")).toBe(false);
   });
 
   it("does not ask for SARIF by default", async () => {

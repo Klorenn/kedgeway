@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs `kedgeway diagnose` exactly once and exposes the results as step outputs.
-# Inputs come from the environment (set by action.yml): KW_PATH, KW_FAIL_ON, KW_FIXTURE, KW_AUTH, KW_JSON, KW_SARIF, KW_CLI.
+# Inputs come from the environment (set by action.yml): KW_PATH, KW_FAIL_ON, KW_FIXTURE, KW_AUTH, KW_JSON, KW_SARIF, KW_ANNOTATIONS, KW_CLI.
 set -uo pipefail
 
 if [ -z "${KW_FIXTURE:-}" ] && [ -z "${KW_AUTH:-}" ]; then
@@ -9,7 +9,12 @@ if [ -z "${KW_FIXTURE:-}" ] && [ -z "${KW_AUTH:-}" ]; then
 fi
 
 report="${RUNNER_TEMP:?RUNNER_TEMP is required}/kedgeway-report.json"
+annotations_file=""
+if [ "${KW_ANNOTATIONS:-}" = "true" ] || { [ -z "${KW_ANNOTATIONS:-}" ] && [ "${GITHUB_ACTIONS:-}" = "true" ]; }; then
+  annotations_file="${RUNNER_TEMP:?RUNNER_TEMP is required}/kedgeway-annotations.txt"
+fi
 args=(diagnose "${KW_PATH:-.}" --json)
+if [ -n "$annotations_file" ]; then args+=(--annotations "$annotations_file"); fi
 if [ -n "${KW_FIXTURE:-}" ]; then
   args+=(--fixture "$KW_FIXTURE") # offline: the auth secret is not needed, so it is not exported
 else
@@ -37,9 +42,14 @@ summary=$(node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1]
   if [ -n "$sarif" ] && [ -f "$sarif" ]; then echo "sarif=$sarif"; fi
 } >> "${GITHUB_OUTPUT:?GITHUB_OUTPUT is required}"
 
+# Workflow commands go to stdout first so the runner turns them into annotations.
+if [ -n "$annotations_file" ] && [ -s "$annotations_file" ]; then cat "$annotations_file"; fi
+
 if [ "${KW_JSON:-false}" = "true" ]; then
   cat "$report"
 else
-  node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));for(const f of d.findings){console.log("["+f.severity.toUpperCase()+"] "+f.code+"  "+f.file+"\n  "+f.message)}console.log("\nSummary: "+process.argv[2])' "$report" "$summary"
+  # Finding text is untrusted (it can contain manifest-derived strings): keep it on one line per field and make
+  # sure no output line starts with "::" so it can never be read as a workflow command.
+  node -e 'const d=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const c=s=>String(s).replace(/[\r\n]+/g," ");const out=[];for(const f of d.findings){out.push("["+c(f.severity).toUpperCase()+"] "+c(f.code)+"  "+c(f.file));out.push("  "+c(f.message))}out.push("","Summary: "+process.argv[2]);console.log(out.map(l=>l.startsWith("::")?" "+l:l).join("\n"))' "$report" "$summary"
 fi
 exit "$code"

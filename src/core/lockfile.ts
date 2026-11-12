@@ -1,4 +1,5 @@
 import { parse as parseToml } from "smol-toml";
+import semver from "semver";
 
 export type LockfileKind = "Cargo.lock" | "package-lock.json" | "pnpm-lock.yaml" | "yarn.lock";
 
@@ -112,11 +113,15 @@ function matchesComparator(v: Triple, op: string, p: Partial3, bare: "caret" | "
 }
 
 /**
- * Does `version` satisfy the requirement `range`? Handles `^ ~ = >= > <= <`, wildcards, partial versions,
- * comma or space separated comparators and `||`. `bare` is what a plain `1.2.3` means: Cargo reads it as a
- * caret requirement, npm as an exact version. Prerelease tags on the candidate are ignored.
+ * Does `version` satisfy the requirement `range`?
+ * - `bare: "exact"` is npm: delegated to `semver.satisfies` (hyphen ranges, `||`, x-ranges). Prerelease candidates
+ *   follow npm rules (a prerelease only satisfies a range that names a prerelease of the same major.minor.patch;
+ *   no `includePrerelease`).
+ * - `bare: "caret"` is Cargo: custom (a plain `1.2.3` is `^1.2.3`; `^ ~ = >= > <= <`, `*`, wildcards, comma
+ *   separated comparators). Prerelease tags on the candidate are ignored.
  */
 export function satisfies(version: string, range: string, bare: "caret" | "exact"): boolean {
+  if (bare === "exact") return semver.satisfies(version, range);
   const vm = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
   if (!vm) return false;
   const v: Triple = [Number(vm[1]), Number(vm[2]), Number(vm[3])];

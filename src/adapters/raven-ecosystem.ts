@@ -8,7 +8,9 @@ import {
   FileOAuthProvider,
   MemoryAuthStore,
   defaultAuthStore,
+  describeAuthUrl,
   openInBrowser,
+  parseAuthorizationInput,
   startCallbackServer,
   type BrowserOpener,
 } from "./raven-auth.js";
@@ -18,6 +20,8 @@ export const RAVEN_URL = "https://raven.stellar.org/mcp";
 
 export interface RavenSession {
   execute(code: string): Promise<string>;
+  /** One ranked `search` call (used by `kedgeway doctor` as a cheap reachability probe). */
+  search(query: string): Promise<string>;
   close(): Promise<void>;
 }
 
@@ -43,7 +47,7 @@ export interface TransportLike {
 
 export interface ClientLike {
   connect(transport: TransportLike): Promise<void>;
-  callTool(params: { name: string; arguments: { code: string } }): Promise<object>;
+  callTool(params: { name: string; arguments: Record<string, unknown> }): Promise<object>;
   close(): Promise<void>;
 }
 
@@ -75,6 +79,7 @@ const noopOpen: BrowserOpener = () => Promise.resolve();
 function toSession(client: ClientLike): RavenSession {
   return {
     execute: async (code) => textFromToolResult(await client.callTool({ name: "execute", arguments: { code } })),
+    search: async (query) => textFromToolResult(await client.callTool({ name: "search", arguments: { query, limit: 1 } })),
     close: () => client.close(),
   };
 }
@@ -89,7 +94,16 @@ export async function openRavenSession(
   store: AuthStore = defaultAuthStore(),
   url: string = RAVEN_URL,
   deps: ConnectDeps = realConnectDeps(url),
-  options: { interactive?: boolean } = {},
+  options: {
+    interactive?: boolean;
+    /** Headless login: print the URL (no browser) and also accept the redirect URL or code pasted on stdin. */
+    noBrowser?: {
+      manualCode: (signal: AbortSignal) => Promise<string>;
+      announce?: (url: string) => void;
+      /** Called with a one-line message when a pasted value is rejected (default: stderr); the prompt then repeats. */
+      onInputError?: (message: string) => void;
+    };
+  } = {},
 ): Promise<RavenSession> {
   const saved = await store.load();
 
@@ -107,7 +121,9 @@ export async function openRavenSession(
     await silentClient.close().catch(() => undefined);
     if (store instanceof MemoryAuthStore) {
       throw new Error(
-        "Raven rejected the credentials in KEDGEWAY_AUTH (expired or revoked). Run `kedgeway login --export` again and update the secret.",
+        store.kind === "env"
+          ? "Raven rejected the credentials in KEDGEWAY_AUTH (expired or revoked). Run `kedgeway login --export` again and update the secret."
+          : 'Not logged in to Raven (or the stored session expired). Run "kedgeway login" first.',
       );
     }
     if (options.interactive === false) {
@@ -117,7 +133,13 @@ export async function openRavenSession(
 
   // 2. interactive authorization
   let provider: FileOAuthProvider | undefined;
-  let opener: BrowserOpener = deps.openBrowser;
+  const nb = options.noBrowser;
+  let opener: BrowserOpener = nb
+    ? (u) => {
+        (nb.announce ?? ((x: string) => void process.stderr.write(describeAuthUrl(x))))(u);
+        return Promise.resolve();
+      }
+    : deps.openBrowser;
   const callback = await deps.startCallbackServer(saved.callbackPort, () => provider?.expectedState());
   try {
     provider = new FileOAuthProvider(store, callback.redirectUrl, (u) => opener(u));
@@ -132,7 +154,29 @@ export async function openRavenSession(
       if (!(e instanceof UnauthorizedError)) throw e;
     }
     // redirectToAuthorization already printed/opened the URL; wait for the callback.
-    const code = await callback.code;
+    let code: string;
+    if (nb) {
+      const ac = new AbortController();
+      const report = nb.onInputError ?? ((m: string) => void process.stderr.write(`kedgeway: ${m}\n`));
+      const pasted = (async (): Promise<string> => {
+        for (;;) {
+          const input = await nb.manualCode(ac.signal); // rejects on abort
+          try {
+            return parseAuthorizationInput(input, provider?.expectedState());
+          } catch (e) {
+            report((e instanceof Error ? e.message : String(e)).replace(/\s*\n\s*/g, " "));
+          }
+        }
+      })();
+      try {
+        code = await Promise.race([callback.code, pasted]);
+      } finally {
+        ac.abort();
+        pasted.catch(() => undefined); // the aborted prompt rejects; that is expected
+      }
+    } else {
+      code = await callback.code;
+    }
     // Reuse the transport that saw the 401: it remembers the resource metadata URL.
     await transport.finishAuth(code);
 
@@ -154,10 +198,27 @@ export async function openRavenSession(
   }
 }
 
-export async function loginToRaven(store: AuthStore = new AuthStore(), opts: { preserve?: boolean } = {}): Promise<void> {
+export async function loginToRaven(
+  store: AuthStore = new AuthStore(),
+  opts: { preserve?: boolean; noBrowser?: { manualCode: (signal: AbortSignal) => Promise<string> } } = {},
+): Promise<void> {
   if (opts.preserve !== true) await store.remove(["tokens", "clientInformation", "codeVerifier"]);
-  const session = await openRavenSession(store);
+  const session = await openRavenSession(store, undefined, undefined, opts.noBrowser ? { noBrowser: opts.noBrowser } : {});
   await session.close();
+}
+
+/** Connects (never interactively) and makes one `search` call; throws if Raven is unreachable or auth fails. */
+export async function pingRaven(
+  store: AuthStore = defaultAuthStore(),
+  url: string = RAVEN_URL,
+  deps: ConnectDeps = realConnectDeps(url),
+): Promise<void> {
+  const session = await openRavenSession(store, url, deps, { interactive: false });
+  try {
+    await session.search("stellar");
+  } finally {
+    await session.close();
+  }
 }
 
 export class RavenEcosystem implements EcosystemPort {

@@ -1,9 +1,11 @@
 import { Command, CommanderError } from "commander";
 import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import type { RepoFacts } from "../core/repo-facts.js";
+import { doctorOk, formatDoctor, type DoctorCheck } from "../core/doctor.js";
 import { parseDuration } from "../core/duration.js";
 import { CachingEcosystem, SnapshotCache, DEFAULT_MAX_AGE_MS } from "../adapters/snapshot-cache.js";
-import { diagnoseDetailed, migrate, toSarif, type MigrateOutcome } from "../sdk.js";
+import { formatGuide } from "../core/guide.js";
+import { diagnoseDetailed, migrate, toAnnotations, toSarif, type MigrateOutcome } from "../sdk.js";
 import type { EcosystemPort, EcosystemSnapshot } from "../ports/ecosystem.js";
 
 export interface CliIo {
@@ -11,10 +13,12 @@ export interface CliIo {
   stderr: (text: string) => void;
   createRavenPort: () => EcosystemPort;
   /** `preserve` keeps any stored registration/tokens (used by `login --export`). */
-  login: (opts?: { preserve?: boolean }) => Promise<void>;
+  login: (opts?: { preserve?: boolean; noBrowser?: boolean }) => Promise<void>;
   logout: () => Promise<boolean>;
   /** Base64 blob of the stored credentials, or null when none are stored. */
   exportAuth: () => Promise<string | null>;
+  /** Runs the self-check (see `kedgeway doctor`). */
+  doctor: (opts: { offline: boolean }) => Promise<DoctorCheck[]>;
   writeFile: (path: string, text: string) => Promise<void>;
   /** Snapshot cache directory (default `$XDG_CACHE_HOME/kedgeway`). Tests pass a temp dir. */
   cacheDir?: string;
@@ -38,6 +42,7 @@ interface DiagnoseOptions extends CacheFlags {
   fixture?: string;
   failOn?: string;
   sarif?: string;
+  annotations?: string;
   format?: string;
 }
 
@@ -108,8 +113,8 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
     return 1;
   }
   const format = opts.format ?? (opts.json ? "json" : "text");
-  if (format !== "text" && format !== "json" && format !== "sarif") {
-    io.stderr(`Invalid --format value "${format}" (expected text, json or sarif)\n`);
+  if (format !== "text" && format !== "json" && format !== "sarif" && format !== "annotations") {
+    io.stderr(`Invalid --format value "${format}" (expected text, json, sarif or annotations)\n`);
     return 1;
   }
   if (!checkMaxAge(opts, io)) return 1;
@@ -122,8 +127,16 @@ async function runDiagnose(path: string, opts: DiagnoseOptions, io: CliIo): Prom
         ? `${JSON.stringify(toSarif(detailed, { cwd: io.cwd?.() ?? process.cwd() }), null, 2)}\n`
         : "";
     if (opts.sarif !== undefined) await io.writeFile(opts.sarif, sarif);
+    const cwd = io.cwd?.() ?? process.cwd();
+    const annotations = opts.annotations !== undefined || format === "annotations" ? toAnnotations(detailed, { cwd }) : [];
+    if (opts.annotations !== undefined) await io.writeFile(opts.annotations, annotations.length > 0 ? `${annotations.join("\n")}\n` : "");
+    const annotationText = format === "annotations" && annotations.length > 0 ? `${annotations.join("\n")}\n` : "";
     io.stdout(
-      format === "sarif" ? sarif : format === "json" ? `${JSON.stringify(diagnosis, null, 2)}\n` : formatReport(facts, snapshot, diagnosis),
+      format === "sarif"
+        ? sarif
+        : format === "json"
+          ? `${JSON.stringify(diagnosis, null, 2)}\n`
+          : `${annotationText}${formatReport(facts, snapshot, diagnosis)}`,
     );
     if (threshold && meetsThreshold(diagnosis, threshold)) {
       return 2;
@@ -145,6 +158,8 @@ export function formatMigration(o: MigrateOutcome, write: boolean): string {
   const { plan, result } = o;
   const lines: string[] = [];
   lines.push(`kedgeway migrate (${write ? "write" : "dry run"}): ${plan.root}`);
+  const guideText = formatGuide(o.guide).trimEnd();
+  if (guideText) lines.push("", guideText);
   if (plan.steps.length === 0) {
     lines.push("", "Nothing to migrate.");
     return `${lines.join("\n")}\n`;
@@ -206,7 +221,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   withCacheFlags(program.command("diagnose [path]"))
     .description("Scan a repo and report toolchain staleness")
     .option("--json", "print Diagnosis as JSON (same as --format json)")
-    .option("--format <format>", "stdout format: text | json | sarif")
+    .option("--format <format>", "stdout format: text | json | sarif | annotations (GitHub annotations, then the text report)")
+    .option("--annotations <file>", "also write GitHub Actions annotations to <file>")
     .option("--sarif <file>", "also write a SARIF 2.1.0 report to <file>")
     .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")
     .option("--fail-on <severity>", "exit 2 if any finding is at or above: critical | warning | info")
@@ -215,7 +231,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     });
 
   withCacheFlags(program.command("migrate [path]"))
-    .description("Plan (default, dry run) or apply (--write) SDK version bumps. Experimental.")
+    .description("Print a migration guide and plan SDK version bumps (dry run). --write applies the manifest edits.")
     .option("--dry-run", "print the planned edits as a diff without writing (default)")
     .option("--write", "apply the edits to the manifests")
     .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")
@@ -226,8 +242,10 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   program
     .command("login")
     .description("Authenticate with Stellar Raven (OAuth)")
+    .option("--no-browser", "do not open a browser: print the URL and accept the redirect URL or code pasted on stdin")
     .option("--export", "print the stored credentials as a base64 blob for CI (KEDGEWAY_AUTH); logs in first if needed")
-    .action(async (opts: { export?: boolean }) => {
+    .action(async (opts: { export?: boolean; browser?: boolean }) => {
+      const noBrowser = opts.browser === false;
       try {
         if (opts.export) {
           if ((io.env ?? process.env)["KEDGEWAY_AUTH"]?.trim()) {
@@ -235,7 +253,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
           }
           let blob = await io.exportAuth();
           if (blob === null) {
-            await io.login({ preserve: true });
+            await io.login({ preserve: true, ...(noBrowser ? { noBrowser: true } : {}) });
             blob = await io.exportAuth();
           }
           if (blob === null) throw new Error("No credentials were stored after login; nothing to export.");
@@ -243,8 +261,23 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
           io.stdout(`${blob}\n`);
           return;
         }
-        await io.login();
+        await io.login(noBrowser ? { noBrowser: true } : undefined);
         io.stdout("Logged in to Stellar Raven.\n");
+      } catch (e) {
+        io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
+        exitCode = 1;
+      }
+    });
+
+  program
+    .command("doctor")
+    .description("Self-check: Node version, auth state, snapshot cache and Raven reachability. Exits 1 if a check fails.")
+    .option("--offline", "skip the Raven reachability call")
+    .action(async (opts: { offline?: boolean }) => {
+      try {
+        const checks = await io.doctor({ offline: opts.offline === true });
+        io.stdout(formatDoctor(checks));
+        exitCode = doctorOk(checks) ? 0 : 1;
       } catch (e) {
         io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
         exitCode = 1;

@@ -46,6 +46,8 @@ npm link        # optional: exposes `kedgeway`
 ```sh
 kedgeway login                                # force the OAuth flow
 kedgeway login --export                       # print credentials as a base64 secret for CI
+kedgeway login --no-browser                   # headless login: print the URL, paste the redirect back
+kedgeway doctor                               # self-check: Node, auth, cache, Raven reachability
 kedgeway logout                               # delete stored credentials
 kedgeway diagnose [path]                      # human-readable report
 kedgeway diagnose . --json                    # Diagnosis as JSON
@@ -54,7 +56,8 @@ kedgeway diagnose . --fixture snapshot.json   # offline, no Raven
 kedgeway diagnose . --offline                 # use the cached Raven snapshot
 kedgeway diagnose . --sarif kedgeway.sarif    # also write SARIF 2.1.0
 kedgeway diagnose . --format sarif            # print SARIF instead of the report
-kedgeway migrate [path]                       # experimental: plan SDK bumps (dry run)
+kedgeway diagnose . --format annotations      # GitHub annotations, then the report
+kedgeway migrate [path]                       # guide plus a dry-run plan
 kedgeway migrate [path] --write               # apply them
 kedgeway mcp                                  # MCP server over stdio
 ```
@@ -68,7 +71,8 @@ Raven is OAuth-protected. Each run tries stored credentials silently; only on a 
 | `--json` | Print the Diagnosis as JSON |
 | `--fixture <file>` | Use an ecosystem snapshot JSON instead of Raven (offline) |
 | `--fail-on <severity>` | Exit 2 if any finding is at or above `critical`, `warning` or `info` |
-| `--format <text\|json\|sarif>` | `diagnose` only: stdout format. `--json` is `--format json`; combining the two exits 1 |
+| `--format <text\|json\|sarif\|annotations>` | `diagnose` only: stdout format (`annotations` prints GitHub workflow commands, then the text report). `--json` is `--format json`; combining the two exits 1 |
+| `--annotations <file>` | `diagnose` only: also write the GitHub annotations to `file` |
 | `--sarif <file>` | `diagnose` only: also write SARIF 2.1.0 to `file` (stdout follows `--format`) |
 | `--offline` | `diagnose` / `migrate`: use the cached ecosystem snapshot only; exit 1 if there is none. Contradicts `--no-cache` (exit 1); ignored, with a warning, when `--fixture` is set |
 | `--no-cache` | `diagnose` / `migrate`: ignore the cached snapshot and fetch live (the result is still written to the cache) |
@@ -118,7 +122,31 @@ kedgeway resolves the **direct** dependency, never "the highest entry in the fil
 | `pnpm-lock.yaml` | The importer's (`.` or the member path) `dependencies` / `devDependencies` / `optionalDependencies` entry; else the one package version satisfying the manifest range (several: `ambiguous in pnpm-lock.yaml`). Minimal parser, lockfile v5 to v9 |
 | `yarn.lock` | The block whose descriptor is `name@<manifest range>` (classic) or `name@npm:<manifest range>` (berry; the `resolution` field is a fallback for the version). Minimal parser |
 
-The lockfile is the nearest one walking up from the manifest's directory to the scan root that has a verdict for that dependency; kedgeway never reads above the scan root (if one exists above it, the text report prints a `hint:`). `kedgeway migrate` still edits the **manifest** only: it decides from the resolved verdict, then bumps the manifest. When the manifest already allows the current major but the lockfile pins an older version, the bump would be a no-op, so migrate emits a manual step to refresh the lockfile instead (`cargo update -p soroban-sdk`, `npm update <name>`, `pnpm update <name>` or `yarn upgrade <name>`). Whenever a planned file has a lockfile, migrate also reminds you that the edits do not update it. `DetectedDep` (SDK and facts) gains `resolved` and `resolvedFrom`.
+The lockfile is the nearest one walking up from the manifest's directory to the scan root that has a verdict for that dependency; kedgeway never reads above the scan root (if one exists above it, the text report prints a `hint:`). `kedgeway migrate` still edits the **manifest** only: it decides from the resolved verdict, then bumps the manifest. When the manifest already allows the current major but the lockfile pins an older version, the bump would be a no-op, so migrate emits a manual step to refresh the lockfile instead (`cargo update -p soroban-sdk`, `npm update <name>`, `pnpm update <name>` or `yarn upgrade <name>`). Whenever a planned file has a lockfile, migrate also reminds you that the edits do not update it. JS ranges (the pnpm fallback) are matched with the [`semver`](https://www.npmjs.com/package/semver) package (hyphen ranges, `||`, x-ranges, npm prerelease rules); Cargo requirements use kedgeway's own matcher (bare `1.2.3` is `^1.2.3`, `*`, `>=, <` combinations, `=`). The parsers are exercised against real lockfiles from public repositories in `fixtures/lockfiles/` (see `SOURCES.md` there for repository and commit). `DetectedDep` (SDK and facts) gains `resolved` and `resolvedFrom`.
+
+## Annotations
+
+`kedgeway diagnose --format annotations` prints one GitHub workflow command per finding before the normal report, with the dependency's line in the manifest: `::error file=contracts/a/Cargo.toml,line=7,title=SDK_DEPRECATED::...` (`critical` is `error`, `warning` is `warning`, `info` is `notice`). Findings that are not about a file (`DATA_DEGRADED`, `NO_SDK_FOUND`) have no `file`. The line comes from a plain scan of the manifest (the first matching key), so it is best effort; paths are relative to the directory you run from. GitHub caps annotations at 10 per type (error, warning, notice) per step and 50 per job, so a large repo shows only the first ones; the full report is still printed. In the GitHub Action the `annotations` input defaults to on when `GITHUB_ACTIONS=true` (set `annotations: "false"` to disable).
+
+## Headless login
+
+Raven's OAuth server supports authorization code + PKCE and refresh tokens only (no device authorization grant), so there is no `--device` flow. On a machine without a browser use:
+
+```sh
+kedgeway login --no-browser        # add --export to print the CI secret afterwards
+```
+
+It prints the authorization URL (and does not try to open a browser). Open it in any browser and sign in; the browser is then redirected to `http://127.0.0.1:<port>/callback`, which only exists on the machine running kedgeway. Either paste the full redirect URL (or just its `code`) into the terminal and press Enter, or forward the callback port from your own machine first so the redirect lands on kedgeway directly:
+
+```sh
+ssh -L <port>:127.0.0.1:<port> user@remote-host   # <port> is shown in the printed URL's redirect_uri
+```
+
+Invalid input gets a one-line error and the prompt repeats. A pasted URL is checked against the login attempt's OAuth `state` (a bare code carries no state, so it cannot be); if there is no state to check, a pasted URL is refused. When stdin is not a terminal, pasting is disabled and only the callback can finish the login. For CI, do this once on a trusted machine and use `login --export` plus the `KEDGEWAY_AUTH` secret.
+
+## `kedgeway doctor`
+
+`kedgeway doctor` is a self-check that changes nothing: Node version (>= 22.12), auth state (`KEDGEWAY_AUTH` valid in the environment, `auth.json` with tokens, or none), the snapshot cache (path and age), and Raven reachability (one cheap non-interactive `search` call with a 10 s timeout, skipped with `--offline`; it uses a read-only copy of the credentials, so a token refresh cannot modify `auth.json`). It prints one line per check (`ok`, `warn`, `fail` or `skip`) and exits `1` if any check failed, `0` otherwise (warnings do not fail it).
 
 ## Snapshot cache and offline mode
 
@@ -133,18 +161,21 @@ After every successful Raven fetch, kedgeway writes the ecosystem snapshot to `$
 
 Applies to `diagnose` and `migrate`.
 
-## Migration mode (experimental)
+## Migration guide
 
 ```sh
-kedgeway migrate [path]            # dry run (default): prints a unified diff, edits nothing
+kedgeway migrate [path]            # dry run (default): prints a guide and a diff, edits nothing
 kedgeway migrate [path] --write    # applies the edits
 kedgeway migrate . --fixture snapshot.json
 ```
 
-Deliberately narrow and safe:
+The dry run leads with a guide, then the diff. The guide states the published SDK version, the protocol and the observation time from the snapshot. Numbered steps say what kedgeway will edit, which commands you run, and that you must confirm the Stellar CLI and the deploy network target that protocol. kedgeway reads neither. For `soroban-client` and unscoped `stellar-sdk` it also lists import sites it found (up to 20, same depth and skip rules as the manifest scan). Doc hits are cited only when the title or url itself is a migration document; a snippet that merely mentions one is not. If none qualify, the guide says Raven returned no upgrade guide.
+
+The edits stay narrow:
 
 - **Rust**: a deprecated or behind `soroban-sdk` is bumped to the exact current version (for example `28.0.0`). Only the quoted version string on that one line changes, so comments, `features` and formatting are untouched. `workspace = true` members are left alone and the workspace root is bumped instead. `=`, `~` and `^` prefixes are kept; other ranges (`>=`, `<`) become manual steps.
 - **JS**: `@stellar/stellar-sdk` is bumped to the current version, keeping `^` or `~` (exact pins stay exact). `@stellar/stellar-base` is a manual step because the snapshot has no current base version. `soroban-client` and unscoped `stellar-sdk` are replaced by `@stellar/stellar-sdk` at `^current`, plus a manual step listing `rg` patterns to update imports. `package.json` is edited by replacing only the affected version (and, for legacy packages, key) spans, so every other byte of the file is preserved (indent, line endings, BOM, number formatting, escapes, key order, minified layout). Only plain versions are edited: `12.x`, `12 || 13`, `a - b` and comma ranges become manual steps. Deps declared in `peerDependencies`, `optionalDependencies`, `overrides` or `resolutions` are not edited.
+- **Aliases**: a member such as `"stellar-sdk": "npm:@stellar/stellar-sdk@^12.0.0"` is read as the real package; migrate rewrites its value in place (`npm:@stellar/stellar-sdk@^<current>`, prefix kept), and replaces an alias of a legacy package wholesale with `"@stellar/stellar-sdk": "^<current>"`.
 - **Manual steps** are listed with their reason; kedgeway never guesses.
 - It never runs `cargo` or `npm`. It prints the follow-up commands (`cargo update -p soroban-sdk`, `npm install`).
 - `--write` is refused if a file it would touch has uncommitted changes in git. The check only passes silently when git is not installed or the path is not in a repository; any other git failure also refuses the write. Files are re-read right before writing (the whole batch aborts if one changed) and each file is replaced atomically with its mode preserved. Symlinked manifests are never planned or edited.
@@ -161,7 +192,7 @@ const diagnosis = await diagnose({ path: ".", ecosystem: createRavenEcosystem() 
 // or offline: await diagnose({ path: ".", fixture: "snapshot.json" });
 ```
 
-Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, `planMigration`, `applyMigration`, `migrate`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`, `MigrationPlan`, `MigrationStep`.
+Also exported: `scanRepo(path)`, the pure `diagnoseRepo(facts, snapshot)`, `diagnoseDetailed` (facts + snapshot + diagnosis), `loadFixture`, `FakeEcosystem`, `planMigration`, `applyMigration`, `migrate`, `buildGuide`, `formatGuide`, `migrationDocs`, `findImportHits`, and the types `Diagnosis`, `Finding`, `Severity`, `EcosystemSnapshot`, `RepoFacts`, `MigrationPlan`, `MigrationStep`, `MigrationGuide`, `SourceHit`.
 
 ESM only (Node >= 22.12). The package `exports` map has no `default` or `require` condition, so `require("kedgeway")` is not supported. Type declarations (`dist/index.d.ts`) are emitted by the build and checked before publishing.
 
@@ -173,7 +204,7 @@ ESM only (Node >= 22.12). The package `exports` map has no `default` or `require
 | ---- | ----- | ------- |
 | `diagnose` | `{ path, fixture?, failOn?, format? }` | a text summary and the Diagnosis JSON, or a SARIF 2.1.0 log with `format: "sarif"` |
 | `findings_reference` | none | the 12 finding codes with severity, meaning and what `migrate` does for them |
-| `migrate` | `{ path, fixture?, write? }` | summary, plan JSON and unified diff; dry run unless `write: true` |
+| `migrate` | `{ path, fixture?, write? }` | summary including the guide, plan JSON and unified diff; dry run unless `write: true` |
 | `ecosystem_snapshot` | `{ fixture? }` | the ecosystem snapshot (live via Raven unless a fixture is given) |
 
 Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
@@ -207,6 +238,7 @@ The MCP server never starts an OAuth flow: without stored Raven credentials, liv
 | `auth` | none | Raven credentials from `kedgeway login --export`, as a secret. Set this **or** `fixture` |
 | `json` | `false` | print JSON instead of text |
 | `sarif` | `false` | also write SARIF 2.1.0 to `$RUNNER_TEMP/kedgeway.sarif` |
+| `annotations` | on in Actions | emit GitHub annotations (file and line) for each finding; `"false"` disables |
 
 Pin a release tag as above; `@main` is unpinned and can change under you. The action builds kedgeway from source on every run (`npm ci && npm run build`), which is slow, until built `dist/` is committed on release tags.
 
@@ -287,15 +319,15 @@ For live data in CI set the `KEDGEWAY_AUTH` secret (see [CI authentication](#ci-
 - The snapshot cache is a single global file; `--max-age` applies to its `observedAt`.
 - `KEDGEWAY_AUTH` refreshes tokens in memory only. If Raven rotates refresh tokens, the stored secret can go stale and must be re-exported.
 - Scanning stops at depth 4 and skips `node_modules`, `target`, `dist`, `.git`, `.next`, `vendor`, `build`, `coverage`.
-- Migration is experimental and limited to the version bumps described above; it does not rewrite source code.
+- Migration prints a guide and bumps version strings. It does not rewrite source, and it does not invent a changelog when Raven's doc search returns none.
 - The live OAuth flow is not covered by automated tests.
 
 ## Roadmap
 
 Not shipped yet:
 
+- [x] Guided migration, not just diagnosis
 - [ ] Publish to npm
-- [ ] Guided migration, not just diagnosis
 
 ## The name
 

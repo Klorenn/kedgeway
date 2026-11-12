@@ -134,11 +134,18 @@ export function decodeAuth(blob: string): StoredAuth {
   return out;
 }
 
-/** Auth held only in memory (used for `KEDGEWAY_AUTH` in CI): refreshed tokens are never written to disk. */
+/**
+ * Auth held only in memory: refreshed tokens are never written to disk. `kind` says where it came from:
+ * `"env"` is `KEDGEWAY_AUTH` (CI), `"snapshot"` is a read-only copy of `auth.json`.
+ */
 export class MemoryAuthStore extends AuthStore {
   private data: StoredAuth;
 
-  constructor(initial: StoredAuth, path?: string) {
+  constructor(
+    initial: StoredAuth,
+    path?: string,
+    readonly kind: "env" | "snapshot" = "env",
+  ) {
     super(path);
     this.data = { ...initial };
   }
@@ -165,10 +172,81 @@ export function defaultAuthStore(env: NodeJS.ProcessEnv = process.env): AuthStor
   return blob !== undefined && blob.trim() !== "" ? new MemoryAuthStore(decodeAuth(blob)) : new AuthStore();
 }
 
+/**
+ * An auth store that can never modify anything on disk: `KEDGEWAY_AUTH` when set, else an in-memory copy of
+ * `auth.json` (read without quarantining a corrupt file). A silent token refresh therefore stays in memory.
+ */
+export async function readOnlyAuthStore(env: NodeJS.ProcessEnv = process.env, path: string = defaultAuthPath()): Promise<AuthStore> {
+  const blob = env["KEDGEWAY_AUTH"];
+  if (blob !== undefined && blob.trim() !== "") return new MemoryAuthStore(decodeAuth(blob));
+  let stored: StoredAuth = {};
+  try {
+    stored = parseStored(JSON.parse(await readFile(path, "utf8"))) ?? {};
+  } catch {
+    stored = {}; // missing or corrupt: nothing to serve
+  }
+  return new MemoryAuthStore(stored, undefined, "snapshot");
+}
+
 /** Base64 blob of the stored auth, or null when nothing usable is stored. */
 export async function exportAuth(store: AuthStore): Promise<string | null> {
   const stored = await store.load();
   return stored.tokens ? encodeAuth(stored) : null;
+}
+
+/**
+ * The authorization code from what a user pasted: the full redirect URL (its OAuth state is checked, and the
+ * check fails closed when there is no expected state) or a bare code (which carries no state to check).
+ */
+export function parseAuthorizationInput(input: string, expectedState: string | undefined): string {
+  const text = input.trim();
+  if (text === "") throw new Error("Empty input: paste the redirect URL or the authorization code.");
+  if (!/^https?:\/\//i.test(text)) {
+    if (/\s/.test(text)) throw new Error("That is neither a redirect URL nor an authorization code (a code has no spaces).");
+    return text;
+  }
+  let url: URL;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new Error("That does not look like a valid redirect URL.");
+  }
+  const err = url.searchParams.get("error");
+  if (err) throw new Error(`Authorization failed: ${err.replace(/[^\w.-]/g, "?").slice(0, 64)}`);
+  const state = url.searchParams.get("state");
+  if (expectedState === undefined) {
+    throw new Error("Cannot verify the OAuth state of a pasted URL for this login attempt; paste only the code, or use the browser callback.");
+  }
+  if (state !== expectedState) {
+    throw new Error("The pasted URL has a different OAuth state than this login attempt; start `kedgeway login --no-browser` again.");
+  }
+  const code = url.searchParams.get("code");
+  if (!code) throw new Error("The pasted URL has no code parameter.");
+  return code;
+}
+
+/** What `--no-browser` prints instead of opening a browser. */
+export function describeAuthUrl(url: string): string {
+  let port: string | null = null;
+  try {
+    const redirect = new URL(url).searchParams.get("redirect_uri");
+    port = redirect ? new URL(redirect).port || null : null;
+  } catch {
+    port = null;
+  }
+  const lines = [
+    "Open this URL in any browser to authorize kedgeway with Stellar Raven:",
+    `  ${url}`,
+    "",
+    "Afterwards the browser is sent to a 127.0.0.1 address that only exists on this machine. Either:",
+    "  - paste the full redirect URL (or just its code) here and press Enter, or",
+  ];
+  lines.push(
+    port
+      ? `  - if this machine is remote, forward the callback port first: ssh -L ${port}:127.0.0.1:${port} <this-host>, then open the URL on your own machine.`
+      : "  - if this machine is remote, forward the callback port with ssh -L <port>:127.0.0.1:<port> <this-host>.",
+  );
+  return `${lines.join("\n")}\n`;
 }
 
 export type BrowserOpener = (url: string) => Promise<void>;

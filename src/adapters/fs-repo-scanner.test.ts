@@ -49,7 +49,7 @@ describe("scanRepo", () => {
     await put("contracts/token/Cargo.toml", `[dependencies]\nsoroban-sdk = { workspace = true }\n`);
     const facts = await scanRepo(dir);
     expect(facts.rustDeps).toEqual([
-      { name: "soroban-sdk", raw: "22.0.0", version: "22.0.0", major: 22, resolved: null, resolvedFrom: null, file: "contracts/token/Cargo.toml", declaredIn: "Cargo.toml" },
+      { name: "soroban-sdk", raw: "22.0.0", version: "22.0.0", major: 22, resolved: null, resolvedFrom: null, file: "contracts/token/Cargo.toml", line: 2, declaredIn: "Cargo.toml" },
     ]);
   });
 

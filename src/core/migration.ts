@@ -148,12 +148,13 @@ export function planMigration(facts: RepoFacts, snapshot: EcosystemSnapshot): Mi
           manual(f, `${f.message} The version constraint is not a plain version, so it is left for you to update.`);
           break;
         }
+        const aliased = d.declaredKey !== undefined && d.declaredRaw !== undefined;
         add({
           file: d.file,
           kind: "bump-js-dep",
-          dependency: d.name,
-          from: d.raw,
-          to: `${prefix}${jsTarget}`,
+          dependency: d.declaredKey ?? d.name,
+          from: d.declaredRaw ?? d.raw,
+          to: aliased ? `npm:${d.name}@${prefix}${jsTarget}` : `${prefix}${jsTarget}`,
           reason: `${f.message} Evidence: ${f.evidence}`,
           findingCode: f.code,
         });
@@ -168,8 +169,8 @@ export function planMigration(facts: RepoFacts, snapshot: EcosystemSnapshot): Mi
         add({
           file: d.file,
           kind: "replace-legacy-package",
-          dependency: d.name,
-          from: d.raw,
+          dependency: d.declaredKey ?? d.name,
+          from: d.declaredRaw ?? d.raw,
           to: `^${jsTarget}`,
           replacement: LEGACY_REPLACEMENT,
           reason: f.message,

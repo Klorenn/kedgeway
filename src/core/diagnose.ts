@@ -9,9 +9,20 @@ export interface Finding {
   code: string;
   message: string;
   file: string;
+  /** 1-based line of the dependency in `file`, when known. */
+  line?: number;
   evidence: string;
   /** The dependency a finding is about; `file` is where its version is declared. */
-  dependency?: { name: string; raw: string; file: string; resolved?: string; resolvedFrom?: LockfileKind };
+  dependency?: {
+    name: string;
+    raw: string;
+    file: string;
+    /** `npm:` alias: the member key and value as written in package.json. */
+    declaredKey?: string;
+    declaredRaw?: string;
+    resolved?: string;
+    resolvedFrom?: LockfileKind;
+  };
 }
 
 export interface Diagnosis {
@@ -29,11 +40,16 @@ function jsProvenance(s: EcosystemSnapshot): string {
   return `source: ${s.jsSdk.source}, observed ${s.observedAt}`;
 }
 
+function lineOf(dep: DetectedDep): { line?: number } {
+  return dep.line === undefined ? {} : { line: dep.line };
+}
+
 function depRef(dep: DetectedDep): NonNullable<Finding["dependency"]> {
   return {
     name: dep.name,
     raw: dep.raw,
     file: dep.declaredIn ?? dep.file,
+    ...(dep.declaredKey !== undefined && dep.declaredRaw !== undefined ? { declaredKey: dep.declaredKey, declaredRaw: dep.declaredRaw } : {}),
     ...(dep.resolved !== null && dep.resolvedFrom !== null ? { resolved: dep.resolved, resolvedFrom: dep.resolvedFrom } : {}),
   };
 }
@@ -195,7 +211,7 @@ export function diagnose(facts: RepoFacts, snapshot: EcosystemSnapshot): Diagnos
     });
   }
   for (const dep of facts.rustDeps) {
-    if (dep.name === "soroban-sdk") findings.push({ ...diagnoseRustDep(dep, snapshot), dependency: depRef(dep) });
+    if (dep.name === "soroban-sdk") findings.push({ ...diagnoseRustDep(dep, snapshot), ...lineOf(dep), dependency: depRef(dep) });
   }
   for (const dep of facts.jsDeps) {
     if (dep.name === "soroban-client" || dep.name === "stellar-sdk") {
@@ -204,11 +220,12 @@ export function diagnose(facts: RepoFacts, snapshot: EcosystemSnapshot): Diagnos
         code: "JS_LEGACY_PACKAGE",
         message: `${dep.name} ${dep.raw} is a legacy package; replace it with @stellar/stellar-sdk.`,
         file: dep.file,
+        ...lineOf(dep),
         evidence: `Legacy package name detected in manifest; reference: ${snapshot.jsSdk.source}, observed ${snapshot.observedAt}.`,
         dependency: depRef(dep),
       });
     } else {
-      findings.push({ ...diagnoseJsDep(dep, snapshot), dependency: depRef(dep) });
+      findings.push({ ...diagnoseJsDep(dep, snapshot), ...lineOf(dep), dependency: depRef(dep) });
     }
   }
   if (facts.rustDeps.length === 0 && facts.jsDeps.length === 0 && facts.manifestErrors.length === 0) {

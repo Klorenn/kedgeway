@@ -32,6 +32,7 @@ function fakeSession(text: string) {
       state.executed.push(code);
       return Promise.resolve(text);
     },
+    search: () => Promise.resolve(text),
     close: () => {
       state.closed += 1;
       return Promise.resolve();

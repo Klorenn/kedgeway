@@ -6,6 +6,7 @@ import { z } from "zod";
 import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import { FINDINGS_REFERENCE } from "../core/findings-reference.js";
 import type { EcosystemPort } from "../ports/ecosystem.js";
+import { formatGuide } from "../core/guide.js";
 import { diagnoseDetailed, migrate, resolveEcosystem, toSarif } from "../sdk.js";
 
 export interface KedgewayServerOptions {
@@ -93,7 +94,7 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
     "migrate",
     {
       description:
-        "Plan SDK version bumps for a Stellar/Soroban repo (experimental). Dry run by default: returns a summary, the plan JSON and a unified diff. With write=true (only if the server runs with --allow-write) it edits the manifests, refusing if they have uncommitted git changes. Never runs cargo or npm.",
+        "Print a migration guide and plan SDK version bumps for a Stellar/Soroban repo. Dry run by default: returns a summary (including the guide), the plan JSON and a unified diff. With write=true (only if the server runs with --allow-write) it edits the manifests, refusing if they have uncommitted git changes. Never runs cargo or npm, and never rewrites source.",
       inputSchema: {
         path: z.string().describe("Directory of the repository"),
         fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
@@ -106,14 +107,15 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
         return failure(new Error("write is disabled. Restart the server with `kedgeway mcp --allow-write` to let migrate edit files (dry run still works)."));
       }
       try {
-        const { plan, result } = await migrate({ path, write, ...ecosystemFor(fixture) });
+        const { plan, result, guide } = await migrate({ path, write, ...ecosystemFor(fixture) });
         const edits = plan.steps.filter((s) => s.kind !== "manual").length;
         const head = result.written
           ? `Updated ${result.changes.length} file(s): ${result.changes.map((c) => c.file).join(", ")}.`
           : `Dry run: ${edits} edit(s), ${result.manual.length} manual step(s).`;
         const follow = result.followUp.length > 0 ? ` Next run: ${result.followUp.join("; ")}.` : "";
         const locks = plan.lockfiles && plan.lockfiles.length > 0 ? ` Lockfile(s) present (${plan.lockfiles.join(", ")}): refresh them yourself.` : "";
-        return text(`${head}${follow}${locks}`, JSON.stringify(plan, null, 2), result.diff);
+        const guideText = formatGuide(guide).trimEnd();
+        return text(`${head}${follow}${locks}${guideText ? `\n\n${guideText}` : ""}`, JSON.stringify(plan, null, 2), result.diff);
       } catch (e) {
         return failure(e);
       }

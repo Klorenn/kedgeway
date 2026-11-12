@@ -207,3 +207,10 @@ describe("diagnose: lockfile resolution", () => {
     expect(d.findings[0]?.dependency).toEqual({ name: "soroban-sdk", raw: "^21", file: "Cargo.toml", resolved: "21.7.6", resolvedFrom: "Cargo.lock" });
   });
 });
+
+describe("diagnose: manifest lines", () => {
+  it("carries the dependency line on its finding", () => {
+    const d = diagnose(facts([{ ...mk("soroban-sdk", "21.0.0", "Cargo.toml"), line: 12 }], [{ ...mk("soroban-client", "1.0.0", "package.json"), line: 5 }]), snap());
+    expect(d.findings.map((f) => f.line)).toEqual([12, 5]);
+  });
+});

@@ -239,3 +239,40 @@ describe("planMigration: lockfile follow-ups", () => {
     expect(planMigration(facts([dep("soroban-sdk", "21.0.0", "a/Cargo.toml")]), snap()).lockfiles).toBeUndefined();
   });
 });
+
+describe("planMigration: npm aliases", () => {
+  const alias = (key: string, target: string, range: string, declaredRaw: string): DetectedDep => ({
+    ...dep(target, range, "w/package.json"),
+    declaredKey: key,
+    declaredRaw,
+  });
+
+  it("bumps an aliased @stellar/stellar-sdk by rewriting the alias value, matching on the declared key and value", () => {
+    const plan = planMigration(facts([], [alias("stellar-sdk", "@stellar/stellar-sdk", "^12.0.0", "npm:@stellar/stellar-sdk@^12.0.0")]), snap());
+    expect(plan.steps).toEqual([
+      expect.objectContaining({
+        kind: "bump-js-dep",
+        file: "w/package.json",
+        dependency: "stellar-sdk",
+        from: "npm:@stellar/stellar-sdk@^12.0.0",
+        to: "npm:@stellar/stellar-sdk@^17.2.1",
+      }),
+    ]);
+  });
+
+  it("replaces the whole member of an aliased legacy package", () => {
+    const plan = planMigration(facts([], [alias("foo", "soroban-client", "^1.0.0", "npm:soroban-client@^1.0.0")]), snap());
+    expect(plan.steps[0]).toMatchObject({
+      kind: "replace-legacy-package",
+      dependency: "foo",
+      from: "npm:soroban-client@^1.0.0",
+      replacement: "@stellar/stellar-sdk",
+      to: "^17.2.1",
+    });
+  });
+
+  it("leaves a version-less alias for a manual step", () => {
+    const plan = planMigration(facts([], [alias("sdk", "@stellar/stellar-sdk", "*", "npm:@stellar/stellar-sdk")]), snap());
+    expect(plan.steps.every((s) => s.kind === "manual")).toBe(true);
+  });
+});

@@ -6,11 +6,14 @@ import { AuthStore, defaultAuthStore } from "./adapters/raven-auth.js";
 import { RavenEcosystem, openRavenSession } from "./adapters/raven-ecosystem.js";
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
-import { posix, relative, resolve, sep } from "node:path";
+import { isAbsolute, posix, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { formatAnnotations } from "./core/annotations.js";
 import { buildSarif, type SarifLog } from "./core/sarif.js";
 import { planMigration, type MigrationPlan } from "./core/migration.js";
+import { buildGuide, type MigrationGuide } from "./core/guide.js";
 import { applyMigration, type MigrationResult } from "./adapters/migration-apply.js";
+import { scanImportHits } from "./adapters/source-scan.js";
 import type { EcosystemPort, EcosystemSnapshot } from "./ports/ecosystem.js";
 
 export interface DiagnoseOptions {
@@ -61,16 +64,22 @@ export interface MigrateOptions extends DiagnoseOptions {
   write?: boolean;
 }
 
+const LEGACY_PACKAGES = new Set(["soroban-client", "stellar-sdk"]);
+
 export interface MigrateOutcome extends DetailedDiagnosis {
   plan: MigrationPlan;
   result: MigrationResult;
+  guide: MigrationGuide;
 }
 
 export async function migrate(opts: MigrateOptions): Promise<MigrateOutcome> {
   const detailed = await diagnoseDetailed(opts);
   const plan = planMigration(detailed.facts, detailed.snapshot);
+  const names = [...new Set(plan.steps.map((s) => s.dependency).filter((n) => LEGACY_PACKAGES.has(n)))];
+  const imports = names.length === 0 ? { hits: [], truncated: false } : await scanImportHits(detailed.facts.root, names);
+  const guide = buildGuide(plan, detailed.snapshot, imports.hits, { importsTruncated: imports.truncated });
   const result = await applyMigration(plan, { write: opts.write === true });
-  return { ...detailed, plan, result };
+  return { ...detailed, plan, result, guide };
 }
 
 const packageVersion = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
@@ -84,19 +93,33 @@ const real = (p: string): string => {
 };
 
 /**
- * Builds the SARIF log for a diagnosis. The repository root is assumed to be `cwd`; manifest uris are
- * relative to it (both paths are realpath'd first). If the scan root lies outside `cwd`, uris are absolute
- * `file://` URIs without a `uriBaseId`.
+ * The scan root relative to the repository root (assumed to be `cwd`, both realpath'd), as a posix path
+ * ("" when equal); null when the scan root lies outside it.
+ */
+export function repoPrefix(root: string, cwd: string = process.cwd()): string | null {
+  const rel = relative(real(cwd), real(root));
+  const escapes = rel === ".." || rel.startsWith(`..${sep}`) || rel.startsWith("../");
+  if (escapes || posix.isAbsolute(rel) || isAbsolute(rel) || /^[A-Za-z]:/.test(rel)) return null;
+  return rel.split(sep).join("/");
+}
+
+/**
+ * Builds the SARIF log for a diagnosis. Manifest uris are relative to the repository root (`cwd`); if the
+ * scan root lies outside it, uris are absolute `file://` URIs without a `uriBaseId`.
  */
 export function toSarif(detailed: Pick<DetailedDiagnosis, "facts" | "diagnosis">, opts: { cwd?: string } = {}): SarifLog {
-  const cwd = real(opts.cwd ?? process.cwd());
-  const root = real(detailed.facts.root);
-  const rel = relative(cwd, root);
-  if (rel.startsWith("..") || posix.isAbsolute(rel) || /^[A-Za-z]:/.test(rel)) {
-    const href = pathToFileURL(root).href;
+  const prefix = repoPrefix(detailed.facts.root, opts.cwd);
+  if (prefix === null) {
+    const href = pathToFileURL(real(detailed.facts.root)).href;
     return buildSarif(detailed.diagnosis, { version: packageVersion, absoluteRootUri: href.endsWith("/") ? href : `${href}/` });
   }
-  return buildSarif(detailed.diagnosis, { version: packageVersion, uriPrefix: rel.split(sep).join("/") });
+  return buildSarif(detailed.diagnosis, { version: packageVersion, uriPrefix: prefix });
+}
+
+/** GitHub Actions annotation lines for a diagnosis (paths relative to `cwd`, the repository root). */
+export function toAnnotations(detailed: Pick<DetailedDiagnosis, "facts" | "diagnosis">, opts: { cwd?: string } = {}): string[] {
+  const prefix = repoPrefix(detailed.facts.root, opts.cwd);
+  return formatAnnotations(detailed.diagnosis, prefix === null ? { omitFiles: true } : { pathPrefix: prefix });
 }
 
 export { diagnoseRepo, scanRepo, planMigration, applyMigration };

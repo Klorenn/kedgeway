@@ -11,3 +11,5 @@ site/out
 .atl/
 .claude/
 site/next-env.d.ts
+.cursor/
+.playwright-mcp/

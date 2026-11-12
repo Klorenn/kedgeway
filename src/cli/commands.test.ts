@@ -40,8 +40,10 @@ function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
     written: {} as Record<string, string>,
     exportable: null as string | null,
     exportCalls: 0,
-    loginOpts: [] as ({ preserve?: boolean } | undefined)[],
+    loginOpts: [] as ({ preserve?: boolean; noBrowser?: boolean } | undefined)[],
     env: {} as NodeJS.ProcessEnv,
+    doctorOpts: [] as { offline: boolean }[],
+    doctorChecks: [{ name: "node", status: "ok", detail: "v22.13.0" }] as { name: string; status: "ok" | "warn" | "fail" | "skip"; detail: string }[],
   };
   const io: CliIo = {
     stdout: (s) => out.push(s),
@@ -60,6 +62,10 @@ function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
     writeFile: (path, text) => {
       state.written[path] = text;
       return Promise.resolve();
+    },
+    doctor: (opts) => {
+      state.doctorOpts.push(opts);
+      return Promise.resolve(state.doctorChecks);
     },
     cacheDir,
     cwd: () => dirname(dir),
@@ -235,6 +241,15 @@ describe("migrate", () => {
     const { io, out } = makeIo();
     expect(await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io)).toBe(0);
     expect(out.join("")).toMatch(/manual steps/i);
+  });
+
+  it("names the file that imports a legacy package", async () => {
+    await mkdir(join(dir, "src"), { recursive: true });
+    await writeFile(join(dir, "package.json"), `${JSON.stringify({ dependencies: { "soroban-client": "1.0.0" } }, null, 2)}\n`);
+    await writeFile(join(dir, "src/app.ts"), 'import { Server } from "soroban-client";\n');
+    const { io, out } = makeIo();
+    await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io);
+    expect(out.join("")).toContain("src/app.ts:1");
   });
 
   it("--write exits 2 when a step could not be applied", async () => {
@@ -437,6 +452,36 @@ describe("diagnose --sarif / --format", () => {
   });
 });
 
+describe("diagnose --format annotations", () => {
+  it("prints workflow commands with file and line, then the normal report", async () => {
+    await repoWith("21.0.0");
+    const { io, out } = makeIo();
+    expect(await runCli(argv("diagnose", dir, "--format", "annotations"), io)).toBe(0);
+    const text = out.join("");
+    const first = text.split("\n")[0] ?? "";
+    expect(first).toBe(`::error file=${basename(dir)}/c/Cargo.toml,line=2,title=SDK_DEPRECATED::${first.split("::").pop()}`);
+    expect(first).toMatch(/soroban-sdk 21\.0\.0/);
+    expect(text).toContain("Summary: 1 critical");
+    expect(text.indexOf("::error")).toBeLessThan(text.indexOf("Summary:"));
+  });
+
+  it("omits file= when the scan root is outside the working directory", async () => {
+    await repoWith("21.0.0");
+    const { io, out } = makeIo();
+    io.cwd = () => cacheDir;
+    await runCli(argv("diagnose", dir, "--format", "annotations"), io);
+    expect(out.join("").split("\n")[0]).toMatch(/^::error title=SDK_DEPRECATED::/);
+  });
+
+  it("--annotations <file> writes them to a file and leaves stdout as the chosen format", async () => {
+    await repoWith("21.0.0");
+    const { io, out, state } = makeIo();
+    expect(await runCli(argv("diagnose", dir, "--json", "--annotations", "ann.txt"), io)).toBe(0);
+    expect(state.written["ann.txt"]).toMatch(/^::error file=.*title=SDK_DEPRECATED::/);
+    expect(out.join("")).not.toContain("::error");
+  });
+});
+
 describe("cache flag conflicts", () => {
   it("--no-cache with --offline is rejected up front", async () => {
     const port = countingPort(snapshot);
@@ -479,6 +524,22 @@ describe("login --export safety", () => {
   });
 });
 
+describe("login --no-browser", () => {
+  it("runs the login with noBrowser and prints the usual message", async () => {
+    const { io, out, state } = makeIo();
+    expect(await runCli(argv("login", "--no-browser"), io)).toBe(0);
+    expect(state.loginOpts).toEqual([{ noBrowser: true }]);
+    expect(out.join("")).toContain("Logged in");
+  });
+
+  it("combines with --export (preserving stored credentials)", async () => {
+    const { io, out, state } = makeIo();
+    expect(await runCli(argv("login", "--export", "--no-browser"), io)).toBe(0);
+    expect(state.loginOpts).toEqual([{ preserve: true, noBrowser: true }]);
+    expect(out.join("")).toBe("Zm9v\n");
+  });
+});
+
 describe("invalid KEDGEWAY_AUTH", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -491,6 +552,27 @@ describe("invalid KEDGEWAY_AUTH", () => {
     const text = err.join("");
     expect(text).toMatch(/KEDGEWAY_AUTH is not valid/);
     expect(text).not.toMatch(/\n\s+at /);
+  });
+});
+
+describe("doctor", () => {
+  it("prints the checks and exits 0 when none failed", async () => {
+    const { io, out } = makeIo();
+    expect(await runCli(argv("doctor"), io)).toBe(0);
+    expect(out.join("")).toMatch(/ok\s+node\s+v22\.13\.0/);
+  });
+
+  it("exits 1 when a check failed", async () => {
+    const { io, out, state } = makeIo();
+    state.doctorChecks = [{ name: "raven", status: "fail", detail: "down" }];
+    expect(await runCli(argv("doctor"), io)).toBe(1);
+    expect(out.join("")).toMatch(/1 failed/);
+  });
+
+  it("passes --offline through", async () => {
+    const { io, state } = makeIo();
+    await runCli(argv("doctor", "--offline"), io);
+    expect(state.doctorOpts).toEqual([{ offline: true }]);
   });
 });
 

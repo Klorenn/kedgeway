@@ -165,3 +165,15 @@ describe("editPackageJson: byte-exact span edits", () => {
     expect(editPackageJson(src, [bump]).text).toBe(src.replaceAll("^12.0.0", "^17.2.1"));
   });
 });
+
+describe("editPackageJson: aliases", () => {
+  const pkg = `{\n  "dependencies": {\n    "stellar-sdk": "npm:@stellar/stellar-sdk@^12.0.0",\n    "foo": "npm:soroban-client@^1.0.0"\n  }\n}\n`;
+  it("rewrites an alias value and replaces a legacy alias member wholesale", () => {
+    const r = editPackageJson(pkg, [
+      { file: "package.json", kind: "bump-js-dep", dependency: "stellar-sdk", from: "npm:@stellar/stellar-sdk@^12.0.0", to: "npm:@stellar/stellar-sdk@^17.2.1", reason: "r", findingCode: "JS_SDK_BEHIND" },
+      { file: "package.json", kind: "replace-legacy-package", dependency: "foo", from: "npm:soroban-client@^1.0.0", to: "^17.2.1", replacement: "@stellar/stellar-sdk", reason: "r", findingCode: "JS_LEGACY_PACKAGE" },
+    ]);
+    expect(r.skipped).toEqual([]);
+    expect(r.text).toBe(`{\n  "dependencies": {\n    "stellar-sdk": "npm:@stellar/stellar-sdk@^17.2.1",\n    "@stellar/stellar-sdk": "^17.2.1"\n  }\n}\n`);
+  });
+});

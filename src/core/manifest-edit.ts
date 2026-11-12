@@ -259,3 +259,25 @@ export function editPackageJson(text: string, steps: MigrationStep[]): JsonEditR
   }
   return { text: current, applied, skipped };
 }
+
+/**
+ * 1-based line of each member of the TOP-LEVEL `dependencies` / `devDependencies` objects, found with the
+ * span-aware scanner (never a text search, so `overrides.dependencies` and the like cannot be mistaken
+ * for them). The text must be valid JSON.
+ */
+export function packageJsonDepLines(text: string): Record<"dependencies" | "devDependencies", Map<string, number>> {
+  const out = { dependencies: new Map<string, number>(), devDependencies: new Map<string, number>() };
+  const root = new Scanner(text).root();
+  if (!root) return out;
+  const lineAt = (offset: number): number => {
+    let n = 1;
+    for (let i = 0; i < offset; i += 1) if (text[i] === "\n") n += 1;
+    return n;
+  };
+  for (const section of root) {
+    if (section.key !== "dependencies" && section.key !== "devDependencies") continue;
+    const map = out[section.key];
+    for (const m of section.members ?? []) if (!map.has(m.key)) map.set(m.key, lineAt(m.keyStart));
+  }
+  return out;
+}

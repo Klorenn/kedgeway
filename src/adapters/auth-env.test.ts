@@ -1,4 +1,4 @@
-import { access } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
@@ -11,6 +11,7 @@ import {
   defaultAuthStore,
   encodeAuth,
   exportAuth,
+  readOnlyAuthStore,
   type StoredAuth,
 } from "./raven-auth.js";
 import { openRavenSession, type ClientLike, type ConnectDeps, type TransportLike } from "./raven-ecosystem.js";
@@ -120,5 +121,59 @@ describe("openRavenSession with KEDGEWAY_AUTH", () => {
       /KEDGEWAY_AUTH.*login --export/s,
     );
     expect(callbackStarts).toBe(0);
+  });
+});
+
+describe("readOnlyAuthStore (used by doctor)", () => {
+  it("serves the stored auth but never writes: refreshed tokens stay in memory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "kw-ro-"));
+    try {
+      const file = join(dir, "auth.json");
+      const original = JSON.stringify({ tokens: auth.tokens, clientInformation: auth.clientInformation });
+      await writeFile(file, original);
+      const store = await readOnlyAuthStore({}, file);
+      expect((await store.load()).tokens?.access_token).toBe("AT");
+      await store.update({ tokens: { access_token: "REFRESHED", token_type: "Bearer" } });
+      expect((await store.load()).tokens?.access_token).toBe("REFRESHED");
+      expect(await readFile(file, "utf8")).toBe(original);
+      expect(await readdir(dir)).toEqual(["auth.json"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not quarantine a corrupt file (reading must not mutate)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "kw-ro-"));
+    try {
+      const file = join(dir, "auth.json");
+      await writeFile(file, "{corrupt");
+      const store = await readOnlyAuthStore({}, file);
+      expect(await store.load()).toEqual({});
+      expect(await readdir(dir)).toEqual(["auth.json"]);
+      expect(await readFile(file, "utf8")).toBe("{corrupt");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("uses KEDGEWAY_AUTH when set", async () => {
+    const store = await readOnlyAuthStore({ KEDGEWAY_AUTH: encodeAuth(auth) }, join(tmpdir(), "does-not-exist.json"));
+    expect((await store.load()).tokens?.access_token).toBe("AT");
+  });
+
+  it("a rejected file-based session says to log in, not to fix KEDGEWAY_AUTH", async () => {
+    const store = await readOnlyAuthStore({}, join(tmpdir(), "does-not-exist.json"));
+    const deps: ConnectDeps = {
+      createClient: (): ClientLike => ({
+        connect: () => Promise.reject(new UnauthorizedError("401")),
+        callTool: () => Promise.resolve({}),
+        close: () => Promise.resolve(),
+      }),
+      createTransport: (): TransportLike => ({ finishAuth: () => Promise.resolve() }),
+      startCallbackServer: () => Promise.reject(new Error("must not start")),
+      openBrowser: () => Promise.resolve(),
+    };
+    await expect(openRavenSession(store, "https://raven.test/mcp", deps)).rejects.toThrow(/kedgeway login/);
+    await expect(openRavenSession(store, "https://raven.test/mcp", deps)).rejects.not.toThrow(/KEDGEWAY_AUTH/);
   });
 });

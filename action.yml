@@ -31,6 +31,11 @@ inputs:
     required: false
     default: "false"
 
+  annotations:
+    description: Emit GitHub annotations (error/warning/notice with file and line) for each finding ("true" or "false"). Empty means true inside GitHub Actions.
+    required: false
+    default: ""
+
 outputs:
   summary:
     description: Finding counts, e.g. "critical=0 warning=1 info=2".
@@ -64,5 +69,6 @@ runs:
         KW_AUTH: ${{ inputs.auth }}
         KW_JSON: ${{ inputs.json }}
         KW_SARIF: ${{ inputs.sarif }}
+        KW_ANNOTATIONS: ${{ inputs.annotations }}
         KW_CLI: ${{ github.action_path }}/dist/cli.js
       run: bash "$GITHUB_ACTION_PATH/scripts/action-run.sh"
