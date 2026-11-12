@@ -1,0 +1,31 @@
+name: action-npm-check
+
+# Runs the published action pinned to the current release tag so the npm install
+# path is exercised on a real runner. The tag below must equal package.json's
+# version; src/action.test.ts enforces it, so bumping the version means bumping
+# this file too. Dispatch it after the tag exists.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-tag:
+    name: run Klorenn/kedgeway at the release tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: kedgeway
+        uses: Klorenn/kedgeway@v0.1.1
+        with:
+          path: .
+          fail-on: warning
+          fixture: fixtures/ecosystem-2026-11-11.json
+      - name: Check outputs
+        env:
+          SUMMARY: ${{ steps.kedgeway.outputs.summary }}
+          REPORT: ${{ steps.kedgeway.outputs.report-json }}
+        run: |
+          echo "summary: $SUMMARY"
+          test -s "$REPORT"

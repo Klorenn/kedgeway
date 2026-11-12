@@ -35,6 +35,14 @@ describe("action.yml", () => {
   });
 });
 
+describe(".github/workflows/action-npm-check.yml", () => {
+  it("pins the published action to the package.json version", async () => {
+    const y = await readFile(resolve(root, ".github/workflows/action-npm-check.yml"), "utf8");
+    const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")) as { version: string };
+    expect(y).toContain(`uses: Klorenn/kedgeway@v${pkg.version}`);
+  });
+});
+
 describe("scripts/action-run.sh", () => {
   const script = resolve(root, "scripts/action-run.sh");
   let tmp: string;
