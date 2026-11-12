@@ -6,8 +6,8 @@ interface HatchGroupProps extends HatchOptions {
 }
 
 /** SVG strokes for one hatch frame, in grid-cell units. Render inside an <svg> with a matching viewBox. */
-export default function HatchGroup({ frame, color = "var(--ink)", weight = 1, trails = true, rows }: HatchGroupProps) {
-  const g = hatchGeometry(frame, { weight, trails, rows });
+export default function HatchGroup({ frame, color = "var(--ink)", weight = 1, trails = true, rows, fine = false }: HatchGroupProps) {
+  const g = hatchGeometry(frame, { weight, trails, rows, fine });
   return (
     <g fill="none" stroke={color} strokeLinecap="round">
       {g.trails.length > 0 ? (

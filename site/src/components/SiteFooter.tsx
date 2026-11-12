@@ -1,9 +1,11 @@
 import Link from "next/link";
+import BackToTop from "./BackToTop";
+import FooterFilm from "./FooterFilm";
+import FooterWordmark from "./FooterWordmark";
 import HorseMark from "./HorseMark";
-import PixelIcon from "./icons/pixel";
 import styles from "./SiteFooter.module.css";
 
-const REPO = "https://github.com/Klorenn/kedgeway";
+const REPO = "https://github.com/kedgeway/kedgeway";
 const BLOB = `${REPO}/blob/main`;
 
 // Official simple-icons paths (24x24 viewBox).
@@ -14,16 +16,23 @@ const GITHUB_PATH =
 export default function SiteFooter() {
   return (
     <footer className={styles.footer}>
-      <div className="wrap">
-        <div className={styles.brandRow}>
-          <HorseMark size={64} />
-          <p className={styles.word}>kedgeway</p>
+      <FooterFilm />
+      <div className={`colWide ${styles.inner}`}>
+        <div className={styles.row1}>
+          <div className={styles.brandRow}>
+            <HorseMark size={64} />
+            <FooterWordmark />
+          </div>
+          <div className={styles.side}>
+            <p>Diagnose Stellar SDK drift against the live ecosystem.</p>
+            <p>A kedge is a small anchor carried out from a drifting ship and hauled in to pull it back on course. kedgeway pulls a repo&apos;s SDK versions back on course.</p>
+            <a className={styles.link} href={REPO}>Star on GitHub →</a>
+            <p className={styles.status}>v0.1.0 · data observed 2026-11-11 · built on Stellar Raven</p>
+          </div>
         </div>
         <div className={styles.cols}>
           <div>
-            <p className={styles.h}>
-              <PixelIcon name="terminal" size={16} />
-              <span>Product</span>
+            <p className={styles.h}>Product
             </p>
             <p><Link href="/#install">Install</Link></p>
             <p><Link href="/docs">Docs</Link></p>
@@ -31,9 +40,7 @@ export default function SiteFooter() {
             <p><a href={`${BLOB}/CHANGELOG.md`}>Changelog</a></p>
           </div>
           <div>
-            <p className={styles.h}>
-              <PixelIcon name="file" size={16} />
-              <span>Project</span>
+            <p className={styles.h}>Project
             </p>
             <p><a href={REPO}>GitHub</a></p>
             <p><a href={`${BLOB}/LICENSE`}>License MIT</a></p>
@@ -41,17 +48,13 @@ export default function SiteFooter() {
             <p><a href={`${BLOB}/CONTRIBUTING.md`}>Contributing</a></p>
           </div>
           <div>
-            <p className={styles.h}>
-              <PixelIcon name="raven" size={16} />
-              <span>Source</span>
+            <p className={styles.h}>Source
             </p>
             <p className={styles.plain}>Built on Stellar Raven</p>
             <p className={styles.plain}>Muybridge pl. 626 — 1878</p>
           </div>
           <div>
-            <p className={styles.h}>
-              <PixelIcon name="anchor" size={16} />
-              <span>Author</span>
+            <p className={styles.h}>Author
             </p>
             <p className={styles.made}>Made by Kl0ren</p>
             <div className={styles.icons}>
@@ -66,7 +69,8 @@ export default function SiteFooter() {
         </div>
         <div className={styles.legal}>
           <span>© 2026 kedgeway contributors</span>
-          <span>kedgeway.xyz</span>
+          <span>MIT</span>
+          <BackToTop className={styles.top} />
         </div>
       </div>
     </footer>

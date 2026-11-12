@@ -20,11 +20,11 @@ Personality: precise, calm, evidence-first, a little old-school scientific. Neve
   with a dry brush. No dots, no outline, no fill. Horse only (rider masked out).
 - **Construction**: the mark sits inside a golden-ratio rectangle; the Fibonacci spiral starts at the
   hind hoof and ends at the eye. The spiral is a construction device: shown as 1px `--construct` lines in
-  the brand/construction panel and, once, as a draw-on behind the hero mark. Never in the header.
+  once as a draw-on behind the hero mark (1.6s, then the rectangle settles at 35% and the spiral fades out entirely). Never in the header.
 - **Compact mark** (favicon, 16–32px): 12 horizontal strokes approximating the silhouette, no spiral.
 - **Wordmark**: `kedgeway`, Geist Mono, 500, lowercase, letter-spacing −0.01em.
 - **Lockup**: mark (height = cap height × 1.6) + 12px gap + wordmark. Mark always to the left.
-- **Motion**: the 11-frame gallop cycle at 10fps is allowed in exactly one place, the hero.
+- **Motion**: the 11-frame gallop cycle at 10fps is allowed in the hero; the footer plays the same frames as a film strip at 8fps. The mark is static everywhere else.
   Everywhere else the mark is static.
 
 ## Color
@@ -43,14 +43,14 @@ chroma is the construction red, used exclusively for construction lines (golden 
 
 Data states (grid only): deprecated = `--ink`; current = `--ink-2`; supported = `--rule`; unknown = `--ink-3`.
 The report's `$` line and `[CRITICAL]` tags are `--ink` at 600 weight, not colored. No glow, no shadows.
-Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical hairlines and a baseline under the hooves, scrolling left at ~36px/s with a fainter half-speed layer behind; faded under the text, static under reduced motion. No other page region moves.
+Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical hairlines and a baseline under the hooves, scrolling left at ~18px/s for 8 seconds, then still, with a fainter half-speed layer behind; faded under the text, static under reduced motion. Its numbers are `--ink-2` at 35%.
 
 ## Typography
 
 - **Geist Sans**: headings 500, body 400, via `next/font/google`.
-- **Geist Mono**: wordmark, overlines, commands, the report, labels.
+- **Geist Mono**: wordmark (header and the large footer wordmark, 500), overlines, commands, the report, labels.
 - Two typefaces only. No italics anywhere.
-- Scale: hero 3rem/1.05, section heading 1.75rem/1.15, body 1.0625rem/1.6, overline 0.75rem mono uppercase tracking 0.12em.
+- Scale: hero `clamp(2.5rem, 5vw, 4.5rem)` / 1 / -0.035em (one line from 56rem), hero sub 1.125rem/1.5 in 34rem, section heading `clamp(1.75rem, 2.6vw, 2.25rem)` / 1.1 / -0.025em, final CTA `clamp(2.5rem, 5vw, 4rem)`, body 1.0625rem/1.6, overline 0.75rem mono uppercase tracking 0.12em.
 - Headings are sentence case, single-tone: Geist 500 in `--ink`. No gray phrase, no italics, no second typeface. No bold heavier than 500.
 - Example hero: `Your Soroban SDK is drifting.` on one line at desktop widths.
 
@@ -59,16 +59,18 @@ Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical ha
 - **No boxes.** No cards, no bordered panels, no filled surfaces behind text. **One exception: code blocks** (surface `#101113`, 1px `--rule` border, 2px radius, label bar with a copy button). Structure comes from
   hairlines (`--rule`, 1px) and whitespace.
 - Content column 40rem for text, 64rem for data. Centered.
-- Vertical rhythm: sections separated by 9rem desktop / 5rem mobile, each opened by a hairline and an overline (`01 — the ecosystem`).
+- Vertical rhythm: every section opens with a hairline. Anchor sections (ecosystem, report, install) get 10rem of padding (6rem on mobile); light ones (how it works, what it catches, FAQ, roadmap) get 6rem (3.5rem on mobile). Overlines (`01 — the ecosystem`) only on the anchor sections; no page numbers.
+- Header and content share the 64rem container; the header is transparent, and once scrolled gets `rgb(11 11 12 / .72)` with `blur(12px) saturate(140%)` and a hairline (64px tall).
+- Pixel icons: 16/24/32px, 1-bit, used only inside diagrams and feature rows (how it works, what it catches, works with), never as decoration (not in navs, footers or headings).
 - Code and commands: the `CodeBlock` (mono, label bar, Copy button, no `$` prompts in copyable text). The report in section 03 is output, so it stays plain mono lines.
 - The report: plain mono lines on the page, prompt line and severity tag in `--ink` at weight 600, no color, no panel.
-- Buttons: one filled `--ink` with `--bg` text (mono), one text link with `→`. Radius 2px. Nothing else is a button.
+- Buttons: one filled `--ink` with `--bg` text (mono, label "Get started"; hover mixes 12% toward `--bg`, pressed moves 1px down), one text link with `→`. Radius 2px. Nothing else is a button.
 - Links in body: underline 1px `--ink-2`, no color change.
 
 ## Motion
 
 - Hero gallop at 10fps and the measuring wall behind it; both pause off-screen and are static under reduced motion.
-- Outside the hero, motion happens once and stops: the grid wave (1.2s), the diagram packet, the report typewriter. No scroll reveals.
+- Outside the hero, motion happens once and stops: the grid wave (1.2s), the diagram packet, the report typewriter, the footer wordmark reveal (plus the footer film strip while in view). No scroll reveals.
 
 ## Image direction
 

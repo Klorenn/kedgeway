@@ -1,8 +1,13 @@
-.root { width: 100%; }
-.canvas { width: 100%; height: 12rem; }
-.legend { display: grid; gap: 0.5rem; margin-top: 1.25rem; justify-items: center; text-align: center; font-size: 0.875rem; }
-.legend ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem 1.5rem; list-style: none; margin: 0; padding: 0; }
+.chart { display: grid; grid-template-columns: repeat(40, minmax(0, 1fr)); gap: 3px; width: 100%; margin-top: 0.75rem; }
+.chart span { aspect-ratio: 1; display: block; }
+.deprecated { background: var(--rule); transition: background-color 0.25s ease-out; transition-delay: calc(var(--c, 0) * 22ms); }
+.chart[data-lit="true"] .deprecated { background: var(--ink); }
+.current { background: var(--ink-2); }
+.other { background: var(--rule); }
+.legend { display: grid; gap: 0.5rem; margin-top: 1.25rem; font-size: 0.875rem; }
+.legend ul { display: flex; flex-wrap: wrap; gap: 0.35rem 1.5rem; list-style: none; margin: 0; padding: 0; }
 .legend li { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--ink); }
-.legend i { width: 8px; height: 8px; display: inline-block; }
+.legend i { width: 8px; height: 8px; display: inline-block; flex: none; }
 .legend b { font-weight: 500; font-variant-numeric: tabular-nums; }
 .legend p { color: var(--ink-2); font-family: var(--font-mono); font-size: 0.75rem; }
+@media (prefers-reduced-motion: reduce) { .deprecated { transition: none; } }

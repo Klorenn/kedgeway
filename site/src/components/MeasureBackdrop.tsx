@@ -5,23 +5,10 @@ import styles from "./MeasureBackdrop.module.css";
 
 const FRAME_MS = 1000 / 30;
 const SPACING = 48;
-const SPEED = 36; // px/s, scrolling left
+const SPEED = 18; // px/s, scrolling left
+const RUN_LIMIT_S = 8; // the wall stops after 8 seconds of running
 const RULE = [0x1f, 0x1f, 0x22] as const; // --rule
-const INK3 = [0x4a, 0x4a, 0x4f] as const; // --ink-3
-
-// 3x5 pixel digits.
-const DIGITS: readonly string[] = [
-  "111101101101111",
-  "010110010010111",
-  "111001111100111",
-  "111001111001111",
-  "101101111001001",
-  "111100111001111",
-  "111100111101111",
-  "111001001001001",
-  "111101111101111",
-  "111101111001111",
-];
+const INK3 = [0x4a, 0x4a, 0x4f] as const; // --ink-3 (lines only, never text)
 
 const rgba = (c: readonly [number, number, number], a: number): string => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 
@@ -53,9 +40,9 @@ export default function MeasureBackdrop({ anchor }: MeasureBackdropProps) {
     let horseCx = 0;
     let raf = 0;
     let last = 0;
+    let runTime = 0; // seconds spent running, capped at RUN_LIMIT_S
     let running = false;
     let onScreen = false;
-    const t0 = performance.now();
 
     const measure = (): void => {
       const rect = root.getBoundingClientRect();
@@ -69,18 +56,6 @@ export default function MeasureBackdrop({ anchor }: MeasureBackdropProps) {
         horseTop = h * 0.6;
         horseCx = w / 2;
       }
-    };
-
-    const drawNumber = (n: number, x: number, y: number, alpha: number): void => {
-      const text = String(n % 100).padStart(2, "0");
-      const px = 2;
-      ctx.fillStyle = rgba(INK3, alpha);
-      [...text].forEach((ch, i) => {
-        const glyph = DIGITS[Number(ch)] ?? "";
-        for (let k = 0; k < 15; k++) {
-          if (glyph[k] === "1") ctx.fillRect(x + i * 4 * px + (k % 3) * px, y + Math.floor(k / 3) * px, px, px);
-        }
-      });
     };
 
     /** Alpha mask: faint behind the text, strongest around the horse. */
@@ -115,28 +90,14 @@ export default function MeasureBackdrop({ anchor }: MeasureBackdropProps) {
         g.addColorStop(1, rgba(col, gx));
         ctx.fillStyle = g;
         ctx.fillRect(Math.floor(x), 0, 1, baseline);
-        if (numbers) {
-          // tick on the baseline
-          ctx.fillStyle = rgba(INK3, 0.8 * maskX(x) * (major ? 1 : 0.6));
-          ctx.fillRect(Math.floor(x), baseline, 1, major ? 7 : 4);
-        }
-        if (major) drawNumber(i < 0 ? 100 + (i % 100) : i, Math.floor(x) + 4, Math.max(8, horseTop - 26), 0.2 * maskX(x));
       }
     };
 
     const draw = (t: number): void => {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      layer(SPACING * 2, SPEED / 2, t, RULE, 0.5, false); // fainter, slower back layer
-      layer(SPACING, SPEED, t, RULE, 1, true);
-      // baseline under the hooves, fading toward the edges
-      const bg = ctx.createLinearGradient(0, 0, w, 0);
-      bg.addColorStop(0, rgba(INK3, 0));
-      bg.addColorStop(0.2, rgba(INK3, 0.9));
-      bg.addColorStop(0.8, rgba(INK3, 0.9));
-      bg.addColorStop(1, rgba(INK3, 0));
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, baseline, w, 1);
+      layer(SPACING * 2, SPEED / 2, t, RULE, 0.35, false); // fainter, slower back layer
+      layer(SPACING, SPEED, t, RULE, 0.7, true);
     };
 
     const layout = (): void => {
@@ -147,20 +108,30 @@ export default function MeasureBackdrop({ anchor }: MeasureBackdropProps) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
       measure();
-      draw(reduce ? 0 : (performance.now() - t0) / 1000);
+      draw(reduce ? 0 : runTime);
     };
 
     const tick = (now: number): void => {
       if (!running) return;
       raf = requestAnimationFrame(tick);
       if (now - last < FRAME_MS) return;
+      const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
-      draw((now - t0) / 1000);
+      runTime = Math.min(RUN_LIMIT_S, runTime + dt);
+      draw(runTime);
+      if (runTime >= RUN_LIMIT_S) {
+        // Stop for good: the wall has made its point.
+        running = false;
+        cancelAnimationFrame(raf);
+        io?.disconnect();
+        document.removeEventListener("visibilitychange", sync);
+      }
     };
     const sync = (): void => {
       const go = !reduce && onScreen && !document.hidden;
       if (go && !running) {
         running = true;
+        last = performance.now();
         raf = requestAnimationFrame(tick);
       } else if (!go && running) {
         running = false;

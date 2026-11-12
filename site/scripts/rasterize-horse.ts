@@ -168,7 +168,11 @@ const MIN_RUN_CELLS = 0.8;
 const RIDER_LEFT = 0.21;
 const RIDER_RIGHT = 0.115;
 const DEFAULT_LIFT = 7; // px below the interpolated back line, so no seat or boot stub survives
-const RIDER_OVERRIDES: Record<number, { left?: number; right?: number; lift?: number }> = {};
+// Frame 11 (index) is the standing horse: the topmost point is the head, not the cap, so the window is set by hand
+// around the rider and the cut line is flat at the horse's back.
+const RIDER_OVERRIDES: Record<number, { left?: number; right?: number; lift?: number; flat?: boolean }> = {
+  11: { left: 0.21, right: 0.115, lift: 4, flat: true },
+};
 
 function columnTop(data: Buffer, w: number, h: number, x: number): number | null {
   for (let y = 0; y < h; y++) if ((data[y * w + x] as number) > 127) return y;
@@ -207,7 +211,7 @@ function maskRider(data: Buffer, w: number, h: number, frameIndex: number): { ma
     return out;
   };
   const yL = median(tops(left - 0.13 * w, left));
-  const yR = median(tops(right, right + 0.07 * w));
+  const yR = o.flat ? yL : median(tops(right, right + 0.07 * w));
   const masked = Buffer.from(data);
   const removed = Buffer.alloc(w * h);
   for (let x = Math.max(0, Math.floor(left)); x < Math.min(w, Math.floor(right)); x++) {

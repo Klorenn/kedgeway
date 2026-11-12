@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import HatchGroup from "./HatchGroup";
 import { goldenConstruction, rectForEye } from "@/lib/golden";
 import { EYE, HATCH_FRAME_COUNT, HORSE_BOTTOM, STATIC_FRAME } from "@/lib/hatch";
@@ -16,6 +16,8 @@ export default function HeroHorse() {
   const svgRef = useRef<SVGSVGElement>(null);
   const framesRef = useRef<(SVGGElement | null)[]>([]);
 
+  // Engraving mode (2x bands, real gaps) when the horse renders 480px wide or more.
+  const [fine, setFine] = useState(true);
   const construction = useMemo(() => goldenConstruction(rectForEye(EYE, HORSE_BOTTOM, 12.8)), []);
   const frames = useMemo(() => Array.from({ length: HATCH_FRAME_COUNT }, (_, i) => i), []);
 
@@ -35,7 +37,10 @@ export default function HeroHorse() {
     // Keep construction lines at 1px on screen whatever the rendered width.
     const setStroke = (): void => {
       const w = svg.getBoundingClientRect().width;
-      if (w > 0) root.style.setProperty("--sw", String(VIEW.w / w));
+      if (w > 0) {
+        root.style.setProperty("--sw", String(VIEW.w / w));
+        setFine(w >= 480);
+      }
     };
     setStroke();
     const ro = new ResizeObserver(setStroke);
@@ -112,7 +117,7 @@ export default function HeroHorse() {
         <path className={`${styles.line} ${styles.spiral}`} d={spiral} pathLength={1} />
         {frames.map((i) => (
           <g key={i} ref={(el) => { framesRef.current[i] = el; }} style={i === STATIC_FRAME ? undefined : { display: "none" }}>
-            <HatchGroup frame={i} color="var(--ink)" />
+            <HatchGroup frame={i} color="var(--ink)" fine={fine} />
           </g>
         ))}
       </svg>

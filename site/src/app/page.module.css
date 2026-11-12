@@ -1,49 +1,74 @@
-/* hero: text block (centered in the free space) -> horse block -> ground */
-.hero { position: relative; overflow: hidden; min-height: 100svh; display: flex; flex-direction: column; padding-top: 4.5rem; }
-.textBlock { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 1.25rem; width: 100%; max-width: 60rem; margin-inline: auto; padding: 1.5rem var(--gutter); }
-.title { font-size: clamp(2.25rem, 4vw, 3rem); }
-@media (min-width: 56.25rem) { .title { white-space: nowrap; } }
-.sub { max-width: 48rem; font-size: 1rem; }
+/* hero (plate): centered text, then the horse with its hooves on a full-width baseline */
+.hero { position: relative; overflow: hidden; padding: 9rem 0 2rem; }
+.textBlock { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.5rem; width: 100%; max-width: 60rem; margin-inline: auto; padding-inline: var(--gutter); }
+.title { font-size: clamp(2.25rem, 5vw, 4.5rem); line-height: 1; letter-spacing: -0.035em; }
+@media (min-width: 56rem) { .title { white-space: nowrap; } }
+.sub { font-size: 1.125rem; line-height: 1.5; max-width: 34rem; }
 .cta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.75rem 1.25rem; margin-top: 0.5rem; }
-.caption { font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
-/* The horse block sits above the measuring baseline, with a little air below it. */
-.horseBlock { --hw: min(100vw - 32px, 440px); position: relative; z-index: 1; width: var(--hw); margin: 0 auto 2.25rem; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
-.plate { display: grid; justify-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
-.plate::before { content: ""; display: block; width: 2.5rem; border-top: 1px solid var(--ink-3); }
+/* The svg has ~5.3% of its width below the hooves: the baseline sits there, the caption beneath it. */
+.horseBlock { --hw: min(100vw - 32px, 44rem); position: relative; z-index: 1; width: var(--hw); margin: 3rem auto 0; }
+.baseline { position: absolute; left: 50%; width: 100vw; transform: translateX(-50%); bottom: calc(var(--hw) * 0.0528 - 2px); height: 1px; background: #4a4a4f; }
+.baseline::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 6px; background: repeating-linear-gradient(to right, #4a4a4f 0 1px, transparent 1px 20%); }
+.baseline::after { content: ""; position: absolute; right: 0; top: 0; width: 1px; height: 6px; background: #4a4a4f; }
+.plate { position: absolute; right: 0; bottom: 0.1rem; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-2); text-align: right; }
 
-/* sections: hairline above, overline, content */
-.section { position: relative; border-top: 1px solid var(--rule); padding-block: var(--space-section); }
-.pageNo { position: absolute; top: 1rem; right: var(--gutter); font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-3); }
+/* sections: a hairline above; anchor sections get 10rem, light ones 6rem */
+.section { position: relative; border-top: 1px solid var(--rule); }
+.anchor { padding-block: clamp(6rem, 12vw, 10rem); }
+.light { padding-block: clamp(3.5rem, 7vw, 6rem); }
 .head { display: grid; gap: 1rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
 .head p:not(.overline), .text p:not(.overline) { max-width: 40rem; }
 .text { display: grid; gap: 1rem; }
 
-/* 01 ecosystem */
-.ecoHead { display: grid; gap: 1.5rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
-.big { font-family: var(--font-mono); font-weight: 400; font-size: clamp(3.5rem, 12vw, 5rem); line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
-@media (min-width: 48rem) { .ecoHead { grid-template-columns: auto minmax(0, 1fr); gap: 4rem; align-items: end; } }
+/* 01 ecosystem: 10rem | 1fr */
+.ecoHead { display: grid; gap: 1.5rem; }
+.big { font-family: var(--font-mono); font-weight: 400; font-size: clamp(3rem, 8vw, 5rem); line-height: 1; letter-spacing: -0.05em; color: var(--ink); }
+.ecoBody { display: grid; gap: 1rem; min-width: 0; }
+.ecoTitle { font-size: 1.5rem; font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; max-width: 30rem; }
+.ecoText { max-width: 40rem; }
+@media (min-width: 48rem) { .ecoHead { grid-template-columns: 10rem minmax(0, 1fr); gap: 2rem; } }
 
-/* 03 report: plain mono lines on the page */
-.term { margin: 0; font-size: 0.8rem; line-height: 1.75; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
-.tag { color: var(--ink); font-weight: 600; }
-@media (min-width: 40rem) { .term { font-size: 0.9rem; } }
+/* works with: one hairline row at the end of "how it works" */
+.works { list-style: none; margin: clamp(2.5rem, 5vw, 3.5rem) 0 0; padding: 1.5rem 0; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1.25rem 2rem; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); color: var(--ink); }
+.works li { display: flex; align-items: center; gap: 0.75rem; font-family: var(--font-mono); font-size: 0.8125rem; }
 
-/* 04 install */
-.steps4 { list-style: none; margin: 0; padding: 0; display: grid; gap: 2.5rem; }
-.steps4 .overline { margin-bottom: 0.75rem; }
-.stepNote { margin-top: -0.25rem; font-size: 0.95rem; max-width: 40rem; }
-.npmSoon { margin-top: 3rem; font-family: var(--font-mono); font-size: 0.8125rem; color: var(--ink-2); }
-.npmLine { font-family: var(--font-mono); font-size: 0.875rem; color: var(--ink-2); opacity: 0.6; user-select: none; margin-top: 0.25rem; }
+/* 02 report: plain mono lines, hairline on the left */
+.term { margin: 0; padding-left: 1.5rem; border-left: 1px solid var(--rule); font-size: 0.875rem; line-height: 1.8; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; max-width: 46rem; }
+.strong { color: var(--ink); font-weight: 600; }
 
-/* kedge note */
-.kedge { margin-top: 3rem; max-width: 40rem; }
+/* what it catches: only a top hairline per item */
+.catches { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2.5rem 1.5rem; }
+.catchItem { border-top: 1px solid var(--rule); padding-top: 1.25rem; display: grid; gap: 0.6rem; align-content: start; color: var(--ink); }
+.catchItem p { color: var(--ink-2); font-size: 0.95rem; max-width: 22rem; }
+.catchCode { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink); word-break: keep-all; }
+.moreLink { margin-top: 2rem; font-family: var(--font-mono); font-size: 0.8125rem; }
+@media (min-width: 48rem) { .catches { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 3rem; } .catchCode { font-size: 0.75rem; } }
 
-/* 05 roadmap */
+/* 03 install */
+.installBlock { max-width: 40rem; }
+.stepNote { margin-top: 0.25rem; font-size: 0.95rem; max-width: 40rem; }
+
+/* faq */
+.faq { max-width: 40rem; border-top: 1px solid var(--rule); }
+.faqItem { border-bottom: 1px solid var(--rule); }
+.faqItem summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; padding: 1.1rem 0; color: var(--ink); font-size: 1.0625rem; }
+.faqItem summary::-webkit-details-marker { display: none; }
+.faqItem summary::after { content: "+"; font-family: var(--font-mono); color: var(--ink-2); flex: none; }
+.faqItem[open] summary::after { content: "\2212"; color: var(--ink); }
+.faqItem p { padding: 0 2rem 1.25rem 0; max-width: 36rem; }
+
+/* roadmap: simple rows, no tags */
 .road { list-style: none; margin: 0; padding: 0; }
 .road li { display: grid; gap: 0.25rem; padding: 1.1rem 0; border-top: 1px solid var(--rule); }
 .road li:last-child { border-bottom: 1px solid var(--rule); }
-.road .status { font-family: var(--font-mono); font-size: 0.75rem; }
-@media (min-width: 48rem) { .road li { grid-template-columns: 12rem minmax(0, 1fr) auto; gap: 2rem; align-items: baseline; } }
+.road h3 { font-size: 1rem; }
+.road p { color: var(--ink-2); }
+@media (min-width: 48rem) { .road li { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; align-items: baseline; } }
 
-/* stats ticker */
-.ticker { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem 0.9rem; padding: 0.9rem var(--gutter); border-top: 1px solid var(--rule); font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); }
+/* final call to action */
+.cta2 { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding-block: clamp(5rem, 10vw, 8rem); text-align: center; }
+.cta2 :global(.col) { display: grid; justify-items: center; gap: 1.25rem; }
+.ctaHorse { display: block; margin-bottom: 0.5rem; }
+.ctaTitle { font-size: clamp(2.5rem, 5vw, 4rem); line-height: 1.05; letter-spacing: -0.035em; }
+.ctaSub { margin-top: -0.25rem; }
+.ctaCode { width: 100%; max-width: 40rem; text-align: left; margin-top: 1rem; }

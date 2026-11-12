@@ -18,7 +18,7 @@ export default function SiteHeader() {
 
   return (
     <header className={styles.header} data-scrolled={scrolled}>
-      <div className={`wrap ${styles.inner}`}>
+      <div className={`colWide ${styles.inner}`}>
         <Link className={styles.brand} href="/" aria-label="kedgeway, home">
           <HorseMark size={40} />
           <span>kedgeway</span>

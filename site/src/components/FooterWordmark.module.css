@@ -1,0 +1,7 @@
+.word { position: relative; font-family: var(--font-mono); font-weight: 500; font-size: clamp(3.75rem, 14vw, 10rem); white-space: nowrap; line-height: 0.9; letter-spacing: -0.04em; color: var(--ink); margin: 0; }
+/* Cover stripes retract left to right, revealing the text in horizontal strokes; removed when done. */
+.cover { position: absolute; inset: 0; pointer-events: none; display: flex; flex-direction: column; }
+.stripe { flex: 1; background: var(--bg); transform-origin: right center; animation: unwrap 0.45s steps(12, end) var(--d, 0ms) forwards; animation-play-state: paused; }
+.cover[data-run="true"] .stripe { animation-play-state: running; }
+@keyframes unwrap { to { transform: scaleX(0); } }
+@media (min-width: 64rem) { .word { font-size: clamp(5rem, 8vw, 6.5rem); } }

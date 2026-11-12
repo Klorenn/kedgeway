@@ -25,6 +25,8 @@ export interface HatchOptions {
   trails?: boolean;
   /** Draw these rows instead of one of the gallop frames (for example the standing horse). */
   rows?: HatchRun[][];
+  /** Engraving mode for large renders: twice the bands, thin strokes with real gaps, ragged edges. */
+  fine?: boolean;
 }
 
 function rng(seed: number): () => number {
@@ -40,7 +42,7 @@ function rng(seed: number): () => number {
 const n2 = (n: number): string => n.toFixed(2);
 
 /** One frame as horizontal dry-brush strokes. Deterministic: same frame, same strokes. */
-export function hatchGeometry(frame: number, { weight = 1, trails = true, rows: rowsOverride }: HatchOptions = {}): HatchGeometry {
+export function hatchGeometry(frame: number, { weight = 1, trails = true, rows: rowsOverride, fine = false }: HatchOptions = {}): HatchGeometry {
   const rows: HatchRun[][] = rowsOverride ?? HORSE_HATCH.frames[frame] ?? [];
   const filled = rows.map((r, i) => (r.length > 0 ? i : -1)).filter((i) => i >= 0);
   const first = filled[0] ?? 0;
@@ -61,7 +63,21 @@ export function hatchGeometry(frame: number, { weight = 1, trails = true, rows: 
     const r = rng(frame * 1009 + row * 31 + 7);
     const w = Math.round((0.8 + r() * 0.6) * weight * 10) / 10;
     const y = row + 0.5 + (r() - 0.5) * 0.4;
-    for (const [a, b] of runs) {
+    if (fine) {
+      // Two bands per source row, pitch 0.5 cell, stroke ~0.2 cell (about 40% stroke to gap).
+      for (const band of [0.25, 0.75]) {
+        const by = row + band + (r() - 0.5) * 0.08;
+        const bw = Math.round((0.17 + r() * 0.09) * weight * 100) / 100;
+        for (const [a, b] of runs) {
+          // ragged silhouette edge: ends wander by up to ~1.4 cells
+          const aa = a + (r() - 0.35) * 1.4;
+          const bb = b - (r() - 0.35) * 1.4;
+          if (bb - aa < 0.8) continue;
+          push(main, bw, `M${n2(aa)} ${n2(by)}H${n2(bb)}`);
+        }
+      }
+    }
+    for (const [a, b] of fine ? [] : runs) {
       const len = b - a;
       if (len > 24 && r() < 0.5) {
         const cut = a + len * (0.35 + 0.3 * r());
