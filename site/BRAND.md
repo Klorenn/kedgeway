@@ -43,7 +43,7 @@ chroma is the construction red, used exclusively for construction lines (golden 
 
 Data states (grid only): deprecated = `--ink`; current = `--ink-2`; supported = `--rule`; unknown = `--ink-3`.
 The report's `$` line and `[CRITICAL]` tags are `--ink` at 600 weight, not colored. No glow, no shadows.
-Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical hairlines and a baseline under the hooves, scrolling left at ~18px/s for 8 seconds, then still, with a fainter half-speed layer behind; faded under the text, static under reduced motion. Its numbers are `--ink-2` at 35%.
+Backdrop: a full-viewport animated dithered cloud field (4x4 Bayer, 2px cells, `--rule` / `--ink-3` / `--ink-2` dots with sparse `--ink` highlights), drifting slowly behind everything, darkened behind the content column so text stays at 4.5:1 or better; quieter on the docs. The footer ends in a dithered mountain band (four ridges, farther is darker, drifting 2-6px/s). Both are static under reduced motion. The hero keeps a static baseline with ticks under the horse.
 
 ## Typography
 
@@ -56,7 +56,7 @@ Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical ha
 
 ## Layout rules
 
-- **No boxes.** No cards, no bordered panels, no filled surfaces behind text. **One exception: code blocks** (surface `#101113`, 1px `--rule` border, 2px radius, label bar with a copy button). Structure comes from
+- **No boxes.** No cards, no bordered panels, no filled surfaces behind text. **Two exceptions: code blocks** (surface `#101113`, 1px `--rule` border, 2px radius, copy button top-right) **and icon buttons** (40px square, hairline `--rule` border, 2px radius, icon 18px, ink-2 to ink on hover). Structure comes from
   hairlines (`--rule`, 1px) and whitespace.
 - Content column 40rem for text, 64rem for data. Centered.
 - Vertical rhythm: every section opens with a hairline. Anchor sections (ecosystem, report, install) get 10rem of padding (6rem on mobile); light ones (how it works, what it catches, FAQ, roadmap) get 6rem (3.5rem on mobile). Overlines (`01 — the ecosystem`) only on the anchor sections; no page numbers.
@@ -69,8 +69,8 @@ Backdrop: the hero carries Muybridge's measuring wall: numbered 48px vertical ha
 
 ## Motion
 
-- Hero gallop at 10fps and the measuring wall behind it; both pause off-screen and are static under reduced motion.
-- Outside the hero, motion happens once and stops: the grid wave (1.2s), the diagram packet, the report typewriter, the footer wordmark reveal (plus the footer film strip while in view). No scroll reveals.
+- Hero gallop at 10fps; the cloud field (24fps) and footer mountains (20fps) pause when hidden and are static under reduced motion.
+- Outside the hero, motion happens once and stops: the grid wave (1.2s), the diagram packet, the report typewriter, . No scroll reveals.
 
 ## Image direction
 

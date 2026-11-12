@@ -7,8 +7,7 @@ import PixelIcon, { type PixelIconName } from "@/components/icons/pixel";
 import Typewriter from "@/components/Typewriter";
 import EcosystemGrid from "@/components/EcosystemGrid";
 import HeroHorse from "@/components/HeroHorse";
-import MeasureBackdrop from "@/components/MeasureBackdrop";
-import { HORSE_STANDING } from "@/data/horse-hatch";
+import { STATIC_FRAME } from "@/lib/hatch";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -56,7 +55,6 @@ export default function Home() {
   return (
     <>
       <section className={styles.hero}>
-        <MeasureBackdrop anchor="[data-hero-horse]" />
         <div className={styles.textBlock}>
           <h1 className={styles.title}>Your Soroban SDK is drifting.</h1>
           <p className={styles.sub}>kedgeway asks the live Stellar ecosystem what is current and tells you how far behind you are.</p>
@@ -64,6 +62,9 @@ export default function Home() {
             <Link className="btnPrimary" href="#install">Get started</Link>
             <Link className="btnLink" href="/docs">Read the docs →</Link>
           </div>
+          <p className={styles.proof}>
+            <b>1,285 Soroban repos</b> are on a deprecated SDK today. <span>Scout via Raven, 2026-11-11.</span>
+          </p>
         </div>
         <figure className={styles.horseBlock}>
           <HeroHorse />
@@ -78,20 +79,26 @@ export default function Home() {
             <p className={styles.big} aria-hidden="true">22%</p>
             <div className={styles.ecoBody}>
               <p className="overline">01 — the ecosystem</p>
-              <h2 id="eco-h" className={styles.ecoTitle}>One in five Soroban repos is on a deprecated SDK.</h2>
+              <h2 id="eco-h" className={styles.ecoTitle}>One in five Soroban repos <span className="line2">runs a deprecated SDK.</span></h2>
               <p className={styles.ecoText}>
                 Scout scanned 5,863 repos on 2026-11-11. 1,285 of them (22%) use a deprecated <code>soroban-sdk</code>. Nothing in their build tells them.
               </p>
               <EcosystemGrid />
             </div>
           </div>
+          <dl className={styles.stats}>
+            <div><dt>repos scanned</dt><dd>5,863</dd></div>
+            <div><dt>deprecated</dt><dd>1,285</dd></div>
+            <div><dt>of the ecosystem</dt><dd>22%</dd></div>
+            <div><dt>current soroban-sdk major</dt><dd>28</dd></div>
+          </dl>
         </div>
       </section>
 
       <section className={`${styles.section} ${styles.light}`} aria-labelledby="how-h">
         <div className="colWide">
           <div className={styles.head}>
-            <h2 id="how-h">It checks the live ecosystem, not a stale list.</h2>
+            <h2 id="how-h">Checked against the live ecosystem. <span className="line2">Never a stale list.</span></h2>
             <p>
               kedgeway scans <code>Cargo.toml</code> for <code>soroban-sdk</code>, including workspace dependencies and <code>package =</code> renames, and <code>package.json</code> for <code>@stellar/stellar-sdk</code>, <code>@stellar/stellar-base</code>, and the legacy <code>soroban-client</code> and <code>stellar-sdk</code>. Then it asks Stellar Raven. If a source fails, the report says <code>DATA_DEGRADED</code> instead of guessing.
             </p>
@@ -112,7 +119,7 @@ export default function Home() {
         <div className="colWide">
           <div className={styles.head}>
             <p className="overline">02 — the report</p>
-            <h2 id="report-h">A report you can act on.</h2>
+            <h2 id="report-h">A report you can act on. <span className="line2">Every line cites its source.</span></h2>
             <p>
               Findings are sorted by severity, point at the file, and say what to do. Every finding cites its source and observation time. Use <code>--json</code> for machines and <code>--fail-on</code> for CI.
             </p>
@@ -148,7 +155,7 @@ Summary: 2 critical, 0 warning, 0 info`}
       <section className={`${styles.section} ${styles.light}`} aria-labelledby="catch-h">
         <div className="colWide">
           <div className={styles.head}>
-            <h2 id="catch-h">Six things it tells you, with evidence.</h2>
+            <h2 id="catch-h">What it catches. <span className="line2">Twelve codes, three severities.</span></h2>
             <p>Each finding names the file, cites its source and the time it was observed, and says what to do.</p>
           </div>
           <ul className={styles.catches}>
@@ -167,10 +174,10 @@ Summary: 2 critical, 0 warning, 0 info`}
       </section>
 
       <section className={`${styles.section} ${styles.anchor}`} id="install" aria-labelledby="install-h">
-        <div className="colWide">
+        <div className={`col ${styles.centered}`}>
           <div className={styles.head}>
             <p className="overline">03 — install</p>
-            <h2 id="install-h">Install</h2>
+            <h2 id="install-h">Install in a minute. <span className="line2">From source today, npm soon.</span></h2>
             <p>kedgeway is not published to npm yet. Build it from source, sign in to Raven, then diagnose a repo.</p>
           </div>
           <div className={styles.installBlock}>
@@ -196,9 +203,9 @@ kedgeway diagnose ./my-contract --fail-on warning`}
       </section>
 
       <section className={`${styles.section} ${styles.light}`} aria-labelledby="faq-h">
-        <div className="colWide">
+        <div className={`col ${styles.centered}`}>
           <div className={styles.head}>
-            <h2 id="faq-h">Questions people ask first.</h2>
+            <h2 id="faq-h">Questions, answered. <span className="line2">Short, no marketing.</span></h2>
           </div>
           <div className={styles.faq}>
             {FAQ.map(([q, a]) => (
@@ -212,10 +219,9 @@ kedgeway diagnose ./my-contract --fail-on warning`}
       </section>
 
       <section className={`${styles.section} ${styles.light}`} aria-labelledby="road-h">
-        <div className="colWide">
+        <div className={`col ${styles.centered}`}>
           <div className={styles.head}>
-            <h2 id="road-h">Roadmap</h2>
-            <p>None of this has shipped. It is what we intend to build.</p>
+            <h2 id="road-h">What comes next. <span className="line2">None of it has shipped.</span></h2>
           </div>
           <ul className={styles.road}>
             {ROADMAP.map(([name, what]) => (
@@ -230,11 +236,10 @@ kedgeway diagnose ./my-contract --fail-on warning`}
 
       <section className={styles.cta2} aria-labelledby="cta-h">
         <div className="col">
-          <svg width="160" height="95" viewBox="-6 6 160 95" role="img" aria-label="A horse standing still" className={styles.ctaHorse}>
-            <HatchGroup frame={0} rows={HORSE_STANDING} color="var(--ink)" trails={false} />
+          <svg width="160" height="76" viewBox="-6 15 160 76" role="img" aria-label="A horse at full gallop" className={styles.ctaHorse}>
+            <HatchGroup frame={STATIC_FRAME} color="var(--ink)" trails={false} weight={1.6} />
           </svg>
-          <h2 id="cta-h" className={styles.ctaTitle}>Stop drifting.</h2>
-          <p className={styles.ctaSub}>Diagnose your repo in under a minute.</p>
+          <h2 id="cta-h" className={styles.ctaTitle}>Stop drifting. <span className="line2">Diagnose your repo now.</span></h2>
           <div className={styles.cta}>
             <Link className="btnPrimary" href="#install">Get started</Link>
             <Link className="btnLink" href="/docs">Read the docs →</Link>

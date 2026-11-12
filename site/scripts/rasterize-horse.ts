@@ -168,11 +168,7 @@ const MIN_RUN_CELLS = 0.8;
 const RIDER_LEFT = 0.21;
 const RIDER_RIGHT = 0.115;
 const DEFAULT_LIFT = 7; // px below the interpolated back line, so no seat or boot stub survives
-// Frame 11 (index) is the standing horse: the topmost point is the head, not the cap, so the window is set by hand
-// around the rider and the cut line is flat at the horse's back.
-const RIDER_OVERRIDES: Record<number, { left?: number; right?: number; lift?: number; flat?: boolean }> = {
-  11: { left: 0.21, right: 0.115, lift: 4, flat: true },
-};
+const RIDER_OVERRIDES: Record<number, { left?: number; right?: number; lift?: number; flat?: boolean }> = {};
 
 function columnTop(data: Buffer, w: number, h: number, x: number): number | null {
   for (let y = 0; y < h; y++) if ((data[y * w + x] as number) > 127) return y;
@@ -254,14 +250,6 @@ function hatchRows(data: Buffer, w: number, h: number): Run[][] {
   return rows;
 }
 
-async function standingHatch(sheet: string): Promise<Run[][]> {
-  // Frame 12 of the sheet (row 3, column 4): a standing horse. Same crop, same cleanup, same rider mask.
-  const box: Box = { left: (BOX_X[3] as number) + CROP.dx, top: (BOX_Y[2] as number) + CROP.dy, width: CROP.w, height: CROP.h };
-  const { data, w, h } = await silhouette(sheet, box);
-  const { masked } = maskRider(data, w, h, 11);
-  return hatchRows(masked, w, h);
-}
-
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
   const showCompact = process.argv.includes("--compact");
@@ -312,7 +300,6 @@ async function main(): Promise<void> {
       .png()
       .toFile(resolve(contact.replace(/\.png$/, "-rider.png")));
   }
-  const standing = await standingHatch(sheet);
   const hatchBody = hatch
     .map((f, i) => `  [ // frame ${i + 1}\n${f.map((r) => `    ${JSON.stringify(r)},`).join("\n")}\n  ],`)
     .join("\n");
@@ -336,10 +323,6 @@ ${hatchBody}
 /** Index of the fully extended flight frame. */
 export const HATCH_STATIC = ${STATIC_INDEX};
 
-/** Frame 12 of the sheet: the standing horse (used on the 404 page). */
-export const HORSE_STANDING: HatchRun[][] = [
-${standing.map((r) => `  ${JSON.stringify(r)},`).join("\n")}
-];
 `,
   );
   if (showCompact) console.log(compact.join("\n"));

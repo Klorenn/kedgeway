@@ -1,8 +1,7 @@
 import Link from "next/link";
-import BackToTop from "./BackToTop";
-import FooterFilm from "./FooterFilm";
-import FooterWordmark from "./FooterWordmark";
+import FooterLandscape from "./FooterLandscape";
 import HorseMark from "./HorseMark";
+import PixelIcon from "./icons/pixel";
 import styles from "./SiteFooter.module.css";
 
 const REPO = "https://github.com/kedgeway/kedgeway";
@@ -16,63 +15,75 @@ const GITHUB_PATH =
 export default function SiteFooter() {
   return (
     <footer className={styles.footer}>
-      <FooterFilm />
       <div className={`colWide ${styles.inner}`}>
         <div className={styles.row1}>
-          <div className={styles.brandRow}>
-            <HorseMark size={64} />
-            <FooterWordmark />
-          </div>
-          <div className={styles.side}>
-            <p>Diagnose Stellar SDK drift against the live ecosystem.</p>
-            <p>A kedge is a small anchor carried out from a drifting ship and hauled in to pull it back on course. kedgeway pulls a repo&apos;s SDK versions back on course.</p>
-            <a className={styles.link} href={REPO}>Star on GitHub →</a>
-            <p className={styles.status}>v0.1.0 · data observed 2026-11-11 · built on Stellar Raven</p>
-          </div>
-        </div>
-        <div className={styles.cols}>
-          <div>
-            <p className={styles.h}>Product
-            </p>
-            <p><Link href="/#install">Install</Link></p>
-            <p><Link href="/docs">Docs</Link></p>
-            <p><Link href="/docs/roadmap">Roadmap</Link></p>
-            <p><a href={`${BLOB}/CHANGELOG.md`}>Changelog</a></p>
-          </div>
-          <div>
-            <p className={styles.h}>Project
-            </p>
-            <p><a href={REPO}>GitHub</a></p>
-            <p><a href={`${BLOB}/LICENSE`}>License MIT</a></p>
-            <p><a href={`${BLOB}/SECURITY.md`}>Security</a></p>
-            <p><a href={`${BLOB}/CONTRIBUTING.md`}>Contributing</a></p>
-          </div>
-          <div>
-            <p className={styles.h}>Source
-            </p>
-            <p className={styles.plain}>Built on Stellar Raven</p>
-            <p className={styles.plain}>Muybridge pl. 626 — 1878</p>
-          </div>
-          <div>
-            <p className={styles.h}>Author
-            </p>
-            <p className={styles.made}>Made by Kl0ren</p>
-            <div className={styles.icons}>
-              <a href="https://x.com/kl0ren" aria-label="Kl0ren on X">
+          <div className={styles.brandCol}>
+            <Link href="/" className={styles.lockup} aria-label="kedgeway, home">
+              <HorseMark size={40} />
+              <span>kedgeway</span>
+            </Link>
+            <p className={styles.blurb}>Diagnose Stellar SDK drift against the live ecosystem. Open source, built on Stellar Raven.</p>
+            <div className={styles.social}>
+              <a className={styles.iconBtn} href="https://x.com/kl0ren" aria-label="Kl0ren on X">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={X_PATH} /></svg>
               </a>
-              <a href="https://github.com/Klorenn" aria-label="Kl0ren on GitHub">
+              <a className={styles.iconBtn} href="https://github.com/Klorenn" aria-label="Kl0ren on GitHub">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={GITHUB_PATH} /></svg>
+              </a>
+              <a className={styles.iconBtn} href="https://www.npmjs.com/package/kedgeway" aria-label="kedgeway on npm (not published yet)">
+                <PixelIcon name="crate" size={18} />
               </a>
             </div>
           </div>
+          <div className={styles.cols}>
+            <nav className={styles.col} aria-label="Product">
+              <h3>Product</h3>
+              <ul>
+                <li><Link href="/#install">Install</Link></li>
+                <li><Link href="/docs">Docs</Link></li>
+                <li><Link href="/docs/findings">Findings</Link></li>
+                <li><a href={`${BLOB}/CHANGELOG.md`}>Changelog</a></li>
+                <li><Link href="/docs/roadmap">Roadmap</Link></li>
+              </ul>
+            </nav>
+            <nav className={styles.col} aria-label="Project">
+              <h3>Project</h3>
+              <ul>
+                <li><a href={REPO}>GitHub</a></li>
+                <li><a href={`${BLOB}/LICENSE`}>License MIT</a></li>
+                <li><a href={`${BLOB}/SECURITY.md`}>Security</a></li>
+                <li><a href={`${BLOB}/CONTRIBUTING.md`}>Contributing</a></li>
+                <li><a href={`${BLOB}/CODE_OF_CONDUCT.md`}>Code of conduct</a></li>
+              </ul>
+            </nav>
+            <nav className={styles.col} aria-label="Resources">
+              <h3>Resources</h3>
+              <ul>
+                <li><Link href="/docs/getting-started">Getting started</Link></li>
+                <li><Link href="/docs/authentication">Authentication</Link></li>
+                <li><Link href="/docs/ci">CI</Link></li>
+                <li><Link href="/docs/fixtures">Fixtures</Link></li>
+                <li><Link href="/docs/faq">FAQ</Link></li>
+              </ul>
+            </nav>
+            <nav className={styles.col} aria-label="Author">
+              <h3>Author</h3>
+              <ul>
+                <li className={styles.plain}>Made by Kl0ren</li>
+                <li><a href="https://x.com/kl0ren">X</a></li>
+                <li><a href="https://github.com/Klorenn">GitHub</a></li>
+              </ul>
+            </nav>
+          </div>
         </div>
         <div className={styles.legal}>
-          <span>© 2026 kedgeway contributors</span>
-          <span>MIT</span>
-          <BackToTop className={styles.top} />
+          <p>© 2026 kedgeway contributors. MIT licensed.</p>
+          <p>
+            Made by <a href="https://x.com/kl0ren">Kl0ren</a>
+          </p>
         </div>
       </div>
+      <FooterLandscape />
     </footer>
   );
 }

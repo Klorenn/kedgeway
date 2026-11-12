@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import SiteHeader from "@/components/SiteHeader";
+import DitherClouds from "@/components/DitherClouds";
 import SiteFooter from "@/components/SiteFooter";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body>
+        <DitherClouds />
         <a className="skip" href="#main">Skip to content</a>
         <SiteHeader />
         <main id="main">{children}</main>

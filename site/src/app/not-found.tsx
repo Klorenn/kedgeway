@@ -1,6 +1,6 @@
 import Link from "next/link";
 import HatchGroup from "@/components/HatchGroup";
-import { HORSE_STANDING } from "@/data/horse-hatch";
+import { STATIC_FRAME } from "@/lib/hatch";
 import styles from "./not-found.module.css";
 
 export const metadata = { title: "Not found — kedgeway" };
@@ -9,8 +9,8 @@ export default function NotFound() {
   return (
     <div className={styles.wrap}>
       <div className={styles.col}>
-        <svg width="320" height="190" viewBox="-6 6 160 95" role="img" aria-label="A horse standing still" style={{ display: "block" }}>
-          <HatchGroup frame={0} rows={HORSE_STANDING} color="var(--ink)" trails={false} />
+        <svg width="160" height="76" viewBox="-6 15 160 76" role="img" aria-label="A horse at full gallop" style={{ display: "block" }}>
+          <HatchGroup frame={STATIC_FRAME} color="var(--ink)" trails={false} weight={1.6} />
         </svg>
         <h1>
           Drifted <em>off course.</em>
