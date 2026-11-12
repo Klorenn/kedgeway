@@ -4,8 +4,11 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-12
+
 ### Added
 
+- feat(cli): `kedgeway --version` / `-V` prints the version from `package.json`. `kedgeway init [path]` writes `.github/workflows/kedgeway.yml` using the published action (pinned to the CLI version, `fail-on: warning`, `auth: ${{ secrets.KEDGEWAY_AUTH }}`); it refuses to overwrite unless `--force` (exit 1), `--print` writes the YAML to stdout, and it prints the written path plus a hint to set the `KEDGEWAY_AUTH` secret.
 - feat(migrate): `kedgeway migrate` leads with a guide: published version, protocol, observation time, numbered steps, and up to 20 import sites for `soroban-client` and unscoped `stellar-sdk`. Raven doc hits are cited only when the title or url is a migration document. SDK: `buildGuide`, `formatGuide`, `migrationDocs`, `findImportHits`. The edits are still version strings only.
 - feat(lockfile): `Cargo.lock`, `package-lock.json` (v1/v2/v3), `pnpm-lock.yaml` and `yarn.lock` (classic and berry) resolution of the DIRECT dependency (Cargo: the entry satisfying the manifest requirement, else `ambiguous in Cargo.lock`; pnpm: the importer's entry; yarn: the `name@range` descriptor). `DetectedDep` gains `resolved`, `resolvedFrom` and an optional `lockNote`; diagnosis compares `resolved ?? version` and evidence names the lockfile (`resolved 21.7.6 from Cargo.lock; manifest ^21`). `migrate` still edits manifests only; when the manifest already allows the current major but the lock is older it emits a "refresh the lockfile" manual step and always notes touched lockfiles. The text report hints at a lockfile above the scan root.
 - feat(cache): the ecosystem snapshot is cached at `$XDG_CACHE_HOME/kedgeway/snapshot.json` (mode 0600, exclusive temp file, directory 0700); degraded snapshots are never cached and cached degraded or future-dated snapshots count as stale. `diagnose` and `migrate` gain `--offline`, `--no-cache` and `--max-age <duration>` (default `24h`; `--offline --no-cache` is rejected; `--offline` is ignored with `--fixture`); a failed Raven fetch falls back to the cache, and stale or fallback snapshots raise `DATA_DEGRADED`.
@@ -22,6 +25,9 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Fixed
 
+- `kedgeway doctor` fails the auth check when `auth.json` exists but cannot be read. Only a missing file stays a warning. `logout` and the read-only auth store used by doctor propagate read errors other than a missing file.
+- MCP `migrate` with `write: true` names the steps it could not apply, and no longer describes that result as a dry run.
+- The GitHub Action exits 1 if printing the report or the annotations fails, instead of keeping the CLI's exit code.
 - `package.json` aliases such as `"stellar-sdk": "npm:@stellar/stellar-sdk@17.4.0"` are read as the real `@stellar/stellar-sdk` instead of being reported as the legacy `stellar-sdk` package (found in the stellar/freighter manifest while building the corpus); `migrate` edits the aliased member (`DetectedDep.declaredKey` / `declaredRaw`). Manifest lines now come from the span-aware JSON scanner, so `overrides.dependencies` cannot win; the action sanitises finding text before printing it so it cannot inject workflow commands.
 
 ### Changed

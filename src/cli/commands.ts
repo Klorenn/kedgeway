@@ -1,4 +1,7 @@
+import { resolve } from "node:path";
 import { Command, CommanderError } from "commander";
+import { WORKFLOW_PATH, renderWorkflow } from "../core/workflow-template.js";
+import type { WorkflowWriteResult } from "../adapters/workflow-writer.js";
 import { meetsThreshold, type Diagnosis, type Severity } from "../core/diagnose.js";
 import type { RepoFacts } from "../core/repo-facts.js";
 import { doctorOk, formatDoctor, type DoctorCheck } from "../core/doctor.js";
@@ -20,6 +23,10 @@ export interface CliIo {
   /** Runs the self-check (see `kedgeway doctor`). */
   doctor: (opts: { offline: boolean }) => Promise<DoctorCheck[]>;
   writeFile: (path: string, text: string) => Promise<void>;
+  /** The kedgeway version (package.json); also pins the action tag in the generated workflow. */
+  version: string;
+  /** Writes `<root>/<relPath>`; without `force` it must never overwrite an existing file. */
+  writeWorkflow: (root: string, relPath: string, text: string, opts: { force: boolean }) => Promise<WorkflowWriteResult>;
   /** Snapshot cache directory (default `$XDG_CACHE_HOME/kedgeway`). Tests pass a temp dir. */
   cacheDir?: string;
   /** Repository root used to make SARIF uris relative (default `process.cwd()`). */
@@ -215,6 +222,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   program
     .name("kedgeway")
     .description("Diagnose how outdated a Stellar/Soroban toolchain is")
+    .version(io.version, "-V, --version", "print the kedgeway version")
     .exitOverride()
     .configureOutput({ writeOut: (s) => io.stdout(s), writeErr: (s) => io.stderr(s) });
 
@@ -237,6 +245,32 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     .option("--fixture <file>", "use an ecosystem snapshot JSON instead of Raven")
     .action(async (path: string | undefined, opts: MigrateOptions) => {
       exitCode = await runMigrate(path ?? ".", opts, io);
+    });
+
+  program
+    .command("init [path]")
+    .description("Write .github/workflows/kedgeway.yml (the kedgeway GitHub Action) into a repo. Exits 1 if the file exists, unless --force.")
+    .option("--force", "overwrite an existing workflow file")
+    .option("--print", "print the workflow YAML to stdout instead of writing a file")
+    .action(async (path: string | undefined, opts: { force?: boolean; print?: boolean }) => {
+      try {
+        const yaml = renderWorkflow({ version: io.version });
+        if (opts.print) {
+          io.stdout(yaml);
+          return;
+        }
+        const root = resolve((io.cwd ?? process.cwd)(), path ?? ".");
+        const r = await io.writeWorkflow(root, WORKFLOW_PATH, yaml, { force: opts.force === true });
+        if (r.status === "exists") {
+          io.stderr(`kedgeway: ${r.path} already exists; use --force to overwrite it.\n`);
+          exitCode = 1;
+          return;
+        }
+        io.stdout(`Wrote ${r.path}\nNext: add your Raven credentials as a repository secret named KEDGEWAY_AUTH (from \`kedgeway login --export\`).\n`);
+      } catch (e) {
+        io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
+        exitCode = 1;
+      }
     });
 
   program

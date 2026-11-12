@@ -13,7 +13,7 @@ export const DOCS_GROUPS: DocsGroup[] = [
     label: "Start",
     pages: [
       { href: "/docs", title: "Overview", summary: "What kedgeway is and is not." },
-      { href: "/docs/getting-started", title: "Getting started", summary: "Install from source, log in, run your first diagnosis." },
+      { href: "/docs/getting-started", title: "Getting started", summary: "Install from npm, log in, run your first diagnosis." },
     ],
   },
   {

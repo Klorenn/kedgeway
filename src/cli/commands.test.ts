@@ -42,6 +42,8 @@ function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
     exportCalls: 0,
     loginOpts: [] as ({ preserve?: boolean; noBrowser?: boolean } | undefined)[],
     env: {} as NodeJS.ProcessEnv,
+    workflowCalls: [] as { root: string; rel: string; text: string; force: boolean }[],
+    workflowExists: false,
     doctorOpts: [] as { offline: boolean }[],
     doctorChecks: [{ name: "node", status: "ok", detail: "v22.13.0" }] as { name: string; status: "ok" | "warn" | "fail" | "skip"; detail: string }[],
   };
@@ -66,6 +68,12 @@ function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
     doctor: (opts) => {
       state.doctorOpts.push(opts);
       return Promise.resolve(state.doctorChecks);
+    },
+    version: "9.8.7",
+    writeWorkflow: (root, rel, text, opts) => {
+      state.workflowCalls.push({ root, rel, text, force: opts.force });
+      const path = join(root, rel);
+      return Promise.resolve(state.workflowExists && !opts.force ? { status: "exists", path } : { status: "written", path });
     },
     cacheDir,
     cwd: () => dirname(dir),
@@ -594,5 +602,72 @@ describe("migrate lockfile note", () => {
     const { io, out } = makeIo();
     await runCli(argv("migrate", dir), io);
     expect(out.join("")).toMatch(/Lockfile\(s\) present \(Cargo\.lock\)/);
+  });
+});
+
+describe("--version", () => {
+  it("prints the injected version and exits 0", async () => {
+    const { io, out } = makeIo();
+    expect(await runCli(argv("--version"), io)).toBe(0);
+    expect(out.join("")).toBe("9.8.7\n");
+  });
+
+  it("-V is the short form", async () => {
+    const { io, out } = makeIo();
+    expect(await runCli(argv("-V"), io)).toBe(0);
+    expect(out.join("")).toBe("9.8.7\n");
+  });
+});
+
+describe("init", () => {
+  it("writes the workflow under the cwd by default, pinned to the CLI version", async () => {
+    const { io, out, err, state } = makeIo();
+    expect(await runCli(argv("init"), io)).toBe(0);
+    const call = state.workflowCalls[0]!;
+    expect(call.root).toBe(dirname(dir));
+    expect(call.rel).toBe(".github/workflows/kedgeway.yml");
+    expect(call.force).toBe(false);
+    expect(call.text).toContain("Klorenn/kedgeway@v9.8.7");
+    expect(out.join("")).toContain(join(dirname(dir), ".github/workflows/kedgeway.yml"));
+    expect(out.join("")).toContain("KEDGEWAY_AUTH");
+    expect(err.join("")).toBe("");
+  });
+
+  it("accepts a target path", async () => {
+    const { io, state } = makeIo();
+    expect(await runCli(argv("init", dir), io)).toBe(0);
+    expect(state.workflowCalls[0]!.root).toBe(dir);
+  });
+
+  it("refuses to overwrite and exits 1 with a --force hint", async () => {
+    const { io, out, err, state } = makeIo();
+    state.workflowExists = true;
+    expect(await runCli(argv("init"), io)).toBe(1);
+    expect(err.join("")).toMatch(/already exists/);
+    expect(err.join("")).toContain("--force");
+    expect(out.join("")).toBe("");
+  });
+
+  it("--force overwrites", async () => {
+    const { io, state } = makeIo();
+    state.workflowExists = true;
+    expect(await runCli(argv("init", "--force"), io)).toBe(0);
+    expect(state.workflowCalls[0]!.force).toBe(true);
+  });
+
+  it("--print writes the YAML to stdout and touches no file", async () => {
+    const { io, out, state } = makeIo();
+    state.workflowExists = true;
+    expect(await runCli(argv("init", "--print"), io)).toBe(0);
+    expect(state.workflowCalls).toHaveLength(0);
+    expect(out.join("")).toMatch(/^name: kedgeway\n/);
+    expect(out.join("")).toContain("Klorenn/kedgeway@v9.8.7");
+  });
+
+  it("exits 1 with a one-line error when the write fails", async () => {
+    const { io, err } = makeIo();
+    io.writeWorkflow = () => Promise.reject(new Error("boom"));
+    expect(await runCli(argv("init"), io)).toBe(1);
+    expect(err.join("")).toBe("kedgeway: boom\n");
   });
 });

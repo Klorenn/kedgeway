@@ -36,8 +36,6 @@ export default function Limitations() {
         <dd>Four folders deep, with common build and dependency folders skipped. See <Link href="/docs/what-it-scans">What it scans</Link>.</dd>
         <dt>Platforms</dt>
         <dd>Developed and checked on macOS. The browser-opening code has a Windows branch, but Windows has not been verified.</dd>
-        <dt>Not on npm yet</dt>
-        <dd>Install from source for now.</dd>
       </dl>
       <PrevNext href="/docs/limitations" />
     </>

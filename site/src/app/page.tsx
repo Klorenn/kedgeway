@@ -49,7 +49,7 @@ const FAQ: [string, string][] = [
   ["Does it work offline?", "Yes. --offline reuses the cached Raven snapshot from your last live run, and --fixture uses a snapshot file. A first live run needs network access and a Raven sign-in."],
   ["Which SDKs are detected?", "soroban-sdk in Cargo.toml, and @stellar/stellar-sdk, @stellar/stellar-base and the legacy soroban-client and stellar-sdk in package.json."],
   ["Can it fail my CI?", "Yes. --fail-on exits with code 2 when a finding meets the threshold. For live data in CI set the KEDGEWAY_AUTH secret; or use a fixture."],
-  ["When will it be on npm?", "Not yet. npm install -g kedgeway is coming soon; build from source today."],
+  ["How do I install it?", "npm install -g kedgeway. It needs Node 22.12 or newer."],
 ];
 
 const WAYS = [
@@ -59,12 +59,8 @@ const WAYS = [
   ["Migration mode", "Published version, protocol, and the lines to edit. Dry run by default.", "/docs/migrate"],
 ] as const;
 
-const INSTALL = `# 1. Build from source
-git clone https://github.com/Klorenn/kedgeway
-cd kedgeway
-npm ci
-npm run build
-npm link
+const INSTALL = `# 1. Install
+npm install -g kedgeway
 
 # 2. Sign in to Raven (opens your browser)
 kedgeway login
@@ -231,13 +227,13 @@ export default function Home() {
           <div className={`grid ${styles.install}`}>
             <div className={styles.reportLeft}>
               <div className={styles.block}>
-                <h2 id="install-h" className="t-heading">Install in a minute. <span className="line2">From source today, npm soon.</span></h2>
-                <p className="t-body">kedgeway is not published to npm yet. Build it from source, sign in to Raven, then diagnose a repo.</p>
+                <h2 id="install-h" className="t-heading">Install in a minute. <span className="line2">Then sign in to Raven.</span></h2>
+                <p className="t-body">Node 22.12 or newer. Install the CLI, sign in to Raven, then diagnose a repo.</p>
                 <p className="t-body-small">
                   The token is stored at <code>~/.config/kedgeway/auth.json</code> with mode 0600. <code>--fail-on warning</code> exits with code 2 if any finding is a warning or worse.
                 </p>
               </div>
-              <LazyDesignFigure name="fig6" fig="fig. 6" caption="four commands, one minute" description="Four commands in order: clone, build, login, diagnose." className={styles.figPad} />
+              <LazyDesignFigure name="fig6" fig="fig. 6" caption="install, sign in, diagnose" description="Three commands in order: npm install, login, diagnose." className={styles.figPad} />
             </div>
             <div className={styles.codeCol}>
               <CodeBlock label="Terminal" code={INSTALL} />

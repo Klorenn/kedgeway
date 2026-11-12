@@ -5,7 +5,7 @@ import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
 
-export const metadata: Metadata = docsMeta("Getting started — kedgeway docs", "Install kedgeway from source, log in, and run your first diagnosis.", "/docs/getting-started");
+export const metadata: Metadata = docsMeta("Getting started — kedgeway docs", "Install kedgeway from npm, log in, and run your first diagnosis.", "/docs/getting-started");
 
 export default function GettingStarted() {
   return (
@@ -14,12 +14,9 @@ export default function GettingStarted() {
       <p className={styles.lede}>Five minutes from clone to your first report. You need Node.js 22.12 or newer.</p>
 
       <h2>Install</h2>
-      <p>kedgeway is not published to npm yet. <code>npm install -g kedgeway</code> is coming soon. Until then, build it from source:</p>
-      <CodeBlock code={`git clone https://github.com/Klorenn/kedgeway
-cd kedgeway
-npm ci
-npm run build
-npm link`} />
+      <p>Install the CLI. It needs Node.js 22.12 or newer.</p>
+      <CodeBlock code={"npm install -g kedgeway"} />
+      <p>To hack on it, clone <a href="https://github.com/Klorenn/kedgeway">Klorenn/kedgeway</a>, then <code>npm ci</code>, <code>npm run build</code> and <code>npm link</code>.</p>
       <p>Check it worked:</p>
       <CodeBlock code={"kedgeway --help"} />
 

@@ -14,6 +14,10 @@ export default function Page() {
       <h1>GitHub Action</h1>
       <p className={styles.lede}>Run kedgeway on every pull request and fail the build when a finding meets your threshold.</p>
 
+      <h2 id="quick-start">Quick start</h2>
+      <CodeBlock code={"kedgeway init"} />
+      <p>This writes <code>.github/workflows/kedgeway.yml</code>, pinned to the installed version. Then add the secret: run <code>kedgeway login --export</code> and save its output as a repository secret named <code>KEDGEWAY_AUTH</code>. Use <code>--print</code> to preview the YAML and <code>--force</code> to overwrite an existing file. See <Link href="/docs/commands#init">Commands</Link>.</p>
+
       <h2>Use it</h2>
       <CodeBlock code={`- uses: actions/checkout@v4
 - uses: Klorenn/kedgeway@v0.1.0

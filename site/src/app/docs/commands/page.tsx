@@ -11,7 +11,11 @@ export default function Commands() {
   return (
     <>
       <h1>Commands</h1>
-      <p className={styles.lede}>Six commands: <code>diagnose</code>, <code>login</code>, <code>logout</code>, <code>doctor</code>, <code>migrate</code> and <code>mcp</code>.</p>
+      <p className={styles.lede}>Seven commands: <code>diagnose</code>, <code>init</code>, <code>login</code>, <code>logout</code>, <code>doctor</code>, <code>migrate</code> and <code>mcp</code>. Plus <code>--version</code>.</p>
+
+      <h2 id="version">--version</h2>
+      <CodeBlock code={"kedgeway --version\nkedgeway -V"} />
+      <p>Prints the installed version, read from <code>package.json</code>, and exits with 0.</p>
 
       <h2 id="diagnose">diagnose</h2>
       <CodeBlock code={"kedgeway diagnose [path] [--json] [--format <text|json|sarif|annotations>] [--sarif <file>] [--annotations <file>] [--fixture <file>] [--fail-on <severity>] [--offline] [--no-cache] [--max-age <duration>]"} />
@@ -38,6 +42,17 @@ export default function Commands() {
       </dl>
       <CodeBlock code={`kedgeway diagnose ./my-contract --fail-on critical
 kedgeway diagnose . --json > report.json`} />
+
+      <h2 id="init">init</h2>
+      <CodeBlock code={"kedgeway init [path] [--force] [--print]"} />
+      <p>Writes <code>.github/workflows/kedgeway.yml</code> under <code>path</code> (default: the current directory). The workflow runs on pushes to <code>main</code> or <code>master</code> and on pull requests, and uses <code>Klorenn/kedgeway@v&lt;installed version&gt;</code> with <code>path: .</code>, <code>fail-on: warning</code> and <code>auth: $&#123;&#123; secrets.KEDGEWAY_AUTH &#125;&#125;</code>. Afterwards, create the <code>KEDGEWAY_AUTH</code> repository secret from the output of <code>kedgeway login --export</code>. See <Link href="/docs/github-action#quick-start">GitHub Action</Link>.</p>
+      <dl className={styles.defs}>
+        <dt><code>--force</code></dt>
+        <dd>Overwrite an existing workflow file. Without it, an existing file is left as is and the command exits with 1.</dd>
+        <dt><code>--print</code></dt>
+        <dd>Print the workflow YAML to stdout and write nothing.</dd>
+      </dl>
+      <p>Exit 0 on success. Exit 1 if the file exists and <code>--force</code> is not set, or if the write fails.</p>
 
       <h2 id="login">login</h2>
       <CodeBlock code={"kedgeway login"} />
@@ -77,8 +92,8 @@ kedgeway diagnose . --json > report.json`} />
         <table className={styles.table}>
           <thead><tr><th scope="col">Code</th><th scope="col">Meaning</th></tr></thead>
           <tbody>
-            <tr><th scope="row"><code>0</code></th><td><code>diagnose</code>: finished, and no <code>--fail-on</code> threshold was hit. <code>migrate</code>: nothing to do, only manual steps, or the edits were applied. <code>doctor</code> and <code>logout</code>: finished. A <code>warn</code> from <code>doctor</code> still exits 0.</td></tr>
-            <tr><th scope="row"><code>1</code></th><td>Tool error: an invalid flag (including <code>--fail-on</code>, <code>--format</code> or <code>--max-age</code>), <code>--json</code> combined with <code>--format</code>, <code>--offline</code> with <code>--no-cache</code>, a login failure, a failed <code>doctor</code> check, or a scan or network failure.</td></tr>
+            <tr><th scope="row"><code>0</code></th><td><code>diagnose</code>: finished, and no <code>--fail-on</code> threshold was hit. <code>migrate</code>: nothing to do, only manual steps, or the edits were applied. <code>init</code>: the workflow was written, or printed with <code>--print</code>. <code>doctor</code> and <code>logout</code>: finished. A <code>warn</code> from <code>doctor</code> still exits 0.</td></tr>
+            <tr><th scope="row"><code>1</code></th><td>Tool error: an invalid flag (including <code>--fail-on</code>, <code>--format</code> or <code>--max-age</code>), <code>--json</code> combined with <code>--format</code>, <code>--offline</code> with <code>--no-cache</code>, a login failure, a failed <code>doctor</code> check, <code>init</code> finding an existing workflow without <code>--force</code> or failing to write it, or a scan or network failure.</td></tr>
             <tr><th scope="row"><code>2</code></th><td><code>diagnose</code>: a finding met <code>--fail-on</code>. <code>migrate</code>: a dry run has an automatic edit, or <code>--write</code> skipped a step. <code>doctor</code> never exits 2.</td></tr>
           </tbody>
         </table>

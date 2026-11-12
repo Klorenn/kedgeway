@@ -31,7 +31,13 @@ What leaves your machine: only the script kedgeway sends to Raven's `execute` to
 
 ## Install
 
-Requires Node >= 22.12. Not on npm yet (coming soon), so build from source:
+Requires Node >= 22.12.
+
+```sh
+npm install -g kedgeway
+```
+
+To work on the source instead:
 
 ```sh
 git clone https://github.com/Klorenn/kedgeway
@@ -44,6 +50,8 @@ npm link        # optional: exposes `kedgeway`
 ## Usage
 
 ```sh
+kedgeway --version                            # print the version (-V)
+kedgeway init [path]                          # write .github/workflows/kedgeway.yml (--force, --print)
 kedgeway login                                # force the OAuth flow
 kedgeway login --export                       # print credentials as a base64 secret for CI
 kedgeway login --no-browser                   # headless login: print the URL, paste the redirect back
@@ -143,6 +151,10 @@ ssh -L <port>:127.0.0.1:<port> user@remote-host   # <port> is shown in the print
 ```
 
 Invalid input gets a one-line error and the prompt repeats. A pasted URL is checked against the login attempt's OAuth `state` (a bare code carries no state, so it cannot be); if there is no state to check, a pasted URL is refused. When stdin is not a terminal, pasting is disabled and only the callback can finish the login. For CI, do this once on a trusted machine and use `login --export` plus the `KEDGEWAY_AUTH` secret.
+
+## `kedgeway init`
+
+`kedgeway init [path]` writes `.github/workflows/kedgeway.yml` (default: the current directory) with the [GitHub Action](#github-action) pinned to this kedgeway version, `fail-on: warning` and `auth: ${{ secrets.KEDGEWAY_AUTH }}`. It refuses to overwrite an existing file (exit `1`) unless you pass `--force`; `--print` writes the YAML to stdout and touches no file. It prints the path it wrote and a reminder to create the `KEDGEWAY_AUTH` secret (see [CI authentication](#ci-authentication)). The pinned tag only exists once that version is released.
 
 ## `kedgeway doctor`
 

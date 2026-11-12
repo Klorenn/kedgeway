@@ -4,6 +4,8 @@ import { writeFile } from "node:fs/promises";
 import { runDoctor } from "./adapters/doctor.js";
 import { SnapshotCache } from "./adapters/snapshot-cache.js";
 import { AuthStore, defaultAuthPath, exportAuth, readOnlyAuthStore } from "./adapters/raven-auth.js";
+import { readPackageVersion } from "./adapters/package-version.js";
+import { writeWorkflow } from "./adapters/workflow-writer.js";
 import { readLine } from "./adapters/stdin-prompt.js";
 import { runStdioServer } from "./mcp/server.js";
 import { createRavenEcosystem } from "./sdk.js";
@@ -36,6 +38,8 @@ const code = await runCli(process.argv, {
       opts,
     ),
   writeFile: (path, text) => writeFile(path, text, "utf8"),
+  version: await readPackageVersion(),
+  writeWorkflow,
   startMcp: ({ allowWrite }) =>
     runStdioServer({ ecosystem: createRavenEcosystem({ interactive: false }), allowWrite }),
 });

@@ -15,7 +15,7 @@ export default function Page() {
       <p className={styles.lede}>The CLI runs on top of a library. Import it to diagnose or migrate a repo from your own tooling.</p>
 
       <h2>Install</h2>
-      <p>kedgeway is not on npm yet. Build it from source (see <Link href="/docs/getting-started">Getting started</Link>) and link it, or depend on a checkout. It needs Node 22.12 or newer. Type declarations are bundled.</p>
+      <p><code>npm install kedgeway</code>. It needs Node 22.12 or newer. Type declarations are bundled. See <Link href="/docs/getting-started">Getting started</Link> for the CLI.</p>
       <Callout kind="warning">
         <p>The package is ESM only. The <code>exports</code> map has no <code>default</code> or <code>require</code> condition, so <code>require(&quot;kedgeway&quot;)</code> does not work. Use <code>import</code>.</p>
       </Callout>

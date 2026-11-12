@@ -51,7 +51,7 @@ const QA: { q: string; a: ReactNode }[] = [
       </>
     ),
   },
-  { q: "Is it on npm?", a: "Not yet. npm install -g kedgeway does not work. Install from source for now; a published package is coming later." },
+  { q: "Is it on npm?", a: "Yes. npm install -g kedgeway. It needs Node 22.12 or newer." },
 ];
 
 export default function Faq() {
