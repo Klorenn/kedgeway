@@ -5,6 +5,7 @@ import FlowDiagram from "@/components/FlowDiagram";
 import HatchGroup from "@/components/HatchGroup";
 import PixelIcon, { type PixelIconName } from "@/components/icons/pixel";
 import Typewriter from "@/components/Typewriter";
+import Faq from "@/components/Faq";
 import EcosystemGrid from "@/components/EcosystemGrid";
 import HeroHorse from "@/components/HeroHorse";
 import { STATIC_FRAME } from "@/lib/hatch";
@@ -56,17 +57,17 @@ export default function Home() {
     <>
       <section className={styles.hero}>
         <div className={styles.textBlock}>
-          <h1 className={styles.title}>Your Soroban SDK is drifting.</h1>
-          <p className={styles.sub}>kedgeway asks the live Stellar ecosystem what is current and tells you how far behind you are.</p>
-          <div className={styles.cta}>
+          <h1 className={`${styles.title} ${styles.r0}`}>Your Soroban SDK is drifting.</h1>
+          <p className={`${styles.sub} ${styles.r1}`}>kedgeway asks the live Stellar ecosystem what is current and tells you how far behind you are.</p>
+          <div className={`${styles.cta} ${styles.r2}`}>
             <Link className="btnPrimary" href="#install">Get started</Link>
             <Link className="btnLink" href="/docs">Read the docs →</Link>
           </div>
-          <p className={styles.proof}>
+          <p className={`${styles.proof} ${styles.r3}`}>
             <b>1,285 Soroban repos</b> are on a deprecated SDK today. <span>Scout via Raven, 2026-11-11.</span>
           </p>
         </div>
-        <figure className={styles.horseBlock}>
+        <figure className={`${styles.horseBlock} ${styles.r4}`}>
           <HeroHorse />
           <span className={styles.baseline} aria-hidden="true" />
           <figcaption className={styles.plate}>Muybridge, pl. 626 — 1878</figcaption>
@@ -207,14 +208,7 @@ kedgeway diagnose ./my-contract --fail-on warning`}
           <div className={styles.head}>
             <h2 id="faq-h">Questions, answered. <span className="line2">Short, no marketing.</span></h2>
           </div>
-          <div className={styles.faq}>
-            {FAQ.map(([q, a]) => (
-              <details key={q} className={styles.faqItem}>
-                <summary>{q}</summary>
-                <p>{a}</p>
-              </details>
-            ))}
-          </div>
+          <Faq items={FAQ} />
         </div>
       </section>
 

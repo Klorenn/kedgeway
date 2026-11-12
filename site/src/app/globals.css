@@ -23,6 +23,7 @@ body {
   font-family: var(--font-sans);
   font-size: 1.0625rem;
   line-height: 1.6;
+  font-variant-numeric: tabular-nums;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -30,8 +31,16 @@ body {
 img, svg, canvas { display: block; max-width: 100%; }
 
 /* body links: 1px underline in ink-2, no color change */
-a { color: inherit; text-decoration: underline; text-decoration-color: var(--ink-2); text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
-a:hover { text-decoration-color: var(--ink); }
+a { color: inherit; text-decoration: none; }
+/* Prose links: a 1px ink-2 underline, with an ink underline growing in from the left on hover. */
+a:where(:not([class])) {
+  background-image: linear-gradient(var(--ink), var(--ink)), linear-gradient(var(--ink-2), var(--ink-2));
+  background-size: 0 1px, 100% 1px;
+  background-position: 0 calc(100% - 0.06em), 0 calc(100% - 0.06em);
+  background-repeat: no-repeat;
+  transition: background-size 0.15s ease-out;
+}
+a:where(:not([class])):hover { background-size: 100% 1px, 100% 1px; }
 :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
 
 h1, h2, h3 { font-family: var(--font-sans); font-weight: 500; color: var(--ink); letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
@@ -63,7 +72,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 }
 .skip:focus { top: 0.75rem; }
 
-.overline { font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-2); }
+.overline { font-family: var(--font-mono); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-2); }
 
 /* inline code: plain mono, no chip */
 :not(pre) > code { font-size: 0.9em; color: var(--ink); overflow-wrap: anywhere; }
@@ -78,15 +87,16 @@ pre.block code { font-size: inherit; color: inherit; }
 
 /* the only two button styles; used in the hero */
 .btnPrimary, .btnLink {
-  display: inline-flex; align-items: center; min-height: 2.75rem;
+  display: inline-flex; align-items: center; height: 44px; padding: 0 1.25rem; box-sizing: border-box;
   font-family: var(--font-mono); font-size: 0.9rem; font-weight: 500; border-radius: 2px; text-decoration: none;
 }
-.btnPrimary { padding: 0 1.25rem; background: var(--ink); color: var(--bg); }
-.btnPrimary { transition: background 0.15s; }
+.btnPrimary { background: var(--ink); color: var(--bg); }
+.btnPrimary { transition: background 0.15s, transform 0.05s; }
 .btnPrimary:hover { background: color-mix(in srgb, var(--ink) 88%, var(--bg)); }
 .btnPrimary:active { transform: translateY(1px); }
-.btnLink { padding: 0 0.5rem; color: var(--ink); }
-.btnLink:hover { text-decoration: underline; text-decoration-color: var(--ink-2); text-underline-offset: 0.25em; }
+.btnLink { color: var(--ink); background: linear-gradient(var(--ink), var(--ink)) no-repeat 1.25rem calc(50% + 0.8em) / 0 1px; transition: background-size 0.15s ease-out; }
+.btnLink:hover { background-size: calc(100% - 2.5rem) 1px; }
+.btnLink:active { transform: translateY(1px); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

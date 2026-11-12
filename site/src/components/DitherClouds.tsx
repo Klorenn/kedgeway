@@ -71,14 +71,15 @@ export default function DitherClouds() {
       staticTime: 40,
       params: () => {
         const vw = Math.max(320, window.innerWidth);
-        const half = Math.min(0.5, 400 / vw); // central content column
+        const half = Math.min(0.5, 560 / vw); // hero text column (wider than the narrow text)
         // strongest at the top of the page (hero), darker once the content scrolls over it
         const s = Math.min(1, window.scrollY / Math.max(1, window.innerHeight * 0.8));
-        const inside = 0.2 + 0.12 * s; // how far the column is pushed into sky
+        const inside = 0.34 + 0.12 * s; // how far the column is pushed into sky
         return [half, inside, calm.current, Math.max(1, canvas.clientWidth)];
       },
     });
-    (window as unknown as { __cloudsLuma?: () => number | null }).__cloudsLuma = handle.readAverageLuminance;
+    (window as unknown as { __cloudsLuma?: () => number | null; __cloudsRegion?: (a: number, b: number, c: number, d: number) => number | null }).__cloudsLuma = handle.readAverageLuminance;
+    (window as unknown as { __cloudsRegion?: typeof handle.readRegionLuminance }).__cloudsRegion = handle.readRegionLuminance;
     return () => handle.destroy();
   }, []);
 

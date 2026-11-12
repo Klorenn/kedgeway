@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import PixelIcon from "./icons/pixel";
 import styles from "./CodeBlock.module.css";
 
 /** "Copy" button for a code block. Announces "Copied" politely for 1.5s. */
@@ -27,12 +28,15 @@ export default function CopyButton({ text }: { text: string }) {
     }
     setCopied(true);
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setCopied(false), 1500);
+    timer.current = window.setTimeout(() => setCopied(false), 1200);
   };
 
   return (
     <button type="button" className={styles.copy} onClick={copy}>
-      <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+      <span aria-live="polite" className={styles.copyLabel}>
+        {copied ? <PixelIcon name="check" size={16} /> : null}
+        <span className={copied ? styles.sr : undefined}>{copied ? "Copied" : "Copy"}</span>
+      </span>
     </button>
   );
 }

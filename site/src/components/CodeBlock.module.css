@@ -5,3 +5,5 @@
 .copy { position: absolute; top: 0.6rem; right: 1rem; font: inherit; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-2); background: none; border: 0; padding: 0.25rem 0; cursor: pointer; }
 .copy:hover { color: var(--ink); }
 @media print { .block { background: #fff; border-color: #ccc; } .copy { display: none; } .pre { color: #000; } }
+.copyLabel { display: inline-flex; align-items: center; gap: 0.35rem; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

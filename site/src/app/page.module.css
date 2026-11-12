@@ -1,9 +1,9 @@
 /* hero (plate): centered text, then the horse with its hooves on a full-width baseline */
 .hero { position: relative; overflow: hidden; padding: 9rem 0 2rem; }
 .textBlock { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 1.5rem; width: 100%; max-width: 60rem; margin-inline: auto; padding-inline: var(--gutter); }
-.title { font-size: clamp(2.25rem, 5vw, 4.5rem); line-height: 1; letter-spacing: -0.035em; }
+.title { font-size: clamp(2.25rem, 5vw, 4.5rem); line-height: 1; letter-spacing: -0.04em; }
 @media (min-width: 56rem) { .title { white-space: nowrap; } }
-.sub { font-size: 1.125rem; line-height: 1.5; max-width: 34rem; }
+.sub { font-size: 1.125rem; line-height: 1.5; max-width: 34rem; text-wrap: pretty; }
 .cta { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.75rem 1.25rem; margin-top: 0.5rem; }
 /* The svg has ~5.3% of its width below the hooves: the baseline sits there, the caption beneath it. */
 .horseBlock { --hw: min(100vw - 32px, 44rem); position: relative; z-index: 1; width: var(--hw); margin: 3rem auto 0; }
@@ -13,7 +13,9 @@
 .plate { position: absolute; right: 0; bottom: 0.1rem; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-2); text-align: right; }
 
 /* sections: a hairline above; anchor sections get 10rem, light ones 6rem */
-.section { position: relative; border-top: 1px solid var(--rule); }
+.section { position: relative; }
+.section::before, .cta2::before, .cta2::after { content: ""; position: absolute; left: 50%; transform: translateX(-50%); width: min(calc(64rem - 32px), calc(100% - 32px)); height: 1px; background: var(--rule); top: 0; }
+.cta2::after { top: auto; bottom: 0; }
 .anchor { padding-block: clamp(6rem, 12vw, 10rem); }
 .light { padding-block: clamp(3.5rem, 7vw, 6rem); }
 .head { display: grid; gap: 1rem; margin-bottom: clamp(2rem, 5vw, 3.5rem); }
@@ -66,7 +68,7 @@
 @media (min-width: 48rem) { .road li { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; align-items: baseline; } }
 
 /* final call to action */
-.cta2 { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding-block: clamp(5rem, 10vw, 8rem); text-align: center; }
+.cta2 { position: relative; padding-block: clamp(5rem, 10vw, 8rem); text-align: center; }
 .cta2 :global(.col) { max-width: 56rem; display: grid; justify-items: center; gap: 1.25rem; }
 .ctaHorse { display: block; margin-bottom: 0.5rem; }
 .ctaTitle { font-size: clamp(2.5rem, 5vw, 4rem); line-height: 1.05; letter-spacing: -0.035em; }
@@ -94,3 +96,12 @@
 .centered .head p:not(.overline) { margin-inline: auto; }
 .centered .installBlock, .centered .faq { max-width: none; }
 .centered .stepNote { text-align: center; margin-inline: auto; }
+
+/* hero load sequence: h1, sub, buttons, proof, horse; 60ms stagger, 400ms ease-out */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.r0, .r1, .r2, .r3, .r4 { animation: rise 400ms ease-out both; }
+.r1 { animation-delay: 60ms; }
+.r2 { animation-delay: 120ms; }
+.r3 { animation-delay: 180ms; }
+.r4 { animation-delay: 240ms; }
+@media (prefers-reduced-motion: reduce) { .r0, .r1, .r2, .r3, .r4 { animation: none; } }

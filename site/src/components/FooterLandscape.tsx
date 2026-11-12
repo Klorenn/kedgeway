@@ -21,7 +21,8 @@ void main() {
     float freq = 1.1 + fi * 0.45;
     float base = 0.60 - fi * 0.13;
     float amp = 0.19 - fi * 0.015;
-    float h = base + amp * (ridge(x * freq + u_time * speedPx / u_p.x * freq, 3.0 + fi * 9.0) - 0.5) * 2.0;
+    float par = (i == 0) ? u_p.y : 0.0; // the farthest ridge drifts vertically with page scroll (0.1x)
+    float h = base + par + amp * (ridge(x * freq + u_time * speedPx / u_p.x * freq, 3.0 + fi * 9.0) - 0.5) * 2.0;
     if (uv.y <= h) {
       float shade = 0.18 + fi * 0.2; // farther is darker
       b = shade * (0.7 + 0.3 * (uv.y / max(h, 0.001)));
@@ -45,7 +46,13 @@ export default function FooterLandscape() {
       fps: 20,
       scale: 0.5,
       staticTime: 30,
-      params: () => [Math.max(1, canvas.clientHeight), 0, 0, 0],
+      params: () => {
+        const r = canvas.getBoundingClientRect();
+        const ch = Math.max(1, canvas.clientHeight);
+        // parallax: 0.1 x how far the band sits from the bottom of the viewport, clamped to a subtle range
+        const shift = Math.max(-0.12, Math.min(0.12, (-(window.innerHeight - r.bottom) * 0.1) / ch));
+        return [ch, shift, 0, 0];
+      },
     });
     return () => handle.destroy();
   }, []);

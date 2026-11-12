@@ -1,9 +1,9 @@
-.header { position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: transparent; border-bottom: 1px solid transparent; transition: background-color 0.2s, border-color 0.2s; }
-.header[data-scrolled="true"] { background: rgb(11 11 12 / 0.72); -webkit-backdrop-filter: blur(12px) saturate(140%); backdrop-filter: blur(12px) saturate(140%); border-bottom-color: var(--rule); }
+/* Fully transparent in every state so the clouds show through; on scroll only a blur and a faint hairline. */
+.header { position: fixed; top: 0; left: 0; right: 0; z-index: 20; background: transparent; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+.header[data-scrolled="true"] { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom-color: rgb(74 74 79 / 0.4); }
 .inner { padding-block: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; font-family: var(--font-mono); font-weight: 500; font-size: 1.05rem; letter-spacing: -0.01em; }
-.brand:hover { text-decoration: none; }
-.nav { display: flex; gap: 1.25rem; align-items: center; font-family: var(--font-mono); font-size: 0.8125rem; }
-.nav a { color: var(--ink-2); text-decoration: none; padding: 0.4rem 0; }
-.nav a:hover { color: var(--ink); }
-@media (prefers-reduced-motion: reduce) { .header { transition: none; } }
+.brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); font-family: var(--font-mono); font-weight: 500; font-size: 1.05rem; line-height: 1; letter-spacing: -0.01em; }
+.nav { display: flex; gap: 1.25rem; align-items: center; font-family: var(--font-mono); font-size: 0.8125rem; line-height: 1; }
+.nav a { color: var(--ink-2); padding: 0.4rem 0; background: linear-gradient(var(--ink), var(--ink)) no-repeat 0 100% / 0 1px; transition: color 0.15s, background-size 0.15s ease-out; }
+.nav a:hover { color: var(--ink); background-size: 100% 1px; }
+@media (prefers-reduced-motion: reduce) { .header, .nav a { transition: none; } }

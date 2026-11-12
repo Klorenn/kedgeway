@@ -78,6 +78,8 @@ export interface DitherHandle {
   /** False when WebGL is unavailable (the canvas is then hidden). */
   ok: boolean;
   readAverageLuminance(): number | null;
+  /** Mean luminance of a region, as fractions of the canvas (origin bottom-left). */
+  readRegionLuminance(x0: number, y0: number, x1: number, y1: number): number | null;
 }
 
 function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLShader | null {
@@ -99,7 +101,7 @@ function compile(gl: WebGLRenderingContext, type: number, src: string): WebGLSha
  */
 export function startDither(canvas: HTMLCanvasElement, opts: DitherOptions): DitherHandle {
   const scale = opts.scale ?? 0.5;
-  const dead: DitherHandle = { destroy: () => undefined, ok: false, readAverageLuminance: () => null };
+  const dead: DitherHandle = { destroy: () => undefined, ok: false, readAverageLuminance: () => null, readRegionLuminance: () => null };
   const gl = canvas.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power", preserveDrawingBuffer: true });
   if (!gl) {
     canvas.style.display = "none";
@@ -195,6 +197,19 @@ export function startDither(canvas: HTMLCanvasElement, opts: DitherOptions): Dit
       ro.disconnect();
       io?.disconnect();
       document.removeEventListener("visibilitychange", sync);
+    },
+    readRegionLuminance: (x0, y0, x1, y1) => {
+      const w = canvas.width;
+      const h = canvas.height;
+      const rx = Math.floor(x0 * w);
+      const ry = Math.floor(y0 * h);
+      const rw = Math.max(1, Math.floor((x1 - x0) * w));
+      const rh = Math.max(1, Math.floor((y1 - y0) * h));
+      const px = new Uint8Array(rw * rh * 4);
+      gl.readPixels(rx, ry, rw, rh, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      let sum = 0;
+      for (let i = 0; i < px.length; i += 4) sum += (0.2126 * (px[i] as number) + 0.7152 * (px[i + 1] as number) + 0.0722 * (px[i + 2] as number)) / 255;
+      return sum / (rw * rh);
     },
     readAverageLuminance: () => {
       const w = canvas.width;
