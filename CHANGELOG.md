@@ -4,9 +4,11 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-12
+
 ### Changed
 
-- feat(action): when pinned to a semver tag (`@v1.2.3`) the action installs that exact version with `npm install -g kedgeway@1.2.3` instead of building from source; a version that is not on npm fails with an error (no silent fallback). Other refs (`@main`, SHAs, branches, the local `./`) still build from source. New `version` input overrides the detected version (`source` forces the build). Detection lives in `scripts/resolve-version.sh`.
+- feat(action): when pinned to a semver tag (`@v1.2.3`) the action installs that exact version with `npm install -g kedgeway@1.2.3` instead of building from source; a version that is not on npm fails with an error (no silent fallback). Other refs (`@main`, SHAs, branches, the local `./`) still build from source. New `version` input overrides the detected version (`source` forces the build). Detection lives in `scripts/resolve-version.sh`. The resolve step runs before `setup-node` because the runner overwrites `github.action_ref` after a nested `uses:` step; the npm install runs with `--ignore-scripts`; the semver check is strict (no leading zeros, no empty prerelease identifiers).
 
 ## [0.1.0] - 2026-11-12
 
