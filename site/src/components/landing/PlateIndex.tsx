@@ -1,6 +1,8 @@
 "use client";
 
 import { useFrameSprite } from "@/lib/frame-sprite";
+import { useLocale } from "@/i18n/LocaleProvider";
+import { fill } from "@/content/schema/ui";
 import styles from "./PlateIndex.module.css";
 
 const FRAME_VIEWBOX = "0 0 180 101";
@@ -9,6 +11,7 @@ const NUMBERS = Array.from({ length: 11 }, (_, i) => i + 1);
 /** Plate/Index: contact sheet of the 11 frames (static), baseline rule, frame ruler 01-11, caption and credit. */
 export default function PlateIndex({ frame }: { frame: number }) {
   const ready = useFrameSprite();
+  const { ui } = useLocale();
   return (
     <div className={styles.plate}>
       <div className={styles.sheet} aria-hidden="true">
@@ -30,8 +33,8 @@ export default function PlateIndex({ frame }: { frame: number }) {
         ))}
       </div>
       <div className={`t-mono-label ${styles.caption}`}>
-        <p className={styles.fig}>fig. 1 — Sallie Gardner at a gallop · frame {String(frame).padStart(2, "0")} of 11</p>
-        <p>E. Muybridge, pl. 626 · Palo Alto, 1878</p>
+        <p className={styles.fig}>{fill(ui.plateCaption, { frame: String(frame).padStart(2, "0") })}</p>
+        <p>{ui.plateCredit}</p>
       </div>
     </div>
   );

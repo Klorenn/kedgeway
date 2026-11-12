@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useLocale } from "@/i18n/LocaleProvider";
 import { useEffect, useState } from "react";
 import styles from "./DocsToc.module.css";
 
@@ -9,11 +10,12 @@ interface Heading {
   text: string;
 }
 
-const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const slug = (s: string): string => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 /** "On this page": built from the article's h2s, with the current one in ink. Desktop only. */
 export default function DocsToc() {
   const pathname = usePathname();
+  const { ui } = useLocale();
   const [headings, setHeadings] = useState<Heading[]>([]);
   const [active, setActive] = useState("");
 
@@ -39,8 +41,8 @@ export default function DocsToc() {
 
   if (headings.length < 2) return <div className={styles.toc} aria-hidden="true" />;
   return (
-    <nav className={styles.toc} aria-label="On this page">
-      <p className={`t-overline ${styles.label}`}>On this page</p>
+    <nav className={styles.toc} aria-label={ui.docs.onThisPage}>
+      <p className={`t-overline ${styles.label}`}>{ui.docs.onThisPage}</p>
       <ul className={styles.list}>
         {headings.map((h) => (
           <li key={h.id}>

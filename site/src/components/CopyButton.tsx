@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "@/i18n/LocaleProvider";
 import styles from "./CodeBlock.module.css";
 
 /** "Copy" button. Announces "Copied" through a polite live region for ~1.2s. */
 export default function CopyButton({ text }: { text: string }) {
+  const { ui } = useLocale();
   const [copied, setCopied] = useState(false);
   const timer = useRef<number>(0);
 
@@ -33,10 +35,10 @@ export default function CopyButton({ text }: { text: string }) {
   return (
     <>
       <button type="button" className={styles.copy} onClick={copy}>
-        <span aria-hidden="true">{copied ? "Copied" : "Copy"}</span>
-        <span className="sr-only">Copy to clipboard</span>
+        <span aria-hidden="true">{copied ? ui.code.copied : ui.code.copy}</span>
+        <span className="sr-only">{ui.code.copyToClipboard}</span>
       </button>
-      <span className="sr-only" role="status" aria-live="polite">{copied ? "Copied" : ""}</span>
+      <span className="sr-only" role="status" aria-live="polite">{copied ? ui.code.copied : ""}</span>
     </>
   );
 }

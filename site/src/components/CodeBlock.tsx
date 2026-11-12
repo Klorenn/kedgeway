@@ -1,3 +1,6 @@
+"use client";
+
+import { useLocale } from "@/i18n/LocaleProvider";
 import CopyButton from "./CopyButton";
 import styles from "./CodeBlock.module.css";
 
@@ -10,12 +13,13 @@ interface CodeBlockProps {
   label?: string;
 }
 
-/** Surface panel with a header (label + Copy) over the code. Server-rendered; only the button is client code. */
+/** Surface panel with a header (label + Copy) over the code. Client component only for the localized default label. */
 export default function CodeBlock({ code, copy = true, label }: CodeBlockProps) {
+  const { ui } = useLocale();
   return (
     <div className={styles.block}>
       <div className={styles.header}>
-        <span className="t-mono-label">{label ?? (copy ? "Terminal" : "Output")}</span>
+        <span className="t-mono-label">{label ?? (copy ? ui.code.terminal : ui.code.output)}</span>
         {copy ? <CopyButton text={code} /> : null}
       </div>
       <pre className={`${styles.pre} t-command`}>

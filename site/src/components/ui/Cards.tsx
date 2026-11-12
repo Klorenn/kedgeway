@@ -24,7 +24,7 @@ export function CardStep({ step, title, children }: { step: number; title: strin
 }
 
 /** Card/Way: the whole card is the link. Hover: surface fill and a stronger border. */
-export function CardWay({ href, title, children, cta = "Read the guide" }: { href: string; title: string; children: ReactNode; cta?: string }) {
+export function CardWay({ href, title, children, cta }: { href: string; title: string; children: ReactNode; cta: string }) {
   return (
     <Link href={href} className={styles.way}>
       <span className={`t-card ${styles.wayTitle}`}>{title}</span>

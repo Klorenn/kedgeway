@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { otherLocale } from "@/i18n/config";
+import { href } from "@/i18n/href";
+import { useLocale, useLocalePath } from "@/i18n/LocaleProvider";
+import { UI } from "@/content/ui";
 import { LogoLockup } from "./ui/Logo";
 import NavLink from "./ui/NavLink";
 import Button from "./ui/Button";
@@ -9,23 +13,25 @@ import MenuButton from "./ui/MenuButton";
 import styles from "./SiteHeader.module.css";
 
 const REPO = "https://github.com/Klorenn/kedgeway";
-const LANG_KEY = "kedgeway-lang";
-const LINKS: readonly (readonly [string, string])[] = [
-  ["Install", "/#install"],
-  ["Docs", "/docs"],
-  ["Findings", "/docs/findings"],
-  ["FAQ", "/#faq"],
-  ["Changelog", `${REPO}/blob/main/CHANGELOG.md`],
-];
-
-type Lang = "en" | "es";
 
 /** Fixed, transparent navbar over the sky. After 24px of scroll it gains a scrim-tinted blur and a hairline. */
 export default function SiteHeader() {
+  const { locale, ui } = useLocale();
+  const path = useLocalePath();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState<Lang>("en");
-  const [ready, setReady] = useState(false);
+  const t = ui.header;
+  const target = otherLocale(locale);
+  const links: readonly (readonly [string, string])[] = [
+    [t.install, href(locale, "/#install")],
+    [t.docs, href(locale, "/docs")],
+    [t.findings, href(locale, "/docs/findings")],
+    [t.faq, href(locale, "/#faq")],
+    [t.changelog, `${REPO}/blob/main/CHANGELOG.md`],
+  ];
+  // The same page in the other language, labelled in that language.
+  const switchHref = href(target, path);
+  const switchLabel = UI[target].header.languageName;
 
   useEffect(() => {
     const onScroll = (): void => setScrolled(window.scrollY > 24);
@@ -33,18 +39,6 @@ export default function SiteHeader() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(LANG_KEY);
-    if (saved === "es") setLang("es");
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    document.documentElement.lang = lang;
-    localStorage.setItem(LANG_KEY, lang);
-  }, [lang, ready]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,43 +52,27 @@ export default function SiteHeader() {
   return (
     <header className={styles.header} data-scrolled={scrolled || open}>
       <div className={`container ${styles.inner}`}>
-        <Link className={styles.brand} href="/" prefetch={false} aria-label="kedgeway, home" onClick={() => setOpen(false)}>
+        <Link className={styles.brand} href={href(locale, "/")} prefetch={false} aria-label={t.home} onClick={() => setOpen(false)}>
           <LogoLockup size={20} />
         </Link>
-        <nav className={styles.nav} aria-label="Primary">
-          {LINKS.map(([label, href]) => (
-            <NavLink key={href} href={href}>{label}</NavLink>
+        <nav className={styles.nav} aria-label={t.nav}>
+          {links.map(([label, to]) => (
+            <NavLink key={to} href={to}>{label}</NavLink>
           ))}
-          <button
-            type="button"
-            className={styles.lang}
-            lang={lang === "es" ? "en" : "es"}
-            aria-pressed={lang === "es"}
-            onClick={() => setLang((current) => (current === "es" ? "en" : "es"))}
-          >
-            {lang === "es" ? "English" : "Español"}
-          </button>
-          <Button variant="secondary" href={REPO} className={styles.gh}>GitHub</Button>
+          <Link className={styles.lang} href={switchHref} lang={target} hrefLang={target}>{switchLabel}</Link>
+          <Button variant="secondary" href={REPO} className={styles.gh}>{t.github}</Button>
         </nav>
         <div className={styles.menuBtn}>
-          <MenuButton open={open} onClick={() => setOpen((o) => !o)} controls="mobile-menu" />
+          <MenuButton open={open} onClick={() => setOpen((o) => !o)} controls="mobile-menu" openLabel={t.openMenu} closeLabel={t.closeMenu} />
         </div>
       </div>
       <div id="mobile-menu" className={styles.menu} hidden={!open}>
-        <nav className={`container ${styles.menuInner}`} aria-label="Primary mobile">
-          {LINKS.map(([label, href]) => (
-            <NavLink key={href} href={href} className={styles.menuLink} onClick={() => setOpen(false)}>{label}</NavLink>
+        <nav className={`container ${styles.menuInner}`} aria-label={t.navMobile}>
+          {links.map(([label, to]) => (
+            <NavLink key={to} href={to} className={styles.menuLink} onClick={() => setOpen(false)}>{label}</NavLink>
           ))}
-          <button
-            type="button"
-            className={`${styles.lang} ${styles.menuLink}`}
-            lang={lang === "es" ? "en" : "es"}
-            aria-pressed={lang === "es"}
-            onClick={() => setLang((current) => (current === "es" ? "en" : "es"))}
-          >
-            {lang === "es" ? "English" : "Español"}
-          </button>
-          <Button variant="secondary" href={REPO}>GitHub</Button>
+          <Link className={`${styles.lang} ${styles.menuLink}`} href={switchHref} lang={target} hrefLang={target} onClick={() => setOpen(false)}>{switchLabel}</Link>
+          <Button variant="secondary" href={REPO}>{t.github}</Button>
         </nav>
       </div>
     </header>

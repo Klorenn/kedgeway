@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLocale } from "@/i18n/LocaleProvider";
+import { fill } from "@/content/schema/ui";
 import styles from "./AsciiBlock.module.css";
 
 /** Splits text on a one-group regex; matches become ink-emphasised spans (the rest stays ink-2). */
@@ -38,6 +40,7 @@ interface AsciiBlockProps {
  * when it fits there is no scroller and no extra tab stop. The text is aria-hidden; `children` carries the data.
  */
 export default function AsciiBlock({ desktop, mobile, desktopLead = 0, mobileLead = 0, desktopMin, emphasis, panel, art, label, decorative, children, className }: AsciiBlockProps) {
+  const { ui } = useLocale();
   const ref = useRef<HTMLDivElement>(null);
   const [scrolls, setScrolls] = useState(false);
 
@@ -60,7 +63,7 @@ export default function AsciiBlock({ desktop, mobile, desktopLead = 0, mobileLea
       ref={ref}
       className={`${styles.wrap} ${styles[`min${desktopMin}`]}${panel ? ` ${styles.panel}` : ""}${className ? ` ${className}` : ""}`}
       data-scroll={scroller ? "true" : undefined}
-      {...(scroller ? { tabIndex: 0, role: "region", "aria-label": `${label ?? "Text block"}, scroll horizontally` } : {})}
+      {...(scroller ? { tabIndex: 0, role: "region", "aria-label": fill(ui.asciiScroll, { label: label ?? ui.asciiDefault }) } : {})}
     >
       <pre className={`${styles.d} ${metrics}`} aria-hidden="true" style={desktopLead ? { marginTop: desktopLead * lh } : undefined}>{emphasise(desktop, re)}</pre>
       <pre className={`${styles.m} ${metrics}`} aria-hidden="true" style={mobileLead ? { marginTop: mobileLead * lh } : undefined}>{emphasise(mobile, re)}</pre>

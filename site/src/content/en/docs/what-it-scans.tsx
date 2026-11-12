@@ -1,0 +1,77 @@
+import type { DocsWhatItScansDict } from "../../schema/docs-what-it-scans";
+import { linkFor } from "@/i18n/Link";
+
+const L = linkFor("en");
+
+export default {
+  meta: { title: "What it scans — kedgeway docs", description: "Which manifests and dependency forms kedgeway reads, what it skips, and how it reads version ranges." },
+  h1: "What it scans",
+  lede: <>A diagnosis reads manifests and lockfiles. It does not score source code. <code>migrate</code> also lists up to 20 import lines of legacy packages, using the same depth and skipped directories.</>,
+  cargoIntro: <>It looks for the <code>soroban-sdk</code> crate in these forms:</>,
+  cargo: {
+    tables: <><strong>Tables read:</strong> <code>[dependencies]</code>, <code>[dev-dependencies]</code>, <code>[build-dependencies]</code>, and the same three under <code>[target.&lt;cfg&gt;]</code>.</>,
+    renames: <><strong>Renames:</strong> a <code>package = &quot;soroban-sdk&quot;</code> key is followed to the real crate name.</>,
+    workspaces: <><strong>Workspaces:</strong> a member with <code>workspace = true</code> takes its version from the nearest ancestor manifest that declares the same key in <code>[workspace.dependencies]</code>. A workspace dependency that no member uses is still reported, at the workspace manifest. If a <code>workspace = true</code> dependency cannot be resolved, it is reported with no version, which gives SDK_UNKNOWN.</>,
+    duplicates: <><strong>Duplicates:</strong> identical findings (same file, crate and version) are reported once.</>,
+  },
+  pkgIntro: <>It reads <code>dependencies</code> and <code>devDependencies</code> only, for these packages:</>,
+  pkgLegacy: "(legacy)",
+  pkgLegacyUnscoped: "(legacy, unscoped)",
+  pkgPeer: <>Peer and optional dependencies are not read.</>,
+  aliasesH: "npm aliases",
+  aliasesIntro: <>A member that uses an <code>npm:</code> alias is read as the real package behind it. This one is the current SDK, <strong>not</strong> the legacy <code>stellar-sdk</code>:</>,
+  aliasesVersion: <>The version after the last <code>@</code> is read as usual. An alias with no version (<code>npm:@stellar/stellar-sdk</code>) is unknown. This was found in a real manifest (stellar/freighter) while building the lockfile corpus. See <L to="/docs/migrate">Migration mode</L> for how aliases are edited.</>,
+  whereH: "Where it looks",
+  where: {
+    walk: <>It walks the path you give, in alphabetical order, up to four folders deep.</>,
+    skips: <>It skips <code>node_modules</code>, <code>target</code>, <code>dist</code>, <code>.git</code>, <code>.next</code>, <code>vendor</code>, <code>build</code> and <code>coverage</code>.</>,
+    unreadable: <>Unreadable folders and files, and manifests that fail to parse, are reported as MANIFEST_UNPARSEABLE instead of being ignored.</>,
+  },
+  versionsH: "How versions are read",
+  versionsIntro: <>kedgeway needs a single major version to compare. It strips leading range operators and reads the major from what is left.</>,
+  versionCols: { declared: "Declared", readAs: "Read as" },
+  versionRows: {
+    plain: <>major 21</>,
+    gte: <>major 21 (the <code>{">="}</code> is stripped)</>,
+    x: <>major 21</>,
+    upper: <>unknown: an upper bound alone does not identify a major</>,
+    compound: <>unknown: compound ranges are not resolved</>,
+    emptyLabel: <>empty, <code>*</code>, a git or path source</>,
+    empty: <>unknown</>,
+  },
+  versionsUnknown: <>An unknown version produces SDK_UNKNOWN or JS_SDK_UNKNOWN, never a guess.</>,
+  versionsLockfile: <>When a lockfile resolves the dependency, that exact version is used instead and this table only matters as a fallback. Where a JS range is matched against candidate versions, kedgeway uses the <code>semver</code> package, so hyphen ranges, <code>||</code>, x-ranges and npm prerelease rules behave like npm. Cargo requirements use kedgeway&apos;s own matcher: a bare <code>1.2.3</code> is <code>^1.2.3</code>, and <code>*</code>, <code>=</code> and <code>&gt;=, &lt;</code> combinations are understood.</>,
+  lockfilesH: "Lockfiles",
+  lockfilesIntro: <>A manifest range like <code>^21</code> says little about what you build. When a lockfile exists, kedgeway reports the <strong>resolved</strong> version of each detected dependency and compares that instead of the manifest version. Evidence says which it used, for example <code>resolved 21.7.6 from Cargo.lock; manifest ^21</code>.</>,
+  lockCols: { lockfile: "Lockfile", how: "How the direct dependency is found" },
+  lockRows: {
+    cargo: <>Among the entries for the crate, the one whose version satisfies the manifest requirement (Cargo rules). If none or several do, the dependency stays unresolved and the evidence says <code>ambiguous in Cargo.lock</code>.</>,
+    npm: <><code>packages[&quot;node_modules/&lt;name&gt;&quot;]</code> (v2 and v3), else <code>dependencies[&lt;name&gt;]</code> (v1).</>,
+    pnpm: <>The importer&apos;s own entry (the root or the workspace member), else the single package version that satisfies the manifest range. Several candidates are reported as ambiguous. Lockfile versions 5 to 9, with a minimal parser.</>,
+    yarn: <>The block whose descriptor is <code>name@&lt;manifest range&gt;</code> (classic) or <code>name@npm:&lt;range&gt;</code> (berry). Minimal parser.</>,
+  },
+  lockNotes: {
+    ambiguous: <><strong>Ambiguous means fallback.</strong> When a lockfile cannot give one answer, kedgeway uses the manifest version and says so in the evidence. It never guesses.</>,
+    where: <><strong>Where it looks.</strong> The nearest lockfile walking up from the manifest&apos;s folder to the scan root that has a verdict for that dependency. It never reads above the scan root. If a lockfile exists above it, the text report prints a <code>hint:</code>.</>,
+    ranges: <><strong>Ranges that do not pin a major</strong> (such as <code>&lt;21</code>) are no longer unknown when a lockfile pins the dependency.</>,
+    limits: <><strong>Limits.</strong> Only these four lockfiles are read. Unusual pnpm or yarn layouts resolve to nothing and fall back to the manifest. Prerelease tags are ignored when testing a version against a Cargo requirement.</>,
+    tested: <><strong>Tested on real files.</strong> The parsers run against seven real lockfiles from public repositories (Cargo.lock v4, package-lock v3, pnpm-lock v9, yarn classic and berry). Repositories and commits are listed in <code>fixtures/lockfiles/SOURCES.md</code> in the kedgeway repo.</>,
+  },
+  remoteH: "Remote repositories",
+  remoteIntro: <><code>diagnose</code> and <code>migrate</code> can scan a repository you have not cloned. Pass a git URL or <code>owner/repo</code> instead of a path. See <L to="/docs/commands#diagnose">Commands</L> for the accepted forms and <code>--ref</code>.</>,
+  remote: {
+    fetch: <><strong>How it fetches.</strong> kedgeway runs <code>git clone --depth 1 --single-branch --no-tags</code> into a private temporary directory, scans it, and deletes it afterwards, also when the scan fails. Nothing from the repository is executed.</>,
+    private: <><strong>Private repositories.</strong> Git credentials must already be configured, through an SSH agent or a credential helper. kedgeway never asks for or stores them.</>,
+    noGit: <><strong>Without git.</strong> For GitHub repositories, kedgeway downloads the source tarball and unpacks it with Node only, capped at 50 MB and 20,000 entries.</>,
+    rejected: <><strong>Rejected.</strong> <code>file://</code> and every other scheme, URLs with embedded credentials, and unsafe refs exit with 1.</>,
+    output: <><strong>Output.</strong> The report header shows <code>github.com/o/r@main</code> instead of the temporary path. Finding, SARIF and annotation paths stay relative to the repository root.</>,
+    migrate: <><strong>Migrate.</strong> A remote <code>migrate</code> is a dry run only.</>,
+  },
+  toolchainH: "Toolchain checks",
+  toolchainIntro: <>Beyond the SDKs, kedgeway reads the toolchain the repo pins. Every finding points at a file and line.</>,
+  toolchain: {
+    cli: <><strong>Stellar CLI pins.</strong> They are read from workflows (<code>cargo install ... --version X</code>, <code>stellar-cli@X</code>, and the <code>version:</code> input of the <code>stellar/stellar-cli</code> action), <code>Dockerfile*</code>, <code>Makefile</code>, shell scripts in the root and <code>scripts/</code>, <code>.tool-versions</code>, and <code>@stellar/stellar-cli</code> in <code>package.json</code>. Each pin is compared by major with the Stellar CLI version on the official <a href="https://developers.stellar.org/docs/networks/software-versions">software versions</a> page. Nothing is reported if the repo pins none.</>,
+    target: <><strong>Rust target.</strong> If a repo with <code>soroban-sdk</code> declares <code>wasm32-unknown-unknown</code> (<code>rust-toolchain.toml</code>, <code>.cargo/config.toml</code>, workflows, Makefiles, scripts) and never <code>wasm32v1-none</code>, RUST_TARGET_LEGACY tells you to run <code>rustup target add wasm32v1-none</code>.</>,
+    rust: <><strong>Rust toolchain.</strong> A pinned Rust channel below 1.84.0 raises RUST_TOOLCHAIN_OLD, because the <a href="https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup">setup guide</a> requires Rust v1.84.0 or higher. <code>stable</code> and <code>nightly</code> are not pins.</>,
+  },
+} satisfies DocsWhatItScansDict;
