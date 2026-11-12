@@ -20,7 +20,11 @@ export default function Limitations() {
       </Callout>
       <dl className={styles.defs}>
         <dt>Lockfile parsing is limited</dt>
-        <dd>Cargo.lock, package-lock.json, pnpm-lock.yaml and yarn.lock are read; pnpm and yarn with a minimal parser, so unusual layouts fall back to the manifest version. Nothing above the scan root is read.</dd>
+        <dd>Cargo.lock, package-lock.json, pnpm-lock.yaml and yarn.lock are read; pnpm and yarn with a minimal parser, so unusual layouts fall back to the manifest version. Nothing above the scan root is read. The parsers are tested on seven real lockfiles from public repositories, which is a corpus, not a guarantee: a layout it has not seen can fall back to the manifest. JS ranges use <code>semver</code>; Cargo requirements use a custom matcher.</dd>
+        <dt>Annotations are best effort</dt>
+        <dd>The line in an annotation comes from a plain scan of the manifest (the first matching key), so it can point at the wrong line in an unusual file. Findings that are not about a file have no location. GitHub shows at most 10 annotations per type per step and 50 per job; the full report is always printed.</dd>
+        <dt>No device-code login</dt>
+        <dd>Stellar Raven offers authorization code and refresh tokens only. On a server, use <code>kedgeway login --no-browser</code> and paste the redirect back, or forward the callback port with <code>ssh -L</code>.</dd>
         <dt>The deprecated list is a sample</dt>
         <dd>Scout&apos;s deprecated sample is capped at 50. A version missing from it is not proof that it is supported. kedgeway also treats anything more than one major behind as deprecated.</dd>
         <dt>Current versions come from a docs page</dt>

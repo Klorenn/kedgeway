@@ -38,6 +38,7 @@ export default function Page() {
             <tr><th scope="row"><code>auth</code></th><td>none</td><td>Raven credentials from <code>kedgeway login --export</code>, as a secret. Set this <strong>or</strong> <code>fixture</code>.</td></tr>
             <tr><th scope="row"><code>json</code></th><td><code>false</code></td><td>Print JSON instead of text.</td></tr>
             <tr><th scope="row"><code>sarif</code></th><td><code>false</code></td><td>Also write SARIF 2.1.0 to <code>$RUNNER_TEMP/kedgeway.sarif</code>.</td></tr>
+            <tr><th scope="row"><code>annotations</code></th><td>on in Actions</td><td>Emit a GitHub annotation, with file and line, for each finding. Set <code>&quot;false&quot;</code> to disable.</td></tr>
           </tbody>
         </table>
       </div>
@@ -52,6 +53,16 @@ export default function Page() {
       <Callout kind="warning">
         <p>The secret refreshes in memory only. If Raven rotates refresh tokens, the secret can go stale and must be re-exported when runs start failing. Treat it like a password.</p>
       </Callout>
+
+      <h2>Annotations</h2>
+      <p>With <code>annotations</code> on, which is the default when the action runs on GitHub, each finding becomes a workflow command pointing at the dependency&apos;s line in its manifest. Critical is <code>::error</code>, warning is <code>::warning</code>, info is <code>::notice</code>. On a pull request they show on the changed files in the diff. No extra permission or step is needed.</p>
+      <ul>
+        <li>GitHub caps annotations at 10 per type (error, warning, notice) per step and 50 per job. A large repo shows only the first ones; the full report is still printed in the log.</li>
+        <li>Findings that are not about a file, such as <code>DATA_DEGRADED</code> and <code>NO_SDK_FOUND</code>, have no file and show on the run instead.</li>
+        <li>The line comes from a plain scan of the manifest (the first matching key), so it is best effort. Paths are relative to the directory the action runs from.</li>
+        <li>Finding text is sanitised before it is printed, so a manifest cannot inject workflow commands.</li>
+      </ul>
+      <p>Outside Actions, use <code>kedgeway diagnose --format annotations</code> or <code>--annotations &lt;file&gt;</code>. See <Link href="/docs/commands">Commands</Link>. SARIF below is separate and stays: it feeds code scanning, annotations feed the diff.</p>
 
       <h2>SARIF and code scanning</h2>
       <CodeBlock code={`permissions:

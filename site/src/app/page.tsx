@@ -39,6 +39,7 @@ const WORKS_WITH: { label: string; icon: PixelIconName }[] = [
 const FAQ: [string, string][] = [
   ["Does my code leave my machine?", "No. kedgeway sends one fixed script to Stellar Raven, with nothing from your repo in it. The comparison runs on your machine."],
   ["Do I need an account?", "You sign in to Stellar Raven once with OAuth in your browser. The token is stored locally at ~/.config/kedgeway/auth.json."],
+  ["Can I log in on a server without a browser?", "Yes. Run kedgeway login --no-browser. It prints the authorization URL; open it anywhere, sign in, then paste the redirect URL (or its code) back into the terminal. Or forward the callback port with ssh -L. Add --export to print the CI secret."],
   ["Does it work offline?", "Yes. --offline reuses the cached Raven snapshot from your last live run, and --fixture uses a snapshot file. A first live run needs network access and a Raven sign-in."],
   ["Which SDKs are detected?", "soroban-sdk in Cargo.toml, and @stellar/stellar-sdk, @stellar/stellar-base and the legacy soroban-client and stellar-sdk in package.json."],
   ["Can it fail my CI?", "Yes. --fail-on exits with code 2 when a finding meets the threshold. For live data in CI set the KEDGEWAY_AUTH secret; or use a fixture."],
@@ -51,6 +52,7 @@ const SHIPPED = [
   ["GitHub Action", "Fail a pull request on drift, with a fixture.", "/docs/github-action"],
   ["Migration guide", "Published version, protocol, and the lines to edit. Dry run by default.", "/docs/migrate"],
   ["Lockfiles, cache & SARIF", "Resolved versions, an offline snapshot cache, code-scanning output.", "/docs/commands"],
+  ["Doctor, headless login & annotations", "A self-check, login without a browser, findings on the PR diff.", "/docs/commands"],
 ] as const;
 
 export default function Home() {

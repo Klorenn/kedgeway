@@ -37,6 +37,7 @@ kedgeway migrate . --fixture snapshot.json`} />
         <li><strong>Rust.</strong> A deprecated or behind <code>soroban-sdk</code> is bumped to the exact current version (for example <code>28.0.0</code>). Only the quoted version string on that one line changes, so comments, <code>features</code> and formatting stay. <code>workspace = true</code> members are left alone and the workspace root is bumped instead. <code>=</code>, <code>~</code> and <code>^</code> prefixes are kept; other ranges (<code>&gt;=</code>, <code>&lt;</code>) become manual steps.</li>
         <li><strong>JavaScript.</strong> <code>@stellar/stellar-sdk</code> is bumped to the current version, keeping <code>^</code> or <code>~</code> (exact pins stay exact). <code>package.json</code> keeps its key order and indentation.</li>
         <li><strong>Legacy packages.</strong> <code>soroban-client</code> and the unscoped <code>stellar-sdk</code> are replaced by <code>@stellar/stellar-sdk</code> at <code>^current</code>, plus a manual step listing <code>rg</code> patterns for the imports you must update yourself.</li>
+        <li><strong>Aliases.</strong> A member such as <code>"stellar-sdk": "npm:@stellar/stellar-sdk@^12.0.0"</code> is read as the real package. A bump rewrites the value in place to <code>npm:@stellar/stellar-sdk@^&lt;current&gt;</code>, keeping the prefix. An alias of a legacy package is replaced wholesale by <code>"@stellar/stellar-sdk": "^&lt;current&gt;"</code>. An alias with no version becomes a manual step.</li>
       </ul>
 
       <h2>What it refuses</h2>

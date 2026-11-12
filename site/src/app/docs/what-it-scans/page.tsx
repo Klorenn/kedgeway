@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import CodeBlock from "@/components/CodeBlock";
 import PrevNext from "@/components/docs/PrevNext";
 import styles from "../docs.module.css";
@@ -14,7 +15,7 @@ export default function WhatItScans() {
   return (
     <>
       <h1>What it scans</h1>
-      <p className={styles.lede}>kedgeway reads manifests, not source code and not lockfiles.</p>
+      <p className={styles.lede}>kedgeway reads manifests and lockfiles, not source code.</p>
 
       <h2>Cargo.toml</h2>
       <p>It looks for the <code>soroban-sdk</code> crate in these forms:</p>
@@ -49,6 +50,10 @@ soroban-sdk = { workspace = true }`} />
         <li><code>stellar-sdk</code> (legacy, unscoped)</li>
       </ul>
       <p>Peer and optional dependencies are not read.</p>
+      <h3>npm aliases</h3>
+      <p>A member that uses an <code>npm:</code> alias is read as the real package behind it. This one is the current SDK, <strong>not</strong> the legacy <code>stellar-sdk</code>:</p>
+      <CodeBlock label="package.json" code={`"stellar-sdk": "npm:@stellar/stellar-sdk@17.4.0"`} />
+      <p>The version after the last <code>@</code> is read as usual. An alias with no version (<code>npm:@stellar/stellar-sdk</code>) is unknown. This was found in a real manifest (stellar/freighter) while building the lockfile corpus. See <Link href="/docs/migrate">Migration mode</Link> for how aliases are edited.</p>
 
       <h2>Where it looks</h2>
       <ul>
@@ -73,6 +78,7 @@ soroban-sdk = { workspace = true }`} />
         </table>
       </div>
       <p>An unknown version produces SDK_UNKNOWN or JS_SDK_UNKNOWN, never a guess.</p>
+      <p>When a lockfile resolves the dependency, that exact version is used instead and this table only matters as a fallback. Where a JS range is matched against candidate versions, kedgeway uses the <code>semver</code> package, so hyphen ranges, <code>||</code>, x-ranges and npm prerelease rules behave like npm. Cargo requirements use kedgeway&apos;s own matcher: a bare <code>1.2.3</code> is <code>^1.2.3</code>, and <code>*</code>, <code>=</code> and <code>&gt;=, &lt;</code> combinations are understood.</p>
       <h2>Lockfiles</h2>
       <p>A manifest range like <code>^21</code> says little about what you build. When a lockfile exists, kedgeway reports the <strong>resolved</strong> version of each detected dependency and compares that instead of the manifest version. Evidence says which it used, for example <code>resolved 21.7.6 from Cargo.lock; manifest ^21</code>.</p>
       <div className={styles.tableWrap}>
@@ -90,7 +96,8 @@ soroban-sdk = { workspace = true }`} />
         <li><strong>Ambiguous means fallback.</strong> When a lockfile cannot give one answer, kedgeway uses the manifest version and says so in the evidence. It never guesses.</li>
         <li><strong>Where it looks.</strong> The nearest lockfile walking up from the manifest&apos;s folder to the scan root that has a verdict for that dependency. It never reads above the scan root. If a lockfile exists above it, the text report prints a <code>hint:</code>.</li>
         <li><strong>Ranges that do not pin a major</strong> (such as <code>&lt;21</code>) are no longer unknown when a lockfile pins the dependency.</li>
-        <li><strong>Limits.</strong> Only these four lockfiles are read. Unusual pnpm or yarn layouts resolve to nothing and fall back to the manifest. Prerelease tags are ignored when testing a version against a requirement.</li>
+        <li><strong>Limits.</strong> Only these four lockfiles are read. Unusual pnpm or yarn layouts resolve to nothing and fall back to the manifest. Prerelease tags are ignored when testing a version against a Cargo requirement.</li>
+        <li><strong>Tested on real files.</strong> The parsers run against seven real lockfiles from public repositories (Cargo.lock v4, package-lock v3, pnpm-lock v9, yarn classic and berry). Repositories and commits are listed in <code>fixtures/lockfiles/SOURCES.md</code> in the kedgeway repo.</li>
       </ul>
 
       <PrevNext href="/docs/what-it-scans" />

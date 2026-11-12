@@ -49,6 +49,27 @@ export default function Authentication() {
         Only one fixed script, run through Raven&apos;s <code>execute</code> tool. It asks for the Software Versions page, the Scout toolchain index and a documentation search. It does not include anything from your repo. File names, manifests and versions stay on your machine; the comparison happens locally.
       </p>
 
+      <h2 id="headless">Headless login</h2>
+      <p>
+        Raven&apos;s OAuth server offers authorization code with PKCE and refresh tokens only, with no device-code grant, so there is no <code>--device</code> flow. On a machine without a browser, use:
+      </p>
+      <CodeBlock label="bash" code={"kedgeway login --no-browser"} />
+      <p>
+        kedgeway prints the authorization URL and does not try to open a browser. Open it in any browser and sign in. The browser is then redirected to <code>http://127.0.0.1:&lt;port&gt;/callback</code>, which only exists on the machine running kedgeway. Two ways to finish:
+      </p>
+      <ul>
+        <li><strong>Paste it back.</strong> Copy the full redirect URL (or just its <code>code</code>) into the terminal and press Enter. Bad input gets a one-line error and the prompt repeats.</li>
+        <li><strong>Forward the port.</strong> From your own machine, before you sign in, forward the callback port so the redirect lands on kedgeway directly. The port is in the <code>redirect_uri</code> of the printed URL.</li>
+      </ul>
+      <CodeBlock label="bash" code={"ssh -L <port>:127.0.0.1:<port> user@remote-host"} />
+      <p>
+        A pasted URL is checked against the login attempt&apos;s OAuth state, and the check fails closed: with no state to compare, a pasted URL is refused. A bare code carries no state, so it cannot be checked. When stdin is not a terminal, pasting is disabled and only the callback can finish the login.
+      </p>
+      <p>
+        For CI, do this once on a trusted machine and add <code>--export</code> to print the secret afterwards:
+      </p>
+      <CodeBlock label="bash" code={"kedgeway login --no-browser --export"} />
+
       <h2>In CI</h2>
       <p>Run <code>kedgeway login --export</code> to print your stored credentials as a base64 secret, and put it in a <code>KEDGEWAY_AUTH</code> secret. At runtime the variable replaces <code>auth.json</code>: it is never written to disk and refreshes in memory only, so a rotated refresh token can make it go stale. See <Link href="/docs/ci">CI</Link>.</p>
 
@@ -57,7 +78,7 @@ export default function Authentication() {
         <dt>The port is busy</dt>
         <dd>kedgeway falls back to a different free port on 127.0.0.1. Nothing to do.</dd>
         <dt>The browser did not open</dt>
-        <dd>Copy the URL printed in the terminal (stderr) into a browser on the same machine. The callback is local, so the browser must run where kedgeway runs.</dd>
+        <dd>Copy the URL printed in the terminal (stderr) into a browser on the same machine. On a server with no browser, see <a href="#headless">Headless login</a>.</dd>
         <dt>Login timed out</dt>
         <dd>The callback gives up after 5 minutes. Run <code>kedgeway login</code> again.</dd>
         <dt>The token was rejected</dt>
