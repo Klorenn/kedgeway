@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-12
+
 ### Added
 
 - feat(pr): the kedgeway bot. `kedgeway pr [path]` turns the migration plan into a pull request: plan on a clean tree (dirty tree exits 2 unless `--dry-run`), skip with exit 0 when there is no automatic edit, create the branch `kedgeway/migrate-<major>` (or `-toolchain`) from the base, apply the edits, optionally refresh lockfiles, commit as `kedgeway[bot]`, force-push, then create the PR or update the OPEN one with the same head branch (never two). Options `--base`, `--branch`, `--repo` (default `GITHUB_REPOSITORY`, else the `origin` remote), `--token` (default `GITHUB_TOKEN`), `--dry-run` (no git or network at all), `--refresh-lockfiles`, `--label` (default `kedgeway`, created if missing), `--draft`, `--json` (`{ action, url?, branch, title }`) and the usual `--fixture/--offline/--no-cache/--max-age`; a hidden `--api-base` for tests and GitHub Enterprise. Exit 0 created, updated or skipped; 1 git/API failure; 2 usage.
