@@ -13,7 +13,7 @@ jobs:
     name: run the action on this repo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: kedgeway
         uses: ./
         with:

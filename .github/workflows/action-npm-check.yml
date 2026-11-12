@@ -15,7 +15,7 @@ jobs:
     name: run Klorenn/kedgeway at the release tag
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: kedgeway
         uses: Klorenn/kedgeway@v0.3.1
         with:
