@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -104,14 +104,58 @@ describe("scripts/action-run.sh", () => {
 });
 
 describe("packaging", () => {
-  it("emits declarations in the build config and checks dist before publishing", async () => {
+  it("emits declarations (no maps), cleans dist before building and checks dist before publishing", async () => {
     const build = JSON.parse(await readFile(resolve(root, "tsconfig.build.json"), "utf8")) as {
       compilerOptions?: { declaration?: boolean; declarationMap?: boolean };
     };
     expect(build.compilerOptions?.declaration).toBe(true);
-    expect(build.compilerOptions?.declarationMap).toBe(true);
+    expect(build.compilerOptions?.declarationMap).toBeUndefined();
     const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")) as { scripts: Record<string, string> };
+    expect(pkg.scripts["build"]).toMatch(/^rm -rf dist && tsc/);
     expect(pkg.scripts["prepublishOnly"]).toContain("scripts/check-dist.mjs");
-    await expect(readFile(resolve(root, "scripts/check-dist.mjs"), "utf8")).resolves.toContain("dist/index.d.ts");
+  });
+});
+
+describe("scripts/check-dist.mjs", () => {
+  const script = resolve(root, "scripts/check-dist.mjs");
+  let tmp: string;
+  beforeEach(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "kw-dist-"));
+  });
+  afterEach(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  const required = ["cli.js", "index.js", "index.d.ts", "sdk.js", "mcp/server.js"];
+  async function makeDist(files: string[]): Promise<void> {
+    for (const f of files) {
+      await mkdir(join(tmp, "dist", f, ".."), { recursive: true });
+      await writeFile(join(tmp, "dist", f), "");
+    }
+  }
+  const check = (): Promise<{ code: number; out: string }> =>
+    new Promise((res) => {
+      execFile("node", [script, tmp], (err, stdout, stderr) =>
+        res({ code: err && typeof err.code === "number" ? err.code : 0, out: stdout + stderr }),
+      );
+    });
+
+  it("passes for a complete dist", async () => {
+    await makeDist(required);
+    expect((await check()).code).toBe(0);
+  });
+
+  it("fails and names missing files", async () => {
+    await makeDist(required.filter((f) => f !== "mcp/server.js"));
+    const r = await check();
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("dist/mcp/server.js");
+  });
+
+  it("fails when test files leaked into dist", async () => {
+    await makeDist([...required, "core/diagnose.test.js"]);
+    const r = await check();
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("diagnose.test.js");
   });
 });

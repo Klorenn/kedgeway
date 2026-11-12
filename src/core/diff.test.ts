@@ -24,4 +24,25 @@ describe("unifiedDiff", () => {
     expect(out).toContain("-l1\n+changed");
     expect(out).toContain("-l28");
   });
+
+  it("marks a missing trailing newline", () => {
+    expect(unifiedDiff("f", "a\nb", "a\nc")).toBe(
+      ["--- a/f", "+++ b/f", "@@ -1,2 +1,2 @@", " a", "-b", "\\ No newline at end of file", "+c", "\\ No newline at end of file", ""].join("\n"),
+    );
+  });
+
+  it("treats adding a trailing newline as a change", () => {
+    const out = unifiedDiff("f", "a", "a\n");
+    expect(out).toContain("-a\n\\ No newline at end of file\n+a\n");
+  });
+
+  it("handles large files with a small change quickly (common prefix/suffix trimmed)", () => {
+    const lines = Array.from({ length: 30000 }, (_, i) => `line ${i}`);
+    const after = [...lines];
+    after[15000] = "changed";
+    const t0 = Date.now();
+    const out = unifiedDiff("big", lines.join("\n") + "\n", after.join("\n") + "\n");
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(out).toContain("-line 15000\n+changed");
+  });
 });

@@ -1,5 +1,6 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { randomBytes } from "node:crypto";
+import { chmod, lstat, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { unifiedDiff } from "../core/diff.js";
 import { bumpCargoDep, editPackageJson } from "../core/manifest-edit.js";
 import type { MigrationPlan, MigrationStep } from "../core/migration.js";
@@ -24,7 +25,26 @@ export interface MigrationResult {
   diff: string;
 }
 
-export async function applyMigration(plan: MigrationPlan, opts: { write: boolean }): Promise<MigrationResult> {
+export interface ApplyOptions {
+  write: boolean;
+  /** Returns files with uncommitted changes (override for tests). */
+  guard?: (cwd: string, files: string[]) => Promise<string[]>;
+}
+
+async function writeAtomic(path: string, content: string): Promise<void> {
+  const mode = (await stat(path)).mode & 0o777;
+  const tmp = join(dirname(path), `.${basename(path)}.kedgeway-${randomBytes(6).toString("hex")}.tmp`);
+  try {
+    await writeFile(tmp, content, { mode });
+    await chmod(tmp, mode);
+    await rename(tmp, path);
+  } catch (e) {
+    await rm(tmp, { force: true });
+    throw e;
+  }
+}
+
+export async function applyMigration(plan: MigrationPlan, opts: ApplyOptions): Promise<MigrationResult> {
   const manual = plan.steps.filter((s) => s.kind === "manual");
   const editable = plan.steps.filter((s) => s.kind !== "manual");
   const byFile = new Map<string, MigrationStep[]>();
@@ -37,6 +57,10 @@ export async function applyMigration(plan: MigrationPlan, opts: { write: boolean
   for (const [file, steps] of byFile) {
     let before: string;
     try {
+      if ((await lstat(join(plan.root, file))).isSymbolicLink()) {
+        for (const step of steps) skipped.push({ step, reason: `${file} is a symlink; kedgeway never edits through symlinks` });
+        continue;
+      }
       before = await readFile(join(plan.root, file), "utf8");
     } catch (e) {
       const reason = `could not read ${file}: ${e instanceof Error ? e.message : String(e)}`;
@@ -66,16 +90,33 @@ export async function applyMigration(plan: MigrationPlan, opts: { write: boolean
   }
 
   if (opts.write && changes.length > 0) {
-    const dirty = await uncommittedFiles(
-      plan.root,
-      changes.map((c) => c.file),
-    );
+    const files = changes.map((c) => c.file);
+    const dirty = await (opts.guard ?? uncommittedFiles)(plan.root, files);
     if (dirty.length > 0) {
       throw new Error(
         `Refusing to write: uncommitted changes in ${dirty.join(", ")}. Commit or stash them first (or run without --write for a dry run).`,
       );
     }
-    for (const c of changes) await writeFile(join(plan.root, c.file), c.after);
+    // Re-read right before writing: abort the whole batch if anything moved under us.
+    const moved: string[] = [];
+    for (const c of changes) {
+      const now = await readFile(join(plan.root, c.file), "utf8").catch(() => null);
+      if (now !== c.before) moved.push(c.file);
+    }
+    if (moved.length > 0) {
+      throw new Error(`${moved.join(", ")} changed since it was planned; nothing was written. Re-run kedgeway migrate.`);
+    }
+    const written: string[] = [];
+    for (const c of changes) {
+      try {
+        await writeAtomic(join(plan.root, c.file), c.after);
+        written.push(c.file);
+      } catch (e) {
+        throw new Error(
+          `Failed writing ${c.file}: ${e instanceof Error ? e.message : String(e)}. Already written: ${written.length > 0 ? written.join(", ") : "(none)"}.`,
+        );
+      }
+    }
   }
 
   return {

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, writeFile, rm, chmod } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, chmod, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -82,6 +82,17 @@ describe("scanRepo", () => {
     await put("a/b/c/d/e/Cargo.toml", `[dependencies]\nsoroban-sdk = "20.0.0"\n`); // depth 5 -> skipped
     const facts = await scanRepo(dir);
     expect(facts.rustDeps.map((d) => d.file)).toEqual(["a/b/c/d/Cargo.toml"]);
+  });
+
+  it("never plans through symlinked manifests", async () => {
+    await put("real/Cargo.toml", `[dependencies]\nsoroban-sdk = "21.0.0"\n`);
+    await symlink(join(dir, "real/Cargo.toml"), join(dir, "Cargo.toml"));
+    await mkdir(join(dir, "linked-dir-target"));
+    await put("linked-dir-target/package.json", JSON.stringify({ dependencies: { "stellar-sdk": "1.0.0" } }));
+    await symlink(join(dir, "linked-dir-target"), join(dir, "linked"));
+    const facts = await scanRepo(dir);
+    expect(facts.rustDeps.map((d) => d.file)).toEqual(["real/Cargo.toml"]);
+    expect(facts.jsDeps.map((d) => d.file)).toEqual(["linked-dir-target/package.json"]);
   });
 
   it("reports unparseable manifests instead of silently ignoring them", async () => {

@@ -28,7 +28,7 @@ afterEach(async () => {
 function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
   const out: string[] = [];
   const err: string[] = [];
-  const state = { loggedIn: 0, loggedOut: 0, mcpStarted: 0 };
+  const state = { loggedIn: 0, loggedOut: 0, mcpStarted: 0, allowWrite: false };
   const io: CliIo = {
     stdout: (s) => out.push(s),
     stderr: (s) => err.push(s),
@@ -37,8 +37,9 @@ function makeIo(port: EcosystemPort = new FakeEcosystem(snapshot)) {
       state.loggedIn += 1;
       return Promise.resolve();
     },
-    startMcp: () => {
+    startMcp: (opts) => {
       state.mcpStarted += 1;
+      state.allowWrite = opts.allowWrite;
       return Promise.resolve();
     },
     logout: () => {
@@ -150,6 +151,15 @@ describe("mcp", () => {
     expect(out.join("")).toBe(""); // stdout is reserved for the MCP protocol
   });
 
+  it("--allow-write is forwarded; default is off", async () => {
+    const off = makeIo();
+    await runCli(argv("mcp"), off.io);
+    expect(off.state.allowWrite).toBe(false);
+    const on = makeIo();
+    await runCli(argv("mcp", "--allow-write"), on.io);
+    expect(on.state.allowWrite).toBe(true);
+  });
+
   it("exits 1 when the server fails to start", async () => {
     const { io, err } = makeIo();
     io.startMcp = () => Promise.reject(new Error("nope"));
@@ -192,12 +202,21 @@ describe("migrate", () => {
     expect(out.join("")).toMatch(/nothing to migrate/i);
   });
 
-  it("exits 2 in dry-run when only manual steps exist", async () => {
+  it("exits 0 in dry-run when only manual steps exist, still printing them", async () => {
     await mkdir(join(dir, "c"), { recursive: true });
     await writeFile(join(dir, "c/Cargo.toml"), `[dependencies]\nsoroban-sdk = ">=21.0.0"\n`);
     const { io, out } = makeIo();
-    expect(await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io)).toBe(2);
-    expect(out.join("")).toMatch(/manual/i);
+    expect(await runCli(argv("migrate", dir, "--fixture", await fixtureFile()), io)).toBe(0);
+    expect(out.join("")).toMatch(/manual steps/i);
+  });
+
+  it("--write exits 2 when a step could not be applied", async () => {
+    await mkdir(join(dir, "c"), { recursive: true });
+    await writeFile(join(dir, "c/Cargo.toml"), `[dependencies]\nsoroban-sdk.version = "21.0.0"\n`);
+    const { io, out } = makeIo();
+    expect(await runCli(argv("migrate", dir, "--write", "--fixture", await fixtureFile()), io)).toBe(2);
+    expect(out.join("")).toMatch(/could not apply/i);
+    expect(await readFile(join(dir, "c/Cargo.toml"), "utf8")).toContain('"21.0.0"');
   });
 
   it("rejects --dry-run together with --write", async () => {

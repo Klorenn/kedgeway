@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -143,5 +143,55 @@ describe("git safety", () => {
     const r = await applyMigration(plan([rustStep]), { write: true });
     expect(r.written).toBe(true);
     expect(await get("Cargo.toml")).toContain("28.0.0");
+  });
+});
+
+describe("safe writes", () => {
+  it("aborts the whole batch, writing nothing, if a file changed after planning", async () => {
+    await put("a/Cargo.toml", cargo);
+    await put("b/Cargo.toml", cargo);
+    const stepA = { ...rustStep, file: "a/Cargo.toml" };
+    const stepB = { ...rustStep, file: "b/Cargo.toml" };
+    const guard = async (): Promise<string[]> => {
+      await writeFile(join(dir, "b/Cargo.toml"), `${cargo}# edited concurrently\n`);
+      return [];
+    };
+    await expect(applyMigration(plan([stepA, stepB]), { write: true, guard })).rejects.toThrow(
+      /b\/Cargo\.toml changed since.*nothing was written/is,
+    );
+    expect(await get("a/Cargo.toml")).toBe(cargo);
+    expect(await get("b/Cargo.toml")).toBe(`${cargo}# edited concurrently\n`);
+  });
+
+  it("preserves the file mode and leaves no temp files", async () => {
+    await put("Cargo.toml", cargo);
+    await chmod(join(dir, "Cargo.toml"), 0o640);
+    await applyMigration(plan([rustStep]), { write: true });
+    expect((await stat(join(dir, "Cargo.toml"))).mode & 0o777).toBe(0o640);
+    expect(await readdir(dir)).toEqual(["Cargo.toml"]);
+  });
+
+  it("reports already-written files when a later write fails", async () => {
+    await put("a/Cargo.toml", cargo);
+    await put("b/Cargo.toml", cargo);
+    await chmod(join(dir, "b"), 0o555); // temp file creation will fail
+    try {
+      await expect(
+        applyMigration(plan([{ ...rustStep, file: "a/Cargo.toml" }, { ...rustStep, file: "b/Cargo.toml" }]), { write: true }),
+      ).rejects.toThrow(/b\/Cargo\.toml.*already written.*a\/Cargo\.toml/is);
+    } finally {
+      await chmod(join(dir, "b"), 0o755);
+    }
+    expect(await get("a/Cargo.toml")).toContain("28.0.0");
+    expect(await get("b/Cargo.toml")).toBe(cargo);
+  });
+
+  it("never edits through a symlinked manifest", async () => {
+    await put("real/Cargo.toml", cargo);
+    await symlink(join(dir, "real/Cargo.toml"), join(dir, "Cargo.toml"));
+    const r = await applyMigration(plan([rustStep]), { write: true });
+    expect(r.changes).toEqual([]);
+    expect(r.skipped[0]?.reason).toMatch(/symlink/i);
+    expect(await get("real/Cargo.toml")).toBe(cargo);
   });
 });

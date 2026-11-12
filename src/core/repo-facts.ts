@@ -1,4 +1,3 @@
-import { posix } from "node:path";
 import { parse as parseToml } from "smol-toml";
 
 export interface DetectedDep {
@@ -64,6 +63,12 @@ export interface CargoManifest {
 }
 
 const DEP_TABLES = ["dependencies", "dev-dependencies", "build-dependencies"] as const;
+
+/** Tiny posix dirname for forward-slash relative paths ("." for top level). */
+function dirname(path: string): string {
+  const i = path.lastIndexOf("/");
+  return i === -1 ? "." : path.slice(0, i) || "/";
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -144,14 +149,14 @@ export function resolveRustDeps(
         out.push(toDep(dep.name, dep.raw, file));
         continue;
       }
-      const dir = posix.dirname(file);
+      const dir = dirname(file);
       const owner = withWs
         .filter((w) => {
-          const wdir = posix.dirname(w.file);
+          const wdir = dirname(w.file);
           return wdir === "." || dir === wdir || dir.startsWith(`${wdir}/`);
         })
         .filter((w) => dep.key in w.manifest.workspaceDeps)
-        .sort((a, b) => posix.dirname(b.file).length - posix.dirname(a.file).length)[0];
+        .sort((a, b) => dirname(b.file).length - dirname(a.file).length)[0];
       if (owner) {
         referenced.add(`${owner.file}::${dep.key}`);
         const resolved = toDep("soroban-sdk", owner.manifest.workspaceDeps[dep.key] ?? "", file);

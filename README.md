@@ -73,6 +73,8 @@ Raven is OAuth-protected. Each run tries stored credentials silently; only on a 
 | `1` | Tool error |
 | `2` | A finding met `--fail-on` |
 
+`kedgeway migrate` uses the same codes with these meanings: `0` nothing to do, only manual steps in a dry run, or edits applied cleanly; `2` a dry run has at least one automatic edit (so CI can gate), or `--write` could not apply some step (`skipped`); `1` error (including a refused write).
+
 ## Findings
 
 kedgeway detects `soroban-sdk` in every `Cargo.toml` (string and table forms, renamed deps, `[workspace.dependencies]`, `workspace = true`) and `@stellar/stellar-sdk`, `stellar-sdk`, `@stellar/stellar-base` and `soroban-client` in every `package.json`.
@@ -105,11 +107,11 @@ kedgeway migrate . --fixture snapshot.json
 Deliberately narrow and safe:
 
 - **Rust**: a deprecated or behind `soroban-sdk` is bumped to the exact current version (for example `28.0.0`). Only the quoted version string on that one line changes, so comments, `features` and formatting are untouched. `workspace = true` members are left alone and the workspace root is bumped instead. `=`, `~` and `^` prefixes are kept; other ranges (`>=`, `<`) become manual steps.
-- **JS**: `@stellar/stellar-sdk` is bumped to the current version, keeping `^` or `~` (exact pins stay exact). `@stellar/stellar-base` is a manual step because the snapshot has no current base version. `soroban-client` and unscoped `stellar-sdk` are replaced by `@stellar/stellar-sdk` at `^current`, plus a manual step listing `rg` patterns to update imports. `package.json` keeps key order and indentation.
+- **JS**: `@stellar/stellar-sdk` is bumped to the current version, keeping `^` or `~` (exact pins stay exact). `@stellar/stellar-base` is a manual step because the snapshot has no current base version. `soroban-client` and unscoped `stellar-sdk` are replaced by `@stellar/stellar-sdk` at `^current`, plus a manual step listing `rg` patterns to update imports. `package.json` is edited by replacing only the affected version (and, for legacy packages, key) spans, so every other byte of the file is preserved (indent, line endings, BOM, number formatting, escapes, key order, minified layout). Only plain versions are edited: `12.x`, `12 || 13`, `a - b` and comma ranges become manual steps. Deps declared in `peerDependencies`, `optionalDependencies`, `overrides` or `resolutions` are not edited.
 - **Manual steps** are listed with their reason; kedgeway never guesses.
 - It never runs `cargo` or `npm`. It prints the follow-up commands (`cargo update -p soroban-sdk`, `npm install`).
-- `--write` is refused if a file it would touch has uncommitted changes in git (skipped if git is not installed or the path is not in a repo).
-- Exit codes: `0` nothing to do or applied, `2` the plan has steps and this is a dry run (so CI can gate), `1` error.
+- `--write` is refused if a file it would touch has uncommitted changes in git. The check only passes silently when git is not installed or the path is not in a repository; any other git failure also refuses the write. Files are re-read right before writing (the whole batch aborts if one changed) and each file is replaced atomically with its mode preserved. Symlinked manifests are never planned or edited.
+- Exit codes: see the table above. A manual-only dry run exits `0` and prints the manual steps.
 
 Always review the diff and run your tests: a major bump can contain breaking API changes that kedgeway does not rewrite.
 
@@ -147,7 +149,7 @@ Claude Code (`.mcp.json`) or Cursor (`.cursor/mcp.json`):
 }
 ```
 
-The MCP server never starts an OAuth flow: without stored Raven credentials, live calls fail immediately with `Run "kedgeway login" first`. Run `kedgeway login` once in a terminal (or pass `fixture`). `diagnose`, `migrate` and `ecosystem_snapshot` read the `path` / `fixture` you give them from the local disk; `migrate` with `write: true` edits files there.
+The MCP server never starts an OAuth flow: without stored Raven credentials, live calls fail immediately with `Run "kedgeway login" first`. Run `kedgeway login` once in a terminal (or pass `fixture`). `diagnose`, `migrate` and `ecosystem_snapshot` read the `path` / `fixture` you give them from the local disk; `migrate` with `write: true` edits files there, but only if you started the server with `kedgeway mcp --allow-write`; without it `write: true` returns an error and dry runs still work. The `migrate` tool is annotated as destructive and non-read-only.
 
 ## GitHub Action
 

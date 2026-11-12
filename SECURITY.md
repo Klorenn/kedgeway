@@ -12,7 +12,7 @@ In scope:
 - **OAuth flow**: dynamic client registration, authorization code + PKCE, the local callback server on `127.0.0.1`, state and redirect handling.
 - **Repo scanning**: path traversal, symlink handling, unsafe parsing of `Cargo.toml` / `package.json`, or any way a scanned repository can make kedgeway execute code or read outside the scanned path.
 
-Note on the MCP server (`kedgeway mcp`): its tools take a `path` and `fixture` and read those local paths (and, for `migrate` with `write: true`, edit manifests there) by design. It is a local stdio tool run by the user's own assistant, not a network service; do not expose it to untrusted callers.
+Note on the MCP server (`kedgeway mcp`): its tools take a `path` and `fixture` and read those local paths (and, for `migrate` with `write: true`, edit manifests there) by design. Writing is disabled unless the server is started with `--allow-write`. It is a local stdio tool run by the user's own assistant, not a network service; do not expose it to untrusted callers.
 
 Out of scope: vulnerabilities in Stellar Raven itself or in third-party dependencies (report those upstream), and issues requiring a machine that is already compromised.
 

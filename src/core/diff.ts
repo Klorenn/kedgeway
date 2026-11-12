@@ -1,13 +1,20 @@
 type Op = { kind: " " | "-" | "+"; text: string };
 
+const NO_EOL = "\u0000";
+
+/** Splits into line tokens; a final line without "\n" is suffixed with NO_EOL so it never equals a terminated one. */
 function lines(text: string): string[] {
   if (text === "") return [];
   const parts = text.split("\n");
-  if (parts[parts.length - 1] === "") parts.pop();
+  if (parts[parts.length - 1] === "") {
+    parts.pop();
+  } else {
+    parts[parts.length - 1] += NO_EOL;
+  }
   return parts;
 }
 
-function diffOps(a: string[], b: string[]): Op[] {
+function lcsOps(a: string[], b: string[]): Op[] {
   const n = a.length;
   const m = b.length;
   const lcs: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
@@ -36,6 +43,22 @@ function diffOps(a: string[], b: string[]): Op[] {
   while (i < n) ops.push({ kind: "-", text: a[i++] as string });
   while (j < m) ops.push({ kind: "+", text: b[j++] as string });
   return ops;
+}
+
+function diffOps(a: string[], b: string[]): Op[] {
+  let prefix = 0;
+  while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix += 1;
+  let suffix = 0;
+  while (
+    suffix < a.length - prefix &&
+    suffix < b.length - prefix &&
+    a[a.length - 1 - suffix] === b[b.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  const head = a.slice(0, prefix).map((text): Op => ({ kind: " ", text }));
+  const tail = a.slice(a.length - suffix).map((text): Op => ({ kind: " ", text }));
+  return [...head, ...lcsOps(a.slice(prefix, a.length - suffix), b.slice(prefix, b.length - suffix)), ...tail];
 }
 
 /** Minimal unified diff (3 lines of context). Returns "" when there is no change. */
@@ -70,7 +93,8 @@ export function unifiedDiff(path: string, before: string, after: string, context
       const op = ops[k] as Op;
       if (op.kind !== "+") oldLen += 1;
       if (op.kind !== "-") newLen += 1;
-      body.push(`${op.kind}${op.text}`);
+      if (op.text.endsWith(NO_EOL)) body.push(`${op.kind}${op.text.slice(0, -1)}`, "\\ No newline at end of file");
+      else body.push(`${op.kind}${op.text}`);
     }
     out.push(`@@ -${oldStart},${oldLen} +${newStart},${newLen} @@`, ...body);
   }

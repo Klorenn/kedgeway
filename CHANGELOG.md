@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Changed
 
+- `migrate` hardening: git guard never fails open (only "git missing" or "not a repository" count as no repo; `-z` parsing, timeout, scrubbed `GIT_DIR`); writes re-read files first, abort the batch on any change, and use atomic same-directory renames preserving mode; symlinked manifests are never edited.
+- `package.json` edits now replace only the affected spans instead of re-serialising the file (byte-exact elsewhere, including BOM, minified layout and big numbers).
+- Only plain versions are bumped; ranges like `12.x`, `12 || 13` or `a, <b` become manual steps.
+- `kedgeway migrate` exit codes: manual-only dry run exits 0; `--write` with a skipped step exits 2.
+- MCP `migrate` is annotated destructive and `write: true` requires `kedgeway mcp --allow-write`.
+- Build cleans `dist` first and no longer emits declaration maps; `check-dist` resolves relative to the script and rejects leaked test files.
+- Core no longer imports `node:path`; the diff trims common prefix/suffix and marks missing trailing newlines.
 - `tsconfig.build.json` emits declarations; `prepublishOnly` runs `scripts/check-dist.mjs` to verify `dist/index.d.ts` exists.
 - The GitHub Action runs `diagnose` once through `scripts/action-run.sh`, always writes its outputs, then exits with the CLI's code.
 - `kedgeway mcp` stays alive until the transport closes, reports the package version, and never starts OAuth: without stored credentials live tools fail with `Run "kedgeway login" first`.

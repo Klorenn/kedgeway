@@ -11,6 +11,7 @@ const code = await runCli(process.argv, {
   createRavenPort: () => new RavenEcosystem(),
   login: () => loginToRaven(),
   logout: () => new AuthStore().clear(),
-  startMcp: () => runStdioServer({ ecosystem: createRavenEcosystem({ interactive: false }) }),
+  startMcp: ({ allowWrite }) =>
+    runStdioServer({ ecosystem: createRavenEcosystem({ interactive: false }), allowWrite }),
 });
 process.exitCode = code; // let stdout drain; do not call process.exit()

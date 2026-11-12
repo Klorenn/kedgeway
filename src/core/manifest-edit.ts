@@ -23,7 +23,7 @@ function splitLines(text: string): string[] {
 export function bumpCargoDep(text: string, from: string, to: string): { text: string; count: number } {
   const lines = splitLines(text);
   const fromRe = escapeRegExp(from);
-  const inlineVersion = new RegExp(`(\\bversion\\s*=\\s*")${fromRe}(")`);
+  const inlineVersion = new RegExp(`((?<![\\w-])version\\s*=\\s*")${fromRe}(")`);
   let count = 0;
 
   // Pass 1: find sub-table sections ([dependencies.<key>]) and decide per section.
@@ -95,52 +95,167 @@ export interface JsonEditResult {
   skipped: { step: MigrationStep; reason: string }[];
 }
 
-const DEP_SECTIONS = ["dependencies", "devDependencies"] as const;
+// ---- minimal span-preserving JSON scanner (input must already be valid JSON) ----
 
-/** Applies bump-js-dep / replace-legacy-package steps, preserving key order, indent and EOL style. */
+interface Member {
+  key: string;
+  keyStart: number;
+  keyEnd: number;
+  valStart: number;
+  valEnd: number;
+  /** Present when the value is an object. */
+  members?: Member[];
+}
+
+class Scanner {
+  constructor(private readonly t: string) {}
+
+  private ws(i: number): number {
+    while (i < this.t.length && " \t\r\n".includes(this.t[i] as string)) i += 1;
+    return i;
+  }
+
+  private str(i: number): number {
+    let j = i + 1;
+    while (this.t[j] !== '"') j += this.t[j] === "\\" ? 2 : 1;
+    return j + 1;
+  }
+
+  /** Scans a value starting at i (after whitespace); returns its end and, for objects, members. */
+  private value(i: number): { end: number; members?: Member[] } {
+    const c = this.t[i];
+    if (c === '"') return { end: this.str(i) };
+    if (c === "{") return this.object(i);
+    if (c === "[") {
+      let j = this.ws(i + 1);
+      if (this.t[j] === "]") return { end: j + 1 };
+      for (;;) {
+        j = this.ws(this.value(j).end);
+        if (this.t[j] === ",") j = this.ws(j + 1);
+        else return { end: j + 1 };
+      }
+    }
+    let j = i;
+    while (j < this.t.length && !",}] \t\r\n".includes(this.t[j] as string)) j += 1;
+    return { end: j };
+  }
+
+  object(i: number): { end: number; members: Member[] } {
+    const members: Member[] = [];
+    let j = this.ws(i + 1);
+    if (this.t[j] === "}") return { end: j + 1, members };
+    for (;;) {
+      const keyStart = j;
+      const keyEnd = this.str(j);
+      j = this.ws(keyEnd);
+      j = this.ws(j + 1); // ':'
+      const v = this.value(j);
+      members.push({
+        key: JSON.parse(this.t.slice(keyStart, keyEnd)) as string,
+        keyStart,
+        keyEnd,
+        valStart: j,
+        valEnd: v.end,
+        ...(v.members ? { members: v.members } : {}),
+      });
+      j = this.ws(v.end);
+      if (this.t[j] === ",") j = this.ws(j + 1);
+      else return { end: j + 1, members };
+    }
+  }
+
+  root(): Member[] | null {
+    const i = this.ws(this.t.startsWith("﻿") ? 1 : 0);
+    return this.t[i] === "{" ? this.object(i).members : null;
+  }
+}
+
+interface Edit {
+  start: number;
+  end: number;
+  text: string;
+}
+
+const DEP_SECTIONS = ["dependencies", "devDependencies"] as const;
+const OTHER_SECTIONS = ["peerDependencies", "optionalDependencies", "overrides", "resolutions"] as const;
+
+function stringValue(text: string, m: Member): string | null {
+  const raw = text.slice(m.valStart, m.valEnd);
+  if (!raw.startsWith('"')) return null;
+  return JSON.parse(raw) as string;
+}
+
+function editsForStep(text: string, root: Member[], step: MigrationStep): Edit[] {
+  const edits: Edit[] = [];
+  for (const section of root.filter((m) => (DEP_SECTIONS as readonly string[]).includes(m.key) && m.members)) {
+    const members = section.members as Member[];
+    for (const [idx, m] of members.entries()) {
+      if (m.key !== step.dependency || stringValue(text, m) !== step.from) continue;
+      if (step.kind === "bump-js-dep") {
+        edits.push({ start: m.valStart, end: m.valEnd, text: JSON.stringify(step.to) });
+      } else if (step.kind === "replace-legacy-package" && step.replacement) {
+        const exists = members.some((o) => o.key === step.replacement);
+        if (!exists) {
+          edits.push({ start: m.keyStart, end: m.keyEnd, text: JSON.stringify(step.replacement) });
+          edits.push({ start: m.valStart, end: m.valEnd, text: JSON.stringify(step.to) });
+        } else if (idx < members.length - 1) {
+          edits.push({ start: m.keyStart, end: (members[idx + 1] as Member).keyStart, text: "" });
+        } else if (idx > 0) {
+          edits.push({ start: (members[idx - 1] as Member).valEnd, end: m.valEnd, text: "" });
+        } else {
+          edits.push({ start: m.keyStart, end: m.valEnd, text: "" });
+        }
+      }
+    }
+  }
+  return edits;
+}
+
+function declaredElsewhere(text: string, root: Member[], dependency: string): string | null {
+  for (const section of root) {
+    if (!(OTHER_SECTIONS as readonly string[]).includes(section.key)) continue;
+    if (section.members?.some((m) => m.key === dependency)) return section.key;
+  }
+  return null;
+}
+
+/**
+ * Applies bump-js-dep / replace-legacy-package steps by editing only the affected spans of the
+ * original text. Everything else (indent, EOLs, BOM, number formatting, escapes, key order,
+ * minification) is preserved byte for byte.
+ */
 export function editPackageJson(text: string, steps: MigrationStep[]): JsonEditResult {
-  let doc: unknown;
   try {
-    doc = JSON.parse(text);
+    JSON.parse(text.replace(/^﻿/, ""));
   } catch (e) {
     const reason = `could not parse package.json: ${e instanceof Error ? e.message : String(e)}`;
     return { text, applied: [], skipped: steps.map((step) => ({ step, reason })) };
   }
-  if (typeof doc !== "object" || doc === null || Array.isArray(doc)) {
-    return { text, applied: [], skipped: steps.map((step) => ({ step, reason: "could not parse package.json: not an object" })) };
-  }
-  const root = doc as Record<string, unknown>;
+  let current = text;
   const applied: MigrationStep[] = [];
   const skipped: JsonEditResult["skipped"] = [];
 
   for (const step of steps) {
-    let hit = false;
-    for (const section of DEP_SECTIONS) {
-      const table = root[section];
-      if (typeof table !== "object" || table === null || Array.isArray(table)) continue;
-      const deps = table as Record<string, unknown>;
-      if (deps[step.dependency] !== step.from) continue;
-      hit = true;
-      if (step.kind === "bump-js-dep") {
-        deps[step.dependency] = step.to;
-      } else if (step.kind === "replace-legacy-package" && step.replacement) {
-        const replacement = step.replacement;
-        const exists = replacement in deps;
-        const entries = Object.entries(deps).flatMap(([k, v]): [string, unknown][] =>
-          k === step.dependency ? (exists ? [] : [[replacement, step.to]]) : [[k, v]],
-        );
-        root[section] = Object.fromEntries(entries);
-      }
+    const root = new Scanner(current).root();
+    if (!root) {
+      skipped.push({ step, reason: "could not parse package.json: not an object" });
+      continue;
     }
-    if (hit) applied.push(step);
-    else skipped.push({ step, reason: `${step.dependency} ${step.from} not found (file changed since the plan?)` });
+    const edits = editsForStep(current, root, step);
+    if (edits.length === 0) {
+      const other = declaredElsewhere(current, root, step.dependency);
+      skipped.push({
+        step,
+        reason: other
+          ? `${step.dependency} is declared outside dependencies/devDependencies (in ${other}); edit manually`
+          : `${step.dependency} ${step.from} not found (file changed since the plan?)`,
+      });
+      continue;
+    }
+    for (const e of edits.sort((a, b) => b.start - a.start)) {
+      current = current.slice(0, e.start) + e.text + current.slice(e.end);
+    }
+    applied.push(step);
   }
-
-  if (applied.length === 0) return { text, applied, skipped };
-
-  const indent = /^([ \t]+)"/m.exec(text)?.[1] ?? "  ";
-  let next = JSON.stringify(root, null, indent);
-  if (text.endsWith("\n")) next += "\n";
-  if (text.includes("\r\n")) next = next.replace(/\r?\n/g, "\r\n");
-  return { text: next, applied, skipped };
+  return { text: current, applied, skipped };
 }

@@ -98,6 +98,14 @@ describe("kedgeway MCP server", () => {
   });
 });
 
+async function connectWith(opts: Parameters<typeof createKedgewayServer>[0]): Promise<Client> {
+  const server = createKedgewayServer(opts);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  const c = new Client({ name: "t", version: "0" });
+  await Promise.all([server.connect(a), c.connect(b)]);
+  return c;
+}
+
 describe("migrate tool", () => {
   it("dry-run returns a summary, the plan JSON and the diff, without writing", async () => {
     const res = await client.callTool({ name: "migrate", arguments: { path: join(dir, "repo"), fixture } });
@@ -110,8 +118,29 @@ describe("migrate tool", () => {
     expect(await readFile(join(dir, "repo/Cargo.toml"), "utf8")).toContain('"21.0.0"');
   });
 
-  it("write: true applies the edits", async () => {
+  it("declares destructive, non-read-only, non-idempotent annotations; the rest are read-only", async () => {
+    const { tools } = await client.listTools();
+    expect(tools.find((t) => t.name === "migrate")?.annotations).toMatchObject({
+      destructiveHint: true,
+      readOnlyHint: false,
+      idempotentHint: false,
+    });
+    for (const name of ["diagnose", "findings_reference", "ecosystem_snapshot"]) {
+      expect(tools.find((t) => t.name === name)?.annotations?.readOnlyHint).toBe(true);
+    }
+  });
+
+  it("write: true is refused unless the server was started with allowWrite", async () => {
     const res = await client.callTool({ name: "migrate", arguments: { path: join(dir, "repo"), fixture, write: true } });
+    expect(res.isError).toBe(true);
+    expect(texts(res)[0]).toContain("--allow-write");
+    expect(await readFile(join(dir, "repo/Cargo.toml"), "utf8")).toContain('"21.0.0"');
+  });
+
+  it("write: true applies the edits when allowWrite is on", async () => {
+    const writer = await connectWith({ allowWrite: true });
+    const res = await writer.callTool({ name: "migrate", arguments: { path: join(dir, "repo"), fixture, write: true } });
+    await writer.close();
     expect(res.isError).not.toBe(true);
     expect(texts(res)[0]).toMatch(/updated 1 file/i);
     expect(await readFile(join(dir, "repo/Cargo.toml"), "utf8")).toContain('"28.0.0"');

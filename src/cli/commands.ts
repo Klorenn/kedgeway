@@ -11,7 +11,7 @@ export interface CliIo {
   login: () => Promise<void>;
   logout: () => Promise<boolean>;
   /** Runs the stdio MCP server until the client disconnects. */
-  startMcp: () => Promise<void>;
+  startMcp: (opts: { allowWrite: boolean }) => Promise<void>;
 }
 
 interface DiagnoseOptions {
@@ -115,7 +115,8 @@ async function runMigrate(path: string, opts: MigrateOptions, io: CliIo): Promis
       ...(opts.fixture ? { fixture: opts.fixture } : { ecosystem: io.createRavenPort() }),
     });
     io.stdout(formatMigration(outcome, write));
-    return !write && outcome.plan.steps.length > 0 ? 2 : 0;
+    if (write) return outcome.result.skipped.length > 0 ? 2 : 0;
+    return outcome.plan.steps.some((s) => s.kind !== "manual") ? 2 : 0;
   } catch (e) {
     io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
     return 1;
@@ -167,9 +168,10 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   program
     .command("mcp")
     .description("Run the kedgeway MCP server over stdio")
-    .action(async () => {
+    .option("--allow-write", "let the migrate tool edit files (off by default)")
+    .action(async (opts: { allowWrite?: boolean }) => {
       try {
-        await io.startMcp();
+        await io.startMcp({ allowWrite: opts.allowWrite === true });
       } catch (e) {
         io.stderr(`kedgeway: ${e instanceof Error ? e.message : String(e)}\n`);
         exitCode = 1;

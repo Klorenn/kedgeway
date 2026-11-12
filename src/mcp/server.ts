@@ -11,6 +11,8 @@ import { diagnoseDetailed, migrate, resolveEcosystem } from "../sdk.js";
 export interface KedgewayServerOptions {
   /** Ecosystem used when a tool call has no fixture. Defaults to live Raven. */
   ecosystem?: EcosystemPort;
+  /** Allow `migrate` with write=true to edit files. Off by default (`kedgeway mcp --allow-write`). */
+  allowWrite?: boolean;
 }
 
 const version = (createRequire(import.meta.url)("../../package.json") as { version: string }).version;
@@ -47,6 +49,7 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
         fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
         failOn: SeveritySchema.optional().describe("Report whether any finding is at or above this severity"),
       },
+      annotations: { readOnlyHint: true },
     },
     async ({ path, fixture, failOn }) => {
       try {
@@ -60,7 +63,10 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
 
   server.registerTool(
     "findings_reference",
-    { description: "List every finding code kedgeway can emit, with its severity and meaning." },
+    {
+      description: "List every finding code kedgeway can emit, with its severity, meaning and migration behaviour.",
+      annotations: { readOnlyHint: true },
+    },
     () => text(JSON.stringify(FINDINGS_REFERENCE, null, 2)),
   );
 
@@ -69,6 +75,7 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
     {
       description: "Return the ecosystem snapshot (current SDK versions, protocol, deprecated sample), live via Raven unless a fixture is given.",
       inputSchema: { fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)") },
+      annotations: { readOnlyHint: true },
     },
     async ({ fixture }) => {
       try {
@@ -84,14 +91,18 @@ export function createKedgewayServer(opts: KedgewayServerOptions = {}): McpServe
     "migrate",
     {
       description:
-        "Plan SDK version bumps for a Stellar/Soroban repo (experimental). Dry run by default: returns a summary, the plan JSON and a unified diff. With write=true it edits the manifests (refused if they have uncommitted git changes). Never runs cargo or npm.",
+        "Plan SDK version bumps for a Stellar/Soroban repo (experimental). Dry run by default: returns a summary, the plan JSON and a unified diff. With write=true (only if the server runs with --allow-write) it edits the manifests, refusing if they have uncommitted git changes. Never runs cargo or npm.",
       inputSchema: {
         path: z.string().describe("Directory of the repository"),
         fixture: z.string().optional().describe("Path to an ecosystem snapshot JSON (offline mode)"),
-        write: z.boolean().optional().default(false).describe("Apply the edits (default false: dry run)"),
+        write: z.boolean().optional().default(false).describe("Apply the edits (default false: dry run). Requires the server to be started with --allow-write."),
       },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ path, fixture, write }) => {
+      if (write && opts.allowWrite !== true) {
+        return failure(new Error("write is disabled. Restart the server with `kedgeway mcp --allow-write` to let migrate edit files (dry run still works)."));
+      }
       try {
         const { plan, result } = await migrate({ path, write, ...ecosystemFor(fixture) });
         const edits = plan.steps.filter((s) => s.kind !== "manual").length;

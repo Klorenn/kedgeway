@@ -28,8 +28,11 @@ export interface MigrationPlan {
 
 const LEGACY_REPLACEMENT = "@stellar/stellar-sdk";
 
+const PLAIN_VERSION = /^(\^|~|=|>=)?\d+(\.\d+){0,2}(-[0-9A-Za-z.-]+)?$/;
+
+/** Returns the range prefix when `raw` is one plain version (no ranges, wildcards, `||`, `-`), else null. */
 function prefixOf(raw: string, allowed: string): string | null {
-  const m = /^([^\d\s]*)\s*\d/.exec(raw.trim());
+  const m = PLAIN_VERSION.exec(raw);
   if (!m) return null;
   const p = m[1] ?? "";
   return p === "" || allowed.includes(p) ? p : null;

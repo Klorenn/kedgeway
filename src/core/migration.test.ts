@@ -162,3 +162,26 @@ describe("planMigration: misc", () => {
     expect(planMigration(facts([]), snap())).toEqual({ root: "/r", steps: [], followUp: [] });
   });
 });
+
+describe("planMigration: only plain versions are edited", () => {
+  it.each(["12.x", "12 || 13", "12.0.0, <13", "12 - 13", "^12 || ^13", "12.*"])("JS range %s becomes a manual step", (raw) => {
+    const plan = planMigration(facts([], [dep("@stellar/stellar-sdk", raw, "package.json")]), snap());
+    expect(plan.steps.map((s) => s.kind)).toEqual(["manual"]);
+  });
+
+  it.each(["21.x", "21.0.0, <22", "21 || 22", "21.*"])("Rust range %s becomes a manual step", (raw) => {
+    const plan = planMigration(facts([dep("soroban-sdk", raw, "Cargo.toml")]), snap());
+    expect(plan.steps.map((s) => s.kind)).toEqual(["manual"]);
+  });
+
+  it("still edits plain versions with prerelease tags and short forms", () => {
+    const plan = planMigration(
+      facts([dep("soroban-sdk", "21", "a/Cargo.toml"), dep("soroban-sdk", "21.0.0-rc.1", "b/Cargo.toml")]),
+      snap(),
+    );
+    expect(plan.steps.map((s) => [s.kind, s.to])).toEqual([
+      ["bump-rust-dep", "28.0.0"],
+      ["bump-rust-dep", "28.0.0"],
+    ]);
+  });
+});
