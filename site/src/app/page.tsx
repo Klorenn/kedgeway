@@ -282,7 +282,7 @@ export default function Home() {
             <Button variant="link" href="/docs">Read the docs →</Button>
           </div>
           <div className={styles.clone}>
-            <CodeBlock label="Clone" code="git clone https://github.com/Klorenn/kedgeway" />
+            <CodeBlock label="Install" code="npm install -g kedgeway" />
           </div>
         </div>
       </section>

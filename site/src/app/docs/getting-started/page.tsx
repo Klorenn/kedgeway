@@ -11,7 +11,7 @@ export default function GettingStarted() {
   return (
     <>
       <h1>Getting started</h1>
-      <p className={styles.lede}>Five minutes from clone to your first report. You need Node.js 22.12 or newer.</p>
+      <p className={styles.lede}>Five minutes from install to your first report. You need Node.js 22.12 or newer.</p>
 
       <h2>Install</h2>
       <p>Install the CLI. It needs Node.js 22.12 or newer.</p>

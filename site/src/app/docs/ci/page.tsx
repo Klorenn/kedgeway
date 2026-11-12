@@ -32,7 +32,7 @@ export default function Ci() {
       <p>Prefer no secret at all? Run offline against a saved snapshot with <code>--fixture</code> and refresh it by hand. See <Link href="/docs/fixtures">Fixtures</Link>. The action needs one of the two: <code>auth</code> or <code>fixture</code>.</p>
 
       <h2>GitHub Actions example</h2>
-      <p>kedgeway is not on npm. This job clones <code>Klorenn/kedgeway</code>, builds it, and checks the repo against a committed fixture. For the maintained action, see <Link href="/docs/github-action">GitHub Action</Link>.</p>
+      <p>Install the published CLI and check the repo against a committed fixture. For the maintained action, see <Link href="/docs/github-action">GitHub Action</Link>.</p>
       <CodeBlock label="yaml" code={`name: kedgeway
 on: [push, pull_request]
 jobs:
@@ -43,9 +43,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: |
-          git clone https://github.com/Klorenn/kedgeway /tmp/kedgeway
-          (cd /tmp/kedgeway && npm ci && npm run build && npm link)
+      - run: npm install -g kedgeway
       - run: kedgeway diagnose . --fail-on warning --fixture snapshot.json`} />
       <p>The diagnose step exits 2 when a warning or critical finding exists, and 1 on a tool error. Commit <code>snapshot.json</code> next to the workflow, or drop <code>--fixture</code> and set <code>KEDGEWAY_AUTH</code> in the step environment for live data.</p>
       <PrevNext href="/docs/ci" />
